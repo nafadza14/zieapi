@@ -1,0 +1,1 @@
+{"base":"https://tf689y3hbj.execute-api.us-east-1.amazonaws.com/prod/authorization","auth":{"t":"key","in":"query","name":"token"},"ops":[["get-search","GET","/search","List all company ESG Ratings",[["q","string",1,"q",{"x":"Company name or stock symbol"}]],0]]}

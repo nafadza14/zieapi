@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v2","auth":null,"ops":[["get-sentiments-by-hotel-ids","GET","/e-reputation/hotel-sentiments","Get sentiments by Amadeus Hotel Ids",[["hotelIds","array",1,"q",{"x":"Comma-separated list of Amadeus Hotel Ids (max. 3) . Amadeus Hotel Ids are found in the Hotel Search response (parameter name is 'hotelId')."}]],0]]}

@@ -1,0 +1,1 @@
+{"base":"https://pal-test.adyen.com/pal/services/TestCard/v1","auth":{"t":"key","in":"header","name":"X-API-Key"},"ops":[["post-create-test-card-ranges","POST","/createTestCardRanges","Creates one or more test card ranges.",[],1]]}

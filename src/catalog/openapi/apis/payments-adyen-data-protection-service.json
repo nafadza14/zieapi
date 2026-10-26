@@ -1,0 +1,1 @@
+{"base":"https://ca-test.adyen.com/ca/services/DataProtectionService/v1","auth":{"t":"key","in":"header","name":"X-API-Key"},"ops":[["post-request-subject-erasure","POST","/requestSubjectErasure","Submit a Subject Erasure Request.",[],1]]}

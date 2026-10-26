@@ -1,0 +1,1 @@
+{"base":"https://api.mastercard.com/billpayAPI/v1","auth":null,"ops":[["post-is-routing-valid","POST","/isRoutingValid","Bill Payment Validator service returns the processing status for a potential RPPS transaction",[],0]]}

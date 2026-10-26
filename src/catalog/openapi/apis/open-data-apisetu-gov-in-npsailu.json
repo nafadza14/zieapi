@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/npsailu/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["ndcer","POST","/ndcer/certificate","No Dues/ Objection Certificate",[],1]]}

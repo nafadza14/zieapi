@@ -1,0 +1,1 @@
+{"base":"https://trips.furkot.com/pub/api","auth":{"t":"bearer"},"ops":[["get-trip","GET","/trip","list user's trips",[],0],["get-trip-trip-id-stop","GET","/trip/{trip_id}/stop","list stops for a trip identified by {trip_id}",[["trip_id","string",1,"p",{"x":"id of the trip"}]],0]]}

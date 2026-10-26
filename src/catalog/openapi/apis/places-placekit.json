@@ -1,0 +1,1 @@
+{"base":"https://api.placekit.co","auth":{"t":"key","in":"header","name":"x-placekit-api-key"},"ops":[["reverse","POST","/reverse","Reverse geocoding",[],1],["search","POST","/search","Search for addresses",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://polls.apiblueprint.org","auth":null,"ops":[["list-all-questions","GET","/questions","List All Questions",[],0],["create-a-new-question","POST","/questions","Create a New Question",[],1]]}

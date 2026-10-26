@@ -1,0 +1,1 @@
+{"base":"https://workbcjobs.api.gov.bc.ca/v1","auth":null,"ops":[["get-industries","GET","/Industries","Industries",[],0],["get-job-types","GET","/jobTypes","Job Types",[],0],["post-jobs","POST","/jobs","Job Feed",[],1],["get-major-projects","GET","/majorProjects","Major Projects",[],0],["get-regions","GET","/regions","Regions",[],0]]}

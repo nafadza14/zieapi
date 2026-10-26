@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/ktech/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["cocer","POST","/cocer/certificate","Company Related Certificate",[],1],["rfcer","POST","/rfcer/certificate","Registration Certificate of Firm/ Company",[],1]]}

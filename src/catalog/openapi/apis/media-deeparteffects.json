@@ -1,0 +1,1 @@
+{"base":"https://api.deeparteffects.com/v1","auth":{"t":"key","in":"header","name":"x-api-key"},"ops":[["get-noauth-result","GET","/noauth/result","GET /noauth/result",[["submissionId","string",0,"q"]],0],["get-noauth-styles","GET","/noauth/styles","GET /noauth/styles",[],0],["post-noauth-upload","POST","/noauth/upload","POST /noauth/upload",[],2]]}

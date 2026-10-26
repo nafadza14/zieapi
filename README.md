@@ -17,7 +17,8 @@ zieapi is a complete, self-hostable public-data API platform with zero runtime d
 - **Admin panel:** users and plans, invoice approval, scraper on/off switches, reports and showcase moderation.
 - **API:** `GET|POST /v1/{category}:{scraper}/{endpoint}` with one envelope, plans and quotas, per-minute rate limits, caching, bulk jobs with idempotency, OpenAPI files and `llms.txt`.
 - **MCP server** at `/mcp` with 8 tools for AI agents.
-- **Catalog:** 296 scrapers and 1,271 endpoints across 24 categories, of which **92 scrapers / 333 endpoints are live**, all built on official public APIs, open data or publisher RSS feeds. The rest are listed as *planned*, or served by an optional upstream adapter.
+- **Global APIs:** 1,383 global APIs with 38,807 endpoints imported from the [APIs.guru OpenAPI Directory](https://github.com/APIs-guru/openapi-directory) (GitHub, Stripe, Twilio, Spotify, Slack, NASA and more). 380 need no key; the rest run with the caller's own provider key (`x-upstream-key`, never stored). See `/docs/byok` and `docs/COMPETITORS.md`.
+- **Native catalog:** 296 scrapers and 1,271 endpoints across 24 categories, of which **92 scrapers / 333 endpoints are live**, all built on official public APIs, open data or publisher RSS feeds. The rest are listed as *planned*, or served by an optional upstream adapter.
 
 The architecture and API contract come from an evidence-backed reverse-engineering study of zapi.ink, done with the [REA](https://github.com/morluto/rea) methodology. See [`docs/REA-REPORT.md`](docs/REA-REPORT.md) (Bahasa Indonesia) and [`docs/evidence/`](docs/evidence). No zapi code, scraper internals, branding or copy is reused. The catalog *structure* (sources, endpoint names, parameter schemas) was imported from their public OpenAPI index, with the circumvention category (Bypass Tools) removed.
 
@@ -89,6 +90,15 @@ Plans, in Rupiah, are defined in `src/core/plans.js`:
 ## Adding scrapers
 
 Copy `src/scrapers/_template.js` into `src/scrapers/live/` and register it in `src/scrapers/index.js`. A live module with the same `category:slug` as a catalog entry replaces its planned endpoints. Helpers in `src/scrapers/kit.js` (`getJson`, `feed`, `url`, `ScraperError`, `requireEnv`, …) keep handlers small. Use official APIs or open data only.
+
+## Refreshing the global API directory
+
+```bash
+npm i --no-save openapi-directory
+node scripts/import-openapi.js node_modules/openapi-directory/api
+```
+
+Operators may set shared provider keys with `ZIE_UPSTREAM_KEY_<CATEGORY>_<SLUG>` (for example `ZIE_UPSTREAM_KEY_FINANCE_STRIPE`). A caller's own `x-upstream-key` always wins.
 
 ## Project layout
 

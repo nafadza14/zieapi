@@ -1,0 +1,1 @@
+{"base":"https://1forge.com/forex-quotes","auth":null,"ops":[["get-quotes","GET","/quotes","Get quotes for all symbols",[],0],["get-symbols","GET","/symbols","Get a list of symbols for which we provide real-time quotes",[],0]]}

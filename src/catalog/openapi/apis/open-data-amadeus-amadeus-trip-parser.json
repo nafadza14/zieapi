@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v3","auth":null,"ops":[["post-trip-parser-request","POST","/travel/trip-parser","POST Trip Parser request",[],1]]}

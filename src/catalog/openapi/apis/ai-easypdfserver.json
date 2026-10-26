@@ -1,0 +1,1 @@
+{"base":"https://api.easypdfserver.com","auth":null,"ops":[["post-make-pdf","POST","/make-pdf","Generate a PDF from HTML or URL.",[],2]]}

@@ -5,7 +5,7 @@ import { E, HttpError, okRun, nowIso } from "./envelope.js";
 import { maxPlan, planAllows, getPlan } from "./plans.js";
 import { pathFieldNames } from "./catalog.js";
 import { validateParams } from "./validate.js";
-import { stableStringify, dayKey } from "./util.js";
+import { stableStringify, dayKey, sha256 } from "./util.js";
 import { ScraperError, NotConfiguredError } from "./errors.js";
 
 export { ScraperError, NotConfiguredError };
@@ -26,11 +26,12 @@ export class Executor {
    * caller = { owner, plan, keyId, keyPreview, ip, source:"rest"|"mcp"|"bulk"|"playground" }
    * Returns {status, body, headers}; never throws for HTTP-level failures.
    */
-  async run({ caller, projectKey, endpointSlug, method, params = {}, pathRest, reserved = false, signal }) {
+  async run({ caller, projectKey, endpointSlug, method, params = {}, pathRest, reserved = false, signal, upstreamAuth = null }) {
     const t0 = Date.now();
     let ticket = null;
     const headers = {};
     let scraper = null;
+    upstreamAuth = upstreamAuth ?? caller.upstreamAuth ?? null;
     try {
       const r = this.catalog.resolve(projectKey, endpointSlug);
       scraper = r.scraper;
@@ -65,7 +66,9 @@ export class Executor {
       if (errors.length) throw E.invalidParams(errors);
 
       const { readTtl, writeTtl } = effectiveTtl(endpoint.cacheTtl, requestedTtl, getPlan(caller.plan).minCacheTtl);
-      const cacheKey = `cache:${scraper.key}/${endpoint.slug}?${stableStringify(value)}`;
+      // Never share cached responses fetched with someone's own upstream credentials.
+      const authTag = upstreamAuth && (upstreamAuth.key || upstreamAuth.authorization) ? `#${caller.owner}:${sha256(JSON.stringify(upstreamAuth)).slice(0, 16)}` : "";
+      const cacheKey = `cache:${scraper.key}/${endpoint.slug}?${stableStringify(value)}${authTag}`;
       let data;
       const cached = readTtl > 0 ? await this._cacheGet(cacheKey) : null;
       if (cached && Date.now() - cached.at <= readTtl * 1000) {
@@ -74,7 +77,7 @@ export class Executor {
         headers["Age"] = String(Math.floor((Date.now() - cached.at) / 1000));
       } else {
         headers["X-Cache"] = writeTtl > 0 ? (readTtl === 0 ? "BYPASS" : "MISS") : "NONE";
-        data = endpoint.handler ? await this._runHandler(endpoint, value, caller, scraper, signal) : await this._runUpstream(scraper, endpoint, value, pathRest, signal);
+        data = endpoint.handler ? await this._runHandler(endpoint, value, caller, scraper, signal, upstreamAuth) : await this._runUpstream(scraper, endpoint, value, pathRest, signal);
         if (writeTtl > 0) await this._cacheSet(cacheKey, data, writeTtl);
       }
       await this._after(caller, scraper, endpoint.slug, 200, Date.now() - t0, !!ticket);
@@ -85,9 +88,9 @@ export class Executor {
     }
   }
 
-  async _runHandler(endpoint, value, caller, scraper, outer) {
+  async _runHandler(endpoint, value, caller, scraper, outer, upstreamAuth) {
     return withTimeout(
-      (signal) => endpoint.handler(value, { fetch: this.fetchImpl, lookup: this.lookupImpl, signal, key: { id: caller.keyId, plan: caller.plan }, project: scraper.key, endpoint: endpoint.slug }),
+      (signal) => endpoint.handler(value, { fetch: this.fetchImpl, lookup: this.lookupImpl, signal, upstreamAuth, key: { id: caller.keyId, plan: caller.plan }, project: scraper.key, endpoint: endpoint.slug }),
       endpoint.timeoutMs,
       outer
     );
@@ -169,8 +172,9 @@ export class Executor {
       body = { content: null, message: "Internal error", errors: [] };
       this.logger?.error?.(err);
     }
-    if (ticket && status >= 500) await ticket.refund();
-    if (scraper && ticket) await this._after(caller, scraper, endpointSlug, status, Date.now() - t0, status < 500);
+    const free = status >= 500 || body?.error?.code === "upstream_key_required";
+    if (ticket && free) await ticket.refund();
+    if (scraper && ticket) await this._after(caller, scraper, endpointSlug, status, Date.now() - t0, !free);
     if (ticket) extra = { ...ticket.headers(), ...extra };
     if (status >= 500 || status === 400) this.webhooks?.emit(caller.owner, "request.error", { project: projectKey, endpoint: endpointSlug, status, message: body.message ?? body.error });
     return { status, body, headers: { ...headers, ...extra } };

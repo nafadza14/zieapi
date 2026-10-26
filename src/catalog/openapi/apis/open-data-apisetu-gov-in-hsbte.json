@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/hsbte/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["dgmst","POST","/dgmst/certificate","Degree/ Diploma Marksheet",[],1]]}

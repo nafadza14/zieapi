@@ -3,7 +3,7 @@ import { scraperCard } from "./home.js";
 
 export function scrapersPage({ user, totals, categories, items, q = "", cat = "" }) {
   const body = `<main class="catalog-page">
-${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} scrapers`, `${fmt(totals.endpoints)} endpoints across ${totals.categories} categories · ${fmt(totals.liveEndpoints)} live on this server.`)}
+${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} APIs`, `${fmt(totals.endpoints)} endpoints across ${totals.categories} categories · ${fmt(totals.liveEndpoints)} live on this server.`)}
 <div class="wrap catalog" data-catalog>
   <aside class="cat-side" aria-label="Categories">
     <button class="cat-item on" data-cat="">All <span>${totals.scrapers}</span></button>
@@ -15,7 +15,7 @@ ${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} scrapers`, `${fmt(tota
       <select data-sort aria-label="Sort"><option value="popular">Most used</option><option value="name">Name A–Z</option><option value="endpoints">Most endpoints</option></select>
     </div>
     <div class="filter-chips" role="group" aria-label="Filters">
-      <button class="fchip on" data-filter="">All</button><button class="fchip" data-filter="live">Live now</button><button class="fchip" data-filter="bulk">Bulk support</button><button class="fchip" data-filter="indonesian">Indonesian sources</button>
+      <button class="fchip on" data-filter="">All</button><button class="fchip" data-filter="live">Live now</button><button class="fchip" data-filter="bulk">Bulk support</button><button class="fchip" data-filter="global">Global APIs</button><button class="fchip" data-filter="nokey">No key needed</button><button class="fchip" data-filter="indonesian">Indonesian sources</button>
     </div>
     <div class="mobile-cats">${categories.map((c) => `<button class="cat-chip" data-cat="${esc(c.slug)}" style="--c:${esc(c.color)}"><i></i>${esc(c.displayName)}</button>`).join("")}</div>
     <p class="result-count" data-count aria-live="polite"></p>
@@ -24,7 +24,7 @@ ${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} scrapers`, `${fmt(tota
     <p class="muted center small">Missing a source? <a href="/report?type=request">Request a scraper</a>.</p>
   </section>
 </div>
-<script type="application/json" id="catalog-data">${json({ items, initialCat: cat })}</script>
+<script type="application/json" id="catalog-data">${json({ items: items.map(({ id, description, sourceUrl, maxCacheTtl, minPlan, hasGatedEndpoint, ...it }) => ({ ...it, description: description ? description.slice(0, 120) : null })), initialCat: cat })}</script>
 </main>`;
   return layout({ title: "Scrapers", active: "scrapers", user, body, description: `Browse ${totals.scrapers} scrapers and ${totals.endpoints} endpoints.` });
 }
@@ -62,7 +62,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
   </div>
   ${s.description ? `<p class="lead">${esc(s.description)}</p>` : ""}
   <div class="tags">${s.tags.map((t) => `<a href="/scrapers?q=${esc(t)}" class="tag">${esc(t)}</a>`).join("")}</div>
-  <div class="dh-stats"><span><b>${s.endpointCount}</b> endpoints</span><span><b>${s.liveEndpoints}</b> live</span><span><b>${fmt(s.totalRequests)}</b> calls</span>${s.hasBulk ? "<span><b>Bulk</b> supported</span>" : ""}</div>
+  <div class="dh-stats"><span><b>${s.endpointCount}</b> endpoints</span>${s.status === "byok" ? `<span><b>${s.endpointCount}</b> with your key</span>` : `<span><b>${s.liveEndpoints}</b> live</span>`}<span><b>${fmt(s.totalRequests)}</b> calls</span>${s.hasBulk ? "<span><b>Bulk</b> supported</span>" : ""}</div>
 </section>
 <div class="wrap detail-body">
   <aside class="ep-list" aria-label="Endpoints">
@@ -73,7 +73,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
 </div>
 <dialog class="modal" data-mcp-modal><form method="dialog"><h2>Use ${esc(s.displayName)} from MCP</h2><p>Add zieapi to your agent once, then ask for “${esc(s.displayName)}”: the agent calls <code>run_scraper</code> with <code>${esc(s.key)}</code>.</p><pre class="code"><code>claude mcp add --transport http zieapi ${esc(apiUrl)}/mcp \\
   --header "x-api-key: zie_••••••••"</code></pre><div class="center"><a href="/mcp" class="pill pill-outline pill-sm">Other clients</a> <button class="pill pill-white pill-sm">Close</button></div></form></dialog>
-<script type="application/json" id="detail-data">${json({ scraper: { key: s.key, displayName: s.displayName, category: s.category, slug: s.slug }, endpoints: s.endpoints, current: ep.slug, apiUrl, errors, langs: CODE_LANGS, loggedIn: !!user })}</script>
+<script type="application/json" id="detail-data">${json({ scraper: { key: s.key, displayName: s.displayName, category: s.category, slug: s.slug, auth: s.auth ?? null, provider: s.provider ?? null, origin: s.origin }, endpoints: s.endpoints, current: ep.slug, apiUrl, errors, langs: CODE_LANGS, loggedIn: !!user })}</script>
 </main>`;
   return layout({ title: `${s.displayName} API`, active: "scrapers", user, body, description: `${s.displayName} (${s.key}): ${s.endpointCount} endpoints via one API key.` });
 }

@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/pareekshabhavanker/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["sslcr","POST","/sslcr/certificate","Class X School Leaving Certificate",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/dgft","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["importer-exporter-code-verification-api","GET","/v1/iec/{iec}","Importer-Exporter Code (IEC) Verification API.",[["iec","string",1,"p",{"x":"Importer-Exporter code"}]],0]]}

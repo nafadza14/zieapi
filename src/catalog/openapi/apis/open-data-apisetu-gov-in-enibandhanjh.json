@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/enibandhanjh/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["rdcer","POST","/rdcer/certificate","Copy of Registered Deed",[],1],["regrii","POST","/regrii/certificate","ROR Register 2",[],1],["rmcer","POST","/rmcer/certificate","Marriage Certificate",[],1]]}

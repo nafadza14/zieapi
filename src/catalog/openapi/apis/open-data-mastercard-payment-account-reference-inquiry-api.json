@@ -1,0 +1,1 @@
+{"base":"https://sandbox.mastercard.com","auth":null,"ops":[["post-par-paymentaccountreference-1-0-get-payment-account-ref","POST","/par/paymentaccountreference/1/0/getPaymentAccountReference","Submit an encrypted PAN to obtain the PAR linked to the account.",[],1]]}

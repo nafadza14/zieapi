@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v2","auth":null,"ops":[["get-flight-choice-predict","POST","/shopping/flight-offers/prediction","Predict the choice of flight offers.",[["X-HTTP-Method-Override","string",1,"h",{"d":"GET","x":"the HTTP method to apply"}]],2]]}

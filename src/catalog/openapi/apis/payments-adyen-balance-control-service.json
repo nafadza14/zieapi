@@ -1,0 +1,1 @@
+{"base":"https://pal-test.adyen.com/pal/servlet/BalanceControl/v1","auth":{"t":"key","in":"header","name":"X-API-Key"},"ops":[["post-balance-transfer","POST","/balanceTransfer","Start a balance transfer",[],1]]}

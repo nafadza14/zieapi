@@ -46,6 +46,7 @@ export const MCP_TOOLS = [
         scraper: s("string", "Project key 'category:slug'"),
         endpoint: s("string", "Endpoint slug"),
         params: { type: "object", description: "Endpoint parameters (see get_scraper_schema)", additionalProperties: true },
+        upstream_key: s("string", "Your own key/token for APIs marked 'your key' (status byok). Never stored."),
       },
     },
   },
@@ -114,6 +115,8 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
             minPlan: ep.minPlan,
             bulkEnabled: ep.bulkEnabled,
             status: ep.status,
+            auth: d.auth ?? null,
+            note: d.auth ? "This API needs your own credentials: pass them as upstream_key to run_scraper." : undefined,
             fields: schema.fields,
             exampleResponse: ep.exampleResponse,
           });
@@ -121,7 +124,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
         case "list_categories":
           return toolResult({ categories: catalog.categoryList(), totals: catalog.totals() });
         case "run_scraper": {
-          const r = await executor.run({ caller: { ...caller, source: "mcp" }, projectKey: String(args.scraper ?? ""), endpointSlug: String(args.endpoint ?? ""), params: args.params ?? {} });
+          const r = await executor.run({ upstreamAuth: args.upstream_key ? { key: String(args.upstream_key) } : null, caller: { ...caller, source: "mcp" }, projectKey: String(args.scraper ?? ""), endpointSlug: String(args.endpoint ?? ""), params: args.params ?? {} });
           return r.status === 200 ? toolResult(r.body) : toolError(r.status, r.body);
         }
         case "get_account": {

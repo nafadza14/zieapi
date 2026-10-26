@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/insvalsura/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["skcer","POST","/skcer/certificate","Skill Certificate",[],1],["skmst","POST","/skmst/certificate","Skill Marksheet/ Score Card",[],1]]}

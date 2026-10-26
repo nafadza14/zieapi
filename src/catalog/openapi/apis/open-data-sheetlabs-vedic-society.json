@@ -1,0 +1,1 @@
+{"base":"https://api-vs.herokuapp.com/vs/v1","auth":null,"ops":[["get-resources","GET","/resources","Fetch all meanings that contain a specific English string",[["description","string",1,"q",{"x":"The string you are looking for in the word meaning, for example, chariot. Wildcards are allowed, for example, char\\*."}]],0]]}

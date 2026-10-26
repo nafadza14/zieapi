@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/igrmaharashtra/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["llcer","POST","/llcer/certificate","Leave and License Certificate",[],1]]}

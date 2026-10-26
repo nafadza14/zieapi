@@ -1,0 +1,1 @@
+{"base":"https://api.exchangerate-api.com/v4","auth":null,"ops":[["get-latest-base-currency","GET","/latest/{base_currency}","Returns latest exchange rates in parameter-supplied base currency.",[["base_currency","string",1,"p",{"x":"**Base Currency**. *Example: USD*. You an use any of the ISO 4217 currency codes we support. See…"}]],0]]}

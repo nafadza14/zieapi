@@ -1,0 +1,1 @@
+{"base":"https://api.landregistry.gov.uk/v1","auth":null,"ops":[["add-deed","POST","/deed/","Deed",[],2],["get-deed-deed-reference","GET","/deed/{deed_reference}","Deed",[["deed_reference","string",1,"p",{"x":"Unique reference of the deed."}]],0]]}

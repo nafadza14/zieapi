@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/phedharyana/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["etcer","POST","/etcer/certificate","Enlistment Certificate",[],1],["govid","POST","/govid/certificate","ID Card",[],1],["sicer","POST","/sicer/certificate","Sanction Letter/ Certificate",[],1]]}

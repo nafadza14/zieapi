@@ -1,0 +1,1 @@
+{"base":"http://api.phila.gov/polling-places/v1","auth":null,"ops":[["get","GET","/","Get Polling Places Data",[["ward","integer",1,"q",{"x":"Ward Number"}],["division","integer",1,"q",{"x":"Division Number"}],["callback","string",0,"q",{"x":"Optional parameter for jsonp support."}]],0]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.nexmo.com/v0.1/dispatch","auth":{"t":"bearer"},"ops":[["create-workflow","POST","/","Create a workflow",[],2]]}

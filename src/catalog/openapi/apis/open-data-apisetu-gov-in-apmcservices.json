@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/apmcservices/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["apmcl","POST","/apmcl/certificate","Agriculture Produce Market Committee License",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.ibanapi.com/v1","auth":{"t":"key","in":"query","name":"api_key"},"ops":[["get-balance","GET","/balance","Get Account Balance",[],0],["validate-iban","GET","/validate","Validate IBAN",[["iban","string",1,"q",{"x":"The IBAN"}]],0],["validate-ibanbasic","GET","/validate-basic","Validate IBAN Basic",[["iban","string",1,"q",{"x":"The IBAN"}]],0]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.json2video.com/v2","auth":null,"ops":[["get-movies","GET","/movies","Get the status of your movies",[],0],["new-movie","POST","/movies","Create a new movie",[],2]]}

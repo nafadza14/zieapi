@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v1","auth":null,"ops":[["upsell-air-offers","POST","/shopping/flight-offers/upselling","Return a list of upsell Flight Offers based on given Flight Offers",[["X-HTTP-Method-Override","string",1,"h",{"d":"GET","x":"the HTTP method to apply"}]],2]]}

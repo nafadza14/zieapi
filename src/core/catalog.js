@@ -6,6 +6,8 @@ import { maxPlan } from "./plans.js";
 import { SEED_CATEGORIES, SEED_SCRAPERS } from "../catalog/seed.js";
 import { SOURCE_DOMAINS } from "../catalog/domains.js";
 import { SOURCE_ICONS } from "../catalog/icons.js";
+import { PROVIDER_ICONS } from "../catalog/icons-global.js";
+import { DIRECTORY_CATEGORIES, loadDirectoryIndex, loadEndpoints } from "./directory.js";
 
 const CATEGORY_BLURBS = {
   ads: "Public ad-library intelligence.",
@@ -39,15 +41,41 @@ const CATEGORY_BLURBS = {
 const titleCase = (s) => s.replace(/(^|-)([a-z])/g, (_, a, b) => (a ? " " : "") + b.toUpperCase());
 
 export class Catalog {
-  constructor({ live = [], upstream = false, seed = true } = {}) {
+  constructor({ live = [], upstream = false, seed = true, directory = true } = {}) {
     this.upstream = upstream;
-    this.categories = SEED_CATEGORIES.map((c) => ({ ...c, iconUrl: null, description: CATEGORY_BLURBS[c.slug] ?? "" }));
+    this.categories = [...SEED_CATEGORIES, ...DIRECTORY_CATEGORIES.filter((d) => !SEED_CATEGORIES.some((c) => c.slug === d.slug))].map((c) => ({ ...c, iconUrl: null, description: c.description ?? CATEGORY_BLURBS[c.slug] ?? "" }));
     this.map = new Map();
     if (seed) for (const s of SEED_SCRAPERS) this._addSeed(s);
     for (const def of live) this._addLive(def);
+    for (const s of this.map.values()) s.status = s.endpoints.some((e) => e.status === "live") ? "live" : upstream ? "upstream" : "planned";
+    if (directory) for (const entry of loadDirectoryIndex()) this._addDirectory(entry);
     this.scrapers = [...this.map.values()];
     this.overrides = {}; // admin-set logo URLs, refreshed per request by the app
-    for (const s of this.scrapers) s.status = s.endpoints.some((e) => e.status === "live") ? "live" : upstream ? "upstream" : "planned";
+  }
+
+  /** A global API from the OpenAPI directory. Endpoints load on first access. */
+  _addDirectory(entry) {
+    let key = entry.k;
+    for (let i = 2; this.map.has(key); i++) key = `${entry.k}-${i}`;
+    const sc = this._blank(key, entry.n, (entry.g ?? []).map((g) => g.replace(/_/g, "-")));
+    const host = entry.p;
+    const h = host.split(":")[0].toLowerCase();
+    sc.description = entry.d || null;
+    sc.provider = host;
+    sc.sourceUrl = entry.w;
+    sc.iconUrl = SOURCE_ICONS[h] ?? SOURCE_ICONS[h.replace(/^(api|www)\./, "")] ?? PROVIDER_ICONS[h] ?? null;
+    sc.auth = entry.a;
+    sc.origin = "directory";
+    sc.version = entry.v;
+    sc.lazy = true;
+    sc._count = entry.o;
+    sc.status = entry.a ? "byok" : "live";
+    let eps = null;
+    Object.defineProperty(sc, "endpoints", {
+      enumerable: false,
+      get: () => (eps ??= loadEndpoints({ ...entry, k: key }, (ep) => ({ ...this._endpoint(key, ep, ep.handler), status: ep.status, upstreamMethod: ep.upstreamMethod }))),
+    });
+    this.map.set(key, sc);
   }
 
   _blank(key, displayName, tags = []) {
@@ -128,22 +156,28 @@ export class Catalog {
       tags: s.tags,
       iconUrl: this.overrides[s.key] || s.iconUrl,
       sourceUrl: s.sourceUrl,
-      endpointCount: s.endpoints.length,
-      liveEndpoints: s.endpoints.filter((e) => e.status === "live").length,
+      endpointCount: epCount(s),
+      liveEndpoints: s.lazy ? (s.status === "live" ? s._count : 0) : s.endpoints.filter((e) => e.status === "live").length,
+      auth: s.auth ?? null,
+      provider: s.provider ?? null,
+      origin: s.origin ?? "native",
       status: disabled?.has(s.key) ? "disabled" : s.status,
       totalRequests: st.requests,
-      maxCacheTtl: Math.max(0, ...s.endpoints.map((e) => e.cacheTtl || 0)),
+      maxCacheTtl: s.lazy ? 60 : Math.max(0, ...s.endpoints.map((e) => e.cacheTtl || 0)),
       minPlan: s.minPlan,
-      hasBulk: s.endpoints.some((e) => e.bulkEnabled),
-      hasGatedEndpoint: s.endpoints.some((e) => !!e.minPlan),
+      hasBulk: s.lazy ? true : s.endpoints.some((e) => e.bulkEnabled),
+      hasGatedEndpoint: s.lazy ? false : s.endpoints.some((e) => !!e.minPlan),
       indonesian: s.indonesian,
     };
   }
 
-  list({ q, cat, cursor, limit, sort = "popular", bulk, indonesian, live } = {}, stats = {}, disabled = new Set()) {
+  list({ q, cat, cursor, limit, sort = "popular", bulk, indonesian, live, auth, origin } = {}, stats = {}, disabled = new Set()) {
     let rows = this.scrapers;
     if (cat) rows = rows.filter((s) => s.category === cat);
-    if (bulk === "true" || bulk === true) rows = rows.filter((s) => s.endpoints.some((e) => e.bulkEnabled));
+    if (origin) rows = rows.filter((s) => (s.origin ?? "native") === origin);
+    if (auth === "none") rows = rows.filter((s) => !s.auth);
+    if (auth === "byok") rows = rows.filter((s) => !!s.auth);
+    if (bulk === "true" || bulk === true) rows = rows.filter((s) => (s.lazy ? true : s.endpoints.some((e) => e.bulkEnabled)));
     if (indonesian === "true" || indonesian === true) rows = rows.filter((s) => s.indonesian);
     if (live === "true" || live === true) rows = rows.filter((s) => s.status === "live");
     if (q) {
@@ -154,7 +188,7 @@ export class Catalog {
     if (sort === "name") items.sort((a, b) => a.displayName.localeCompare(b.displayName));
     else if (sort === "endpoints") items.sort((a, b) => b.endpointCount - a.endpointCount);
     else items.sort((a, b) => b.totalRequests - a.totalRequests || b.liveEndpoints - a.liveEndpoints || a.displayName.localeCompare(b.displayName));
-    const lim = Math.min(500, Math.max(1, Number(limit) || 20));
+    const lim = Math.min(2000, Math.max(1, Number(limit) || 20));
     const off = Math.max(0, Number(cursor) || 0);
     return { items: items.slice(off, off + lim), nextCursor: off + lim < items.length ? String(off + lim) : null, total: items.length };
   }
@@ -198,27 +232,41 @@ export class Catalog {
     return this.categories
       .map((c) => {
         const ss = this.scrapers.filter((s) => s.category === c.slug);
-        return { slug: c.slug, displayName: c.displayName, iconUrl: null, color: c.color, description: c.description, scrapers: ss.length, endpoints: ss.reduce((n, s) => n + s.endpoints.length, 0), live: ss.filter((s) => s.status === "live").length };
+        return { slug: c.slug, displayName: c.displayName, iconUrl: null, color: c.color, description: c.description, scrapers: ss.length, endpoints: ss.reduce((n, s) => n + epCount(s), 0), live: ss.filter((s) => s.status === "live").length };
       })
       .filter((c) => withEmpty || c.scrapers > 0)
       .sort((a, b) => b.scrapers - a.scrapers);
   }
 
   totals() {
-    const eps = this.scrapers.flatMap((s) => s.endpoints);
-    return {
+    if (this._totals) return this._totals;
+    let endpoints = 0, liveEndpoints = 0, byokEndpoints = 0;
+    for (const s of this.scrapers) {
+      endpoints += epCount(s);
+      if (s.lazy) {
+        if (s.status === "live") liveEndpoints += s._count;
+        else byokEndpoints += s._count;
+      } else liveEndpoints += s.endpoints.filter((e) => e.status === "live").length;
+    }
+    const directory = this.scrapers.filter((s) => s.origin === "directory").length;
+    return (this._totals = {
       scrapers: this.scrapers.length,
-      endpoints: eps.length,
+      endpoints,
       liveScrapers: this.scrapers.filter((s) => s.status === "live").length,
-      liveEndpoints: eps.filter((e) => e.status === "live").length,
+      byokScrapers: this.scrapers.filter((s) => s.status === "byok").length,
+      liveEndpoints,
+      byokEndpoints,
+      usableEndpoints: liveEndpoints + byokEndpoints,
+      directoryApis: directory,
       categories: this.categoryList().length,
-    };
+    });
   }
 }
 
 function searchText(s) {
-  return (s._search ??= [s.key, s.displayName, s.description ?? "", ...s.tags, ...s.endpoints.flatMap((e) => [e.slug, e.displayName ?? ""])].join(" ").toLowerCase());
+  return (s._search ??= [s.key, s.displayName, s.description ?? "", s.provider ?? "", ...s.tags, ...(s.lazy ? [] : s.endpoints.flatMap((e) => [e.slug, e.displayName ?? ""]))].join(" ").toLowerCase());
 }
+const epCount = (s) => (s.lazy ? s._count : s.endpoints.length);
 
 export function pathFieldNames(endpoint) {
   return (endpoint.pathTemplate ?? "")

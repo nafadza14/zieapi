@@ -1,0 +1,1 @@
+{"base":"https://rest-api.d7networks.com/secure","auth":{"t":"basic"},"ops":[["balance-get","GET","/balance","Balance",[],0],["send-post","POST","/send","SendSMS",[],2],["sendbatch-post","POST","/sendbatch","Bulk SMS",[],2]]}

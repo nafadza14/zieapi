@@ -1,0 +1,1 @@
+{"base":"https://spectrocoin.com/api/merchant/1","auth":null,"ops":[["create-order","POST","/api/createOrder","Create merchant order",[],3]]}

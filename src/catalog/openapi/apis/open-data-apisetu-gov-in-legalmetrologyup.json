@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/legalmetrologyup/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["delcs","POST","/delcs/certificate","Dealer License",[],1],["malcs","POST","/malcs/certificate","Manufacturer License",[],1],["palcs","POST","/palcs/certificate","Packers License",[],1],["relcs","POST","/relcs/certificate","Repairer License",[],1]]}

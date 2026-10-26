@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/bhavishya/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["pecer","POST","/pecer/certificate","Pension Certificate",[],1]]}

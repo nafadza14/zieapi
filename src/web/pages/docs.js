@@ -100,7 +100,25 @@ ${c(`import { createHmac, timingSafeEqual } from "node:crypto";\n\nfunction veri
 <tr><td><code>GET /api/scrapers/{category:slug}</code></td><td>Scraper detail with endpoints</td></tr>
 <tr><td><code>GET /api/public/scrapers/{slug}/endpoints/{endpoint}/schema</code></td><td>Parameter schema</td></tr>
 <tr><td><code>GET /api/public/scrapers/{slug}/stats</code></td><td>Requests and success rate</td></tr></table>
-<p>Catalog responses use <code>{ content, message, errors }</code>.</p>${c(`curl "${api}/api/scrapers/list?q=saham&limit=5"`)}`,
+<p>Catalog responses use <code>{ content, message, errors }</code>.</p>${c(`curl "${api}/api/scrapers/list?q=saham&limit=5"`)}
+<p>Extra filters: <code>origin=native|directory</code> and <code>auth=none|byok</code>. Each global API also has its own spec at <code>/api/{category}/{slug}/openapi.json</code>.</p>`,
+      },
+      {
+        slug: "byok",
+        title: "Global APIs & your own key",
+        body: (api) => `<p>Besides the native scrapers, zieapi includes more than a thousand global APIs (payments, messaging, developer tools, media, open data and more). They are imported from public OpenAPI specs in the <a href="https://github.com/APIs-guru/openapi-directory" rel="noopener">APIs.guru OpenAPI Directory</a> and called through the same <code>/v1</code> pattern, envelope, quotas and MCP tools.</p>
+<h2>Two kinds of global API</h2>
+<table class="doc-table"><tr><th>Badge</th><th>Meaning</th></tr><tr><td><span class="badge badge-live">Live</span></td><td>The provider needs no key. Call it with just your zieapi key.</td></tr><tr><td><span class="badge badge-byok">Your key</span></td><td>The provider needs credentials. Bring your own key (BYOK).</td></tr></table>
+<h2>Sending your provider key</h2>
+<p>Add one of these headers next to your zieapi key. zieapi places it where the provider expects (header, query or basic auth) and forwards the call.</p>
+<table class="doc-table"><tr><td><code>x-upstream-key</code></td><td>The raw key or token. For basic auth send <code>username:password</code>.</td></tr><tr><td><code>x-upstream-authorization</code></td><td>A full <code>Authorization</code> header value, sent as is.</td></tr></table>
+${c(`curl "${api}/v1/finance:stripe/get-balance" \\\n  -H "x-api-key: $ZIE_KEY" \\\n  -H "x-upstream-key: $STRIPE_SECRET_KEY"`)}
+<p>Your provider key is used for that request only. It is never stored, logged or shown in the dashboard, and responses fetched with it are cached per account and per key so they are never served to anyone else.</p>
+<p>Without a key, a BYOK endpoint answers <code>401</code> with <code>error.code = "upstream_key_required"</code> and tells you where the key goes. That request is not billed as a success.</p>
+<h2>Server-side keys (self-hosting)</h2>
+<p>Operators can set a shared key per API with an env var named <code>ZIE_UPSTREAM_KEY_</code> plus the API key in upper case, for example <code>ZIE_UPSTREAM_KEY_FINANCE_STRIPE</code>. A caller's own header always wins. Check each provider's terms before sharing a key with your users.</p>
+<h2>Via MCP</h2><p><code>run_scraper</code> accepts an optional <code>upstream_key</code> argument. <code>get_scraper_schema</code> returns the auth type.</p>
+<h2>Refreshing the directory</h2>${c(`npm i --no-save openapi-directory\nnode scripts/import-openapi.js node_modules/openapi-directory/api`)}`,
       },
     ],
   },

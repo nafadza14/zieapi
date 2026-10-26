@@ -15,3 +15,6 @@ Admin → Scrapers → **Set logo**. Paste an `https://` image URL, or leave it 
 
 ## Trademarks
 Logos belong to their owners and are shown only to identify where the data comes from. Remove any logo on request from its owner.
+
+## Global API providers
+Logos for the 1,383 global APIs come from each provider's favicon (favicone.com, collected with the in-app browser on 26 Oct 2026, placeholders removed). Mapping: `src/catalog/icons-global.js`. 884 of 1,383 global APIs have a logo; the rest show a monogram.

@@ -74,14 +74,15 @@
   });
 
   // ---------- code samples ----------
-  function sample(lang, { api: base, key, ep, method = "GET", params = {}, pathParams = [] }) {
+  function sample(lang, { api: base, key, ep, method = "GET", params = {}, pathParams = [], upstream = false }) {
     let path = `/v1/${key}/${ep}`;
     const q = { ...params };
     for (const n of pathParams) if (q[n] !== undefined) { path += "/" + encodeURIComponent(q[n]); delete q[n]; }
     const qs = new URLSearchParams(q).toString();
     const url = `${base}${path}${method === "GET" && qs ? "?" + qs : ""}`;
     const bodyJson = JSON.stringify(q);
-    if (lang === "cURL") return method === "GET" ? `curl "${url}" \\\n  -H "x-api-key: $ZIE_KEY"` : `curl -X POST "${url}" \\\n  -H "x-api-key: $ZIE_KEY" \\\n  -H "content-type: application/json" \\\n  -d '${bodyJson}'`;
+    const up = upstream ? ' \\\n  -H "x-upstream-key: $UPSTREAM_KEY"' : "";
+    if (lang === "cURL") return method === "GET" ? `curl "${url}" \\\n  -H "x-api-key: $ZIE_KEY"${up}` : `curl -X POST "${url}" \\\n  -H "x-api-key: $ZIE_KEY"${up} \\\n  -H "content-type: application/json" \\\n  -d '${bodyJson}'`;
     if (lang === "JavaScript") return method === "GET" ? `const res = await fetch("${url}", {\n  headers: { "x-api-key": process.env.ZIE_KEY },\n});\nconst { data } = await res.json();\nconsole.log(data);` : `const res = await fetch("${url}", {\n  method: "POST",\n  headers: { "x-api-key": process.env.ZIE_KEY, "content-type": "application/json" },\n  body: JSON.stringify(${bodyJson}),\n});\nconst { data } = await res.json();`;
     if (lang === "Python") return method === "GET" ? `import os, requests\n\nr = requests.get(\n    "${base}${path}",\n    params=${JSON.stringify(q)},\n    headers={"x-api-key": os.environ["ZIE_KEY"]},\n)\nprint(r.json()["data"])` : `import os, requests\n\nr = requests.post(\n    "${base}${path}",\n    json=${bodyJson},\n    headers={"x-api-key": os.environ["ZIE_KEY"]},\n)\nprint(r.json()["data"])`;
     if (lang === "Go") return `req, _ := http.NewRequest("${method}", "${url}", ${method === "GET" ? "nil" : `strings.NewReader(\`${bodyJson}\`)`})\nreq.Header.Set("x-api-key", os.Getenv("ZIE_KEY"))${method === "GET" ? "" : '\nreq.Header.Set("content-type", "application/json")'}\nres, err := http.DefaultClient.Do(req)\nif err != nil { log.Fatal(err) }\ndefer res.Body.Close()\nbody, _ := io.ReadAll(res.Body)\nfmt.Println(string(body))`;
@@ -117,7 +118,7 @@
     const { items, initialCat } = JSON.parse($("#catalog-data").textContent);
     const grid = $("[data-grid]");
     let state = { q: $("[data-q]").value.toLowerCase(), cat: initialCat || "", filter: "", sort: "popular", shown: 18 };
-    const badge = (s) => ({ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Off" })[s] ?? "";
+    const badge = (s) => ({ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Off" })[s] ?? "";
     const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n));
     const iconHtml = (s) => { const m = esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"); return s.iconUrl ? `<span class="sc-icon has-img"><img src="${esc(s.iconUrl)}" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.parentNode.classList.remove('has-img');this.parentNode.textContent='${m}'"></span>` : `<span class="sc-icon" style="--c:#8b8ba7">${m}</span>`; };
     const cardHtml = (s) => `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}"><div class="sc-top">${iconHtml(s)}<span class="badge badge-${esc(s.status)}">${badge(s.status)}</span></div><h3>${esc(s.displayName)}</h3><p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p><div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div></a>`;
@@ -128,6 +129,8 @@
         if (state.filter === "live" && s.status !== "live") return false;
         if (state.filter === "bulk" && !s.hasBulk) return false;
         if (state.filter === "indonesian" && !s.indonesian) return false;
+        if (state.filter === "global" && s.origin !== "directory") return false;
+        if (state.filter === "nokey" && (s.auth || s.status !== "live")) return false;
         if (state.q && !`${s.key} ${s.displayName} ${(s.tags || []).join(" ")} ${s.description ?? ""}`.toLowerCase().includes(state.q)) return false;
         return true;
       });
@@ -135,7 +138,7 @@
       else if (state.sort === "endpoints") rows.sort((a, b) => b.endpointCount - a.endpointCount);
       grid.innerHTML = rows.slice(0, state.shown).map(cardHtml).join("") || '<div class="card empty"><h3>No scrapers match.</h3><p>Try another word, or <a href="/report?type=request">request a source</a>.</p></div>';
       $$(".scraper-card", grid).forEach((el, i) => { const c = colors[rows[i]?.category]; if (c) el.querySelector(".sc-icon")?.style.setProperty("--c", c); });
-      $("[data-count]").textContent = `${rows.length} scraper${rows.length === 1 ? "" : "s"}`;
+      $("[data-count]").textContent = `${rows.length} API${rows.length === 1 ? "" : "s"}`;
       $("[data-more]").hidden = rows.length <= state.shown;
       $$("[data-cat]").forEach((b) => b.classList.toggle("on", b.dataset.cat === state.cat));
       const u = new URL(location.href);
@@ -147,6 +150,8 @@
     $("[data-sort]").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
     $$("[data-cat]").forEach((b) => b.addEventListener("click", () => { state.cat = b.dataset.cat; state.shown = 18; render(); }));
     $$("[data-filter]").forEach((b) => b.addEventListener("click", () => { $$("[data-filter]").forEach((x) => x.classList.toggle("on", x === b)); state.filter = b.dataset.filter; render(); }));
+    const f0 = new URLSearchParams(location.search).get("filter");
+    if (f0) { const b = $(`[data-filter="${CSS.escape(f0)}"]`); if (b) { $$("[data-filter]").forEach((x) => x.classList.toggle("on", x === b)); state.filter = f0; } }
     $("[data-more]").addEventListener("click", () => { state.shown += 18; render(); });
     addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("[data-q]").focus(); } });
     render();
@@ -166,21 +171,24 @@
       const pathParams = ep.fields.filter((f) => f.in === "path").map((f) => f.name);
       const path = `/v1/${D.scraper.key}/${ep.slug}${ep.pathTemplate ? "/" + ep.pathTemplate : ""}`;
       const ex = Object.fromEntries(ep.fields.filter((f) => f.example !== undefined || f.required).map((f) => [f.name, f.example ?? (f.enum ? f.enum[0] : f.type === "string" ? "…" : 1)]));
-      const notLive = ep.status !== "live" && ep.status !== "upstream";
+      const notLive = !["live", "upstream", "byok"].includes(ep.status);
+      const needKey = !!D.scraper.auth;
+      const isDir = D.scraper.origin === "directory";
       main.innerHTML = `
         <div class="ep-title"><span class="m m-${ep.method.toLowerCase()}">${ep.method}</span><h2>${esc(ep.displayName)}</h2><span class="badge badge-${ep.status}">${ep.status}</span>${ep.minPlan ? `<span class="badge badge-plan">${esc(ep.minPlan)}+</span>` : ""}${ep.bulkEnabled ? '<span class="badge">bulk</span>' : ""}</div>
         ${ep.description ? `<p class="muted" style="margin:0">${esc(ep.description)}</p>` : ""}
         <div class="ep-path">${esc(D.apiUrl)}${esc(path)}</div>
+        ${needKey ? `<p class="notice">This API needs your own ${D.scraper.auth === "key" ? "API key" : D.scraper.auth === "basic" ? "username:password" : "access token"} for ${esc(D.scraper.provider || D.scraper.displayName)}. Send it in the <code>x-upstream-key</code> header; zieapi forwards it on that call only and never stores it.</p>` : isDir ? `<p class="notice notice-soft">Global API built from ${esc(D.scraper.provider || "the provider")}'s public OpenAPI spec. If the provider asks for credentials, add them in the optional key field or the <code>x-upstream-key</code> header.</p>` : ""}
         ${notLive ? '<p class="notice">This endpoint is in the catalog but not live on this server yet. Calls return 501 until it is implemented or an upstream is configured.</p>' : ""}
         <section><h3>Parameters</h3>${ep.fields.length ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>In</th><th>Description</th></tr></thead><tbody>${ep.fields.map((f) => `<tr><td><code>${esc(f.name)}</code>${f.required ? ' <span class="badge badge-pending">required</span>' : ""}</td><td>${esc(f.type)}${f.enum ? `<div class="small muted">${f.enum.map(esc).join(" · ")}</div>` : ""}</td><td>${esc(f.in)}</td><td class="muted">${esc(f.description ?? "")}${f.default !== undefined ? ` <span class="small">Default <code>${esc(JSON.stringify(f.default))}</code></span>` : ""}${f.min !== undefined || f.max !== undefined ? ` <span class="small">Range ${f.min ?? "…"}–${f.max ?? "…"}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">No parameters.</p>'}</section>
         <section class="card try"><h3 style="margin:0">Try it</h3>
           <div class="try-fields">${ep.fields.map((f) => `<label><span><b>${esc(f.name)}</b>${f.required ? " *" : " · optional"}</span>${f.enum ? `<select data-p="${esc(f.name)}">${f.required ? "" : '<option value=""></option>'}${f.enum.map((v) => `<option${v === f.default ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>` : f.type === "boolean" ? `<select data-p="${esc(f.name)}"><option value=""></option><option>true</option><option>false</option></select>` : `<input data-p="${esc(f.name)}" placeholder="${esc(f.example ?? f.default ?? "")}" value="${esc(f.example ?? "")}">`}</label>`).join("")}</div>
-          <div class="row">${D.loggedIn ? '<span class="small muted">Runs with your account (counts against your quota).</span>' : `<input type="password" data-key placeholder="Your API key (zie_…)" style="max-width:320px" value="${esc(store.get("zie_key") || "")}" aria-label="API key"><span class="small muted">or <a href="/login?next=${encodeURIComponent(location.pathname)}">sign in</a></span>`}<button class="pill pill-white" data-run>Send request</button></div>
+          <div class="row">${D.loggedIn ? '<span class="small muted">Runs with your account (counts against your quota).</span>' : `<input type="password" data-key placeholder="Your API key (zie_…)" style="max-width:320px" value="${esc(store.get("zie_key") || "")}" aria-label="API key"><span class="small muted">or <a href="/login?next=${encodeURIComponent(location.pathname)}">sign in</a></span>`}${needKey || isDir ? `<input type="password" data-upkey placeholder="${esc(D.scraper.provider || "Upstream")} key${needKey ? "" : " (optional)"}" style="max-width:260px" aria-label="Upstream key">` : ""}<button class="pill pill-white" data-run>Send request</button></div>
           <div data-resp hidden><div class="resp-meta" data-resp-meta></div><pre class="out" data-out></pre></div>
         </section>
         <section><h3>Code</h3><div class="code-card"><div class="code-tabs">${D.langs.map((l) => `<button class="${l === lang ? "on" : ""}" data-l="${l}">${l}</button>`).join("")}<button class="copy" data-copy-code>Copy</button></div><pre class="code"><code data-sample></code></pre></div></section>
         <section><h3>Errors</h3><div class="table-wrap"><table><tbody>${D.errors.map(([s, t]) => `<tr><td><code>${s}</code></td><td class="muted">${esc(t)}</td></tr>`).join("")}</tbody></table></div></section>`;
-      const renderSample = () => ($("[data-sample]", main).textContent = sample(lang, { api: D.apiUrl, key: D.scraper.key, ep: ep.slug, method: ep.method, params: ex, pathParams }));
+      const renderSample = () => ($("[data-sample]", main).textContent = sample(lang, { api: D.apiUrl, key: D.scraper.key, ep: ep.slug, method: ep.method, params: ex, pathParams, upstream: needKey }));
       renderSample();
       $$("[data-l]", main).forEach((b) => b.addEventListener("click", () => { lang = b.dataset.l; $$("[data-l]", main).forEach((x) => x.classList.toggle("on", x === b)); renderSample(); }));
       $("[data-key]", main)?.addEventListener("input", (e) => store.set("zie_key", e.target.value.trim()));
@@ -194,7 +202,8 @@
         let res, data, headers = {};
         try {
           if (D.loggedIn) {
-            res = await fetch("/api/me/run", { method: "POST", headers: { "content-type": "application/json", "x-zie-csrf": "1" }, body: JSON.stringify({ project: D.scraper.key, endpoint: ep.slug, params }) });
+            const upk = $("[data-upkey]", main)?.value.trim();
+            res = await fetch("/api/me/run", { method: "POST", headers: { "content-type": "application/json", "x-zie-csrf": "1" }, body: JSON.stringify({ project: D.scraper.key, endpoint: ep.slug, params, ...(upk ? { upstreamKey: upk } : {}) }) });
           } else {
             const key = $("[data-key]", main).value.trim();
             if (!key) { toast("Paste an API key or sign in first"); return; }
@@ -202,6 +211,8 @@
             const q = { ...params };
             for (const n of pathParams) if (q[n] !== undefined) { p += "/" + encodeURIComponent(q[n]); delete q[n]; }
             const init = { method: ep.method, headers: { "x-api-key": key } };
+            const upk2 = $("[data-upkey]", main)?.value.trim();
+            if (upk2) init.headers["x-upstream-key"] = upk2;
             if (ep.method === "GET") { const qs = new URLSearchParams(q).toString(); if (qs) p += "?" + qs; } else { init.headers["content-type"] = "application/json"; init.body = JSON.stringify(q); }
             res = await fetch(p, init);
           }

@@ -5,9 +5,9 @@ import { pathFieldNames } from "./catalog.js";
 
 const jsonType = (t) => (t === "integer" ? "integer" : ["string", "number", "boolean", "array", "object"].includes(t) ? t : "string");
 
-export function buildOpenApi(catalog, { apiUrl, version, category = null }) {
+export function buildOpenApi(catalog, { apiUrl, version, category = null, only = null }) {
   const paths = {};
-  for (const s of catalog.scrapers.filter((x) => !category || x.category === category)) {
+  for (const s of only ?? catalog.scrapers.filter((x) => !x.lazy && (!category || x.category === category))) {
     for (const e of s.endpoints) {
       const pathNames = pathFieldNames(e);
       const suffix = pathNames.map((n) => `/{${n}}`).join("");
@@ -116,7 +116,11 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   ];
   for (const s of catalog.scrapers.filter((x) => !category || x.category === category)) {
     if (!full) {
-      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\`: ${s.endpoints.length} endpoints`);
+      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\`: ${s.lazy ? s._count : s.endpoints.length} endpoints${s.auth ? " (your key)" : ""}`);
+      continue;
+    }
+    if (s.lazy) {
+      lines.push(`- ${s.displayName} \`${s.key}\`: ${s._count} endpoints${s.auth ? " (your key)" : ""}. Spec: ${publicUrl}/api/${s.category}/${s.slug}/openapi.json`);
       continue;
     }
     lines.push("", `### ${s.displayName} (\`${s.key}\`)`, s.description ?? "");

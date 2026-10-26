@@ -1,0 +1,1 @@
+{"base":"https://api.nexmo.com/v1/messages","auth":{"t":"bearer"},"ops":[["send-message","POST","/","Send a message to the given channel.",[],2]]}

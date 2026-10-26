@@ -227,3 +227,24 @@ Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh 
 | U10 | Isi dashboard dan admin zapi (tata letak, metrik) | Butuh login |
 | U11 | Gateway pembayaran zapi | Butuh akun + transaksi |
 | U12 | Sekitar 38 upstream live zieapi yang belum terverifikasi | CORS / izin situs di browser; uji dari server setelah deploy |
+
+# Iterasi 3: Perluasan ke ribuan API global (26 Okt 2026)
+
+Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
+
+## A. Observations
+- Kompetitor besar (RapidAPI, ApyHub, API Ninjas, Apify) menjual "satu kunci, banyak API". Pembeda zieapi adalah satu format respons dan satu kuota untuk semua sumber.
+- APIs.guru OpenAPI Directory (CC0) menyediakan spesifikasi mesin untuk ribuan API publik, sehingga integrasi bisa dibuat otomatis dan diulang.
+
+## B. Rekonstruksi
+| Komponen | Berkas |
+|---|---|
+| Importer spesifikasi | `scripts/import-openapi.js` lalu `src/catalog/openapi/` |
+| Katalog lazy (operasi dimuat saat pertama dipakai) | `src/core/directory.js`, `src/core/catalog.js` |
+| Konektor OpenAPI generik + BYOK + SSRF | `src/core/connector.js` |
+| Cache dipisah per kredensial, 401 kunci hilang di-refund | `src/core/executor.js` |
+| Spesifikasi per API | `GET /api/{category}/{slug}/openapi.json` |
+| Dokumentasi | `/docs/byok` |
+
+## C. Verifikasi
+`npm test`: 147 tes lulus, termasuk konektor (kunci di header/query/basic/bearer, kunci env server, SSRF host privat dan redirect, 5xx ke 502), pemisahan cache per kredensial, dan alur `/v1` BYOK end-to-end.

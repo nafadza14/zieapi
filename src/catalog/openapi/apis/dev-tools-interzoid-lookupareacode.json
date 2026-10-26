@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getareacode","GET","/getareacode","Gets telephone area code information",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["areacode","string",1,"q",{"x":"Telephone area code to retrieve area code information"}]],0]]}

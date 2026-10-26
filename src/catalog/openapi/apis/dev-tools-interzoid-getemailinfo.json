@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getemailinfo","GET","/getemailinfo","Gets email validation information for an email address",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["email","string",1,"q",{"x":"Email address to retrieve validation information"}]],0]]}

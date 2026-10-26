@@ -1,0 +1,1 @@
+{"base":"https://authorization.api.npr.org","auth":{"t":"bearer"},"ops":[["generate-device-code","POST","/v2/device","Initiate an OAuth2 login flow for limited input devices",[],4],["create-token","POST","/v2/token","Create a new OAuth2 access token",[],4],["revoke-token","POST","/v2/token/revoke","Revoke an existing OAuth2 access token",[],4]]}

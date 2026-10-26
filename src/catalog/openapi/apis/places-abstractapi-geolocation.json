@@ -1,0 +1,1 @@
+{"base":"https://ipgeolocation.abstractapi.com","auth":null,"ops":[["get-v1","GET","/v1/","Retrieve the location of an IP address",[["api_key","string",1,"q"],["ip_address","string",0,"q"],["fields","string",0,"q"]],0]]}

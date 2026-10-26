@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/geetanjaliuniv/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["dgcer","POST","/dgcer/certificate","Degree/ Diploma Certificate",[],1]]}

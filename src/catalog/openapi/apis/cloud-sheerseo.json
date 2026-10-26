@@ -1,0 +1,1 @@
+{"base":"https://www.sheerseo.com/seo/api","auth":{"t":"key","in":"query","name":"apiKey"},"ops":[["rank-collect","POST","/rank-collect","Submit serp jobs",[],2],["rank-submit","POST","/rank-submit","Submit rank jobs",[],2],["serp-collect","POST","/serp-collect","Submit serp jobs",[],2],["serp-submit","POST","/serp-submit","Submit serp jobs",[],2]]}

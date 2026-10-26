@@ -206,6 +206,24 @@
       "source": "Browser pane fetch of zieapi live-scraper upstream URLs (user machine, 26 Oct 2026)",
       "kind": "verification",
       "summary": "Of 79 upstream URLs (one per live scraper), 30 returned HTTP 200 with the expected shape (e.g. BMKG autogempa, equran.id, myquran, Nager.Date, CoinGecko, Frankfurter, World Bank, GLEIF, Treasury XML, NCBI, DOAJ, Wikipedia, npm, Openverse, Bluesky, RDAP, Jina, Cloudflare DoH, ipwho.is, TVmaze, iTunes, MusicBrainz, PokeAPI, CheapShark, TheMealDB, ClinicalTables, Flathub, AMO), 11 more were reachable without CORS; the rest could not be checked from the browser (site permission / CORS) and remain unverified."
+    },
+    {
+      "id": "E35",
+      "source": "Web research 26 Oct 2026 (see docs/COMPETITORS.md for links)",
+      "kind": "research",
+      "summary": "Competitors: RapidAPI open marketplace with per-API plans; ApyHub 1,500+ utility endpoints on credits; API Ninjas own APIs with tiered plans and an MCP server; Apify Actors on compute units; SerpApi SERP-only tiers; scraping APIs (Firecrawl, ScrapingBee, Zyte, Bright Data, Oxylabs, ScraperAPI, ZenRows, Scrapfly, Diffbot, Crawlbase, Browserless, Jina) focus on proxies/anti-bot."
+    },
+    {
+      "id": "E36",
+      "source": "npm openapi-directory@1.3.17 (APIs.guru OpenAPI Directory, CC0 specs)",
+      "kind": "dataset",
+      "summary": "2,639 specs scanned by scripts/import-openapi.js: 1,383 APIs / 38,807 operations kept (380 keyless; auth key 518, bearer 399, basic 86). Skipped cloud control planes 1,099, no absolute server 126, GHES variants 16, private servers 10."
+    },
+    {
+      "id": "E37",
+      "source": "Browser pane fetch of favicone.com/{domain}?s=128 (user machine, 26 Oct 2026)",
+      "kind": "verification",
+      "summary": "528 provider domains requested: 474 returned an icon, 91 were the service placeholder and were dropped, 382 logos kept and mapped to 383 provider hosts (884 of 1,383 global APIs show a logo)."
     }
   ]
 }

@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/ditarunachal/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["ilpmt","POST","/ilpmt/certificate","Inner Line Permit",[],1]]}

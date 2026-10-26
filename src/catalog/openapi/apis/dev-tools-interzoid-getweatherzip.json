@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getweatherzipcode","GET","/getweatherzipcode","Gets current weather information for a US zip code",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["zip","string",1,"q",{"x":"Zip code for weather information"}]],0]]}

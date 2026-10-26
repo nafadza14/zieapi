@@ -1,0 +1,1 @@
+{"base":"https://api.nexmo.com/v1/redact","auth":{"t":"basic"},"ops":[["redact-message","POST","/transaction","Redact a specific message",[],2]]}

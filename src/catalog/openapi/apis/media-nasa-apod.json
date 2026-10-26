@@ -1,0 +1,1 @@
+{"base":"https://api.nasa.gov/planetary","auth":{"t":"key","in":"query","name":"api_key"},"ops":[["get-apod","GET","/apod","Returns images",[["date","string",0,"q",{"x":"The date of the APOD image to retrieve"}],["hd","boolean",0,"q",{"x":"Retrieve the URL for the high resolution image"}]],0]]}

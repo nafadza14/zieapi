@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v1","auth":null,"ops":[["getairlines","GET","/reference-data/airlines","Return airlines information.",[["airlineCodes","string",0,"q",{"x":"Code of the airline following IATA standard([IATA table codes](http://www.iata.org/publications/Pages/code-search.aspx)) or ICAO standard…","ex":"BA"}]],0]]}

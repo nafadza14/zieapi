@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/gauhati/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["socer","POST","/socer/certificate","Educational/ Exam Registration Certificate",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.ebay.com/commerce/translation/v1","auth":{"t":"bearer"},"ops":[["translate","POST","/translate","Translates input text inot a given language.",[],2]]}

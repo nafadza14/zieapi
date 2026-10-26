@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/kkhsou/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["pvcer","POST","/pvcer/certificate","Provisional Certificate",[],1]]}

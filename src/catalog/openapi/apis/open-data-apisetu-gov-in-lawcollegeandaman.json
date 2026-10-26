@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/lawcollegeandaman/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["trcer","POST","/trcer/certificate","Transfer Certificate",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getcitymatch","GET","/getcitymatch","Gets a similarity key for matching purposes for city name data",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["city","string",1,"q",{"x":"City name from which to generate similarity key"}]],0]]}

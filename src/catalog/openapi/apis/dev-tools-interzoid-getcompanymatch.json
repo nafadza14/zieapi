@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getcompanymatch","GET","/getcompanymatch","Gets a similarity key for matching purposes for company name data",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["company","string",1,"q",{"x":"Company name from which to generate similarity key"}]],0]]}

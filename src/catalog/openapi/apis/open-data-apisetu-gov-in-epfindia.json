@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/epfindia/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["epfsc","POST","/epfsc/certificate","Scheme Certificate",[],1],["pecer","POST","/pecer/certificate","Pension Certificate",[],1],["uncrd","POST","/uncrd/certificate","UAN Card",[],1]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.hubapi.com","auth":{"t":"key","in":"header","name":"private-app-legacy"},"ops":[["post-conversations-v3-visitor-identification-tokens-create-g","POST","/conversations/v3/visitor-identification/tokens/create","Generate a token",[],2]]}

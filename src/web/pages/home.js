@@ -4,7 +4,7 @@ import { PLANS, PLAN_COPY } from "../../core/plans.js";
 const GLOBE_STILL = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg";
 const GLOBE_VIDEO = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e71aea27-a808-4ae3-8231-a469d49285d4.mp4";
 
-export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
+export function homePage({ user, totals, categories, top, global = [], apiUrl, publicUrl }) {
   const examples = [
     { key: "indonesia:bmkg", ep: "gempa-terkini", qs: "", label: "Gempa BMKG" },
     { key: "finance:coingecko", ep: "simple-price", qs: "?ids=bitcoin&vs_currencies=idr", label: "Harga kripto" },
@@ -23,10 +23,10 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
     <span class="chip-coin c1">{ }</span><span class="chip-coin c2">Rp</span><span class="chip-coin c3">₿</span><span class="chip-coin c4"><svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2" opacity=".7"/></svg></span>
   </div>
   <div class="hero-inner">
-    <a href="/scrapers" class="hero-pill rise r1"><span aria-hidden="true">⚡</span> Indonesia-first public data API</a>
+    <a href="/scrapers" class="hero-pill rise r1"><span aria-hidden="true">⚡</span> Indonesia-first, built for the world</a>
     <h1 class="hero-title"><span class="rise r2"><span class="grad-l">Every Public</span> Data Source,</span><span class="rise r3">Behind One <span class="grad-r">API Key</span></span></h1>
-    <p class="hero-sub rise r4">${fmt(totals.scrapers)} scrapers and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">We keep the sources working. You ship the product.</p>
-    <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} scrapers</a></div>
+    <p class="hero-sub rise r4">${fmt(totals.scrapers)} APIs and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">Local scrapers plus ${fmt(totals.directoryApis ?? 0)} global APIs. You ship the product.</p>
+    <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
   </div>
   <a href="#steps" class="scroll-hint rise r6" aria-label="Scroll down">
     <svg viewBox="0 0 120 120" class="scroll-ring" aria-hidden="true"><defs><path id="arcL" d="M18 60a42 42 0 0 1 42-42"/><path id="arcR" d="M60 18a42 42 0 0 1 42 42"/></defs><text><textPath href="#arcL" startOffset="18%">JSON</textPath></text><text><textPath href="#arcR" startOffset="30%">MCP</textPath></text></svg>
@@ -36,7 +36,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
 
   const stats = `
 <section class="stats-strip wrap" aria-label="At a glance">
-  <div><b>${fmt(totals.scrapers)}</b><span>scrapers</span></div>
+  <div><b>${fmt(totals.scrapers)}</b><span>APIs</span></div>
   <div><b>${fmt(totals.endpoints)}</b><span>endpoints</span></div>
   <div><b>${fmt(totals.liveEndpoints)}</b><span>live right now</span></div>
   <div><b>${totals.categories}</b><span>categories</span></div>
@@ -61,6 +61,16 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
   <div class="grid-4 top-grid">${top.map(scraperCard).join("")}</div>
   <div class="center"><a href="/scrapers" class="pill pill-outline">See all ${fmt(totals.scrapers)} scrapers →</a></div>
 </section>`;
+
+  const globalSec = global.length
+    ? `
+<section class="section wrap">
+  <div class="section-head"><span class="eyebrow">Global APIs</span><h2 class="display-2">${fmt(totals.directoryApis ?? 0)} global APIs. One gateway.</h2>
+  <p class="lead">Payments, messaging, developer tools, media, open data and more, imported from public OpenAPI specs. ${fmt(totals.liveEndpoints)} endpoints work with no extra setup. The rest run with your own provider key: send it in <code>x-upstream-key</code> and zieapi never stores it.</p></div>
+  <div class="grid-4 top-grid">${global.map(scraperCard).join("")}</div>
+  <div class="center"><a href="/scrapers?filter=global" class="pill pill-outline">Explore global APIs →</a> <a href="/docs/byok" class="pill pill-ghost">How your own key works</a></div>
+</section>`
+    : "";
 
   const code = `
 <section class="section wrap">
@@ -116,12 +126,12 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
   <a href="${user ? "/dashboard/keys" : "/register"}" class="pill pill-white pill-lg">Get a free API key →</a>
 </section>`;
 
-  return layout({ title: "", active: "home", user, bodyClass: "home", publicUrl, body: `<main>${hero}${stats}${steps}${find}${code}${features}${pricing}${agent}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
+  return layout({ title: "", active: "home", user, bodyClass: "home", publicUrl, body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
 }
 
 export function scraperCard(s) {
   return `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}">
-  <div class="sc-top">${sourceIcon(s)}<span class="badge badge-${esc(s.status)}">${{ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span></div>
+  <div class="sc-top">${sourceIcon(s)}<span class="badge badge-${esc(s.status)}">${{ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span></div>
   <h3>${esc(s.displayName)}</h3>
   <p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p>
   <div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div>

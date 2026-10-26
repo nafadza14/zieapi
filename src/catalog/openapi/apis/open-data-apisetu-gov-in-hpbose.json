@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/hpbose/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["hvcer","POST","/hvcer/certificate","Class XII Provisional Certificate",[],1],["svcer","POST","/svcer/certificate","Class X Provisional Certificate",[],1]]}

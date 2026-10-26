@@ -1,0 +1,1 @@
+{"base":"https://slack.com/api","auth":null,"ops":[["ai-alpha-search-messages","POST","/ai.alpha.search.messages","Search for messages matching a query",[],2]]}

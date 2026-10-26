@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/msde/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["iticr","POST","/iticr/certificate","ITI Certificate",[],1]]}

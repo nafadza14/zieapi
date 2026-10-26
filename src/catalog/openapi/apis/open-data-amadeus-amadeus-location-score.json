@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v1","auth":null,"ops":[["get-category-rated-areas","GET","/location/analytics/category-rated-areas","GET category rated areas",[["latitude","number",1,"q",{"x":"Latitude in decimal coordinates","ex":41.397158}],["longitude","number",1,"q",{"x":"Longitude in decimal coordinates","ex":2.160873}]],0]]}

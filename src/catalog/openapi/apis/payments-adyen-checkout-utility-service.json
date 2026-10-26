@@ -1,0 +1,1 @@
+{"base":"https://checkout-test.adyen.com/v1","auth":null,"ops":[["post-origin-keys","POST","/originKeys","Create originKey values for one or more merchant domains.",[],1]]}

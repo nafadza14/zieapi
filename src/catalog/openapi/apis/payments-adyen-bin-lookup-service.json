@@ -1,0 +1,1 @@
+{"base":"https://pal-test.adyen.com/pal/servlet/BinLookup/v54","auth":{"t":"key","in":"header","name":"X-API-Key"},"ops":[["post-get3ds-availability","POST","/get3dsAvailability","Check if 3D Secure is available",[],1],["post-get-cost-estimate","POST","/getCostEstimate","Get a fees cost estimate",[],1]]}

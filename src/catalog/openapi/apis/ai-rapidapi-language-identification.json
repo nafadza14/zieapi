@@ -1,0 +1,1 @@
+{"base":"https://language-identification-prediction.p.rapidapi.com/v1","auth":null,"ops":[["post-recognize-language","POST","/recognize-language/","Recognize Language",[["X-RapidAPI-Host","string",1,"h",{"d":"language-identification-prediction.p.rapidapi.com"}],["X-RapidAPI-Key","string",1,"h"]],4]]}

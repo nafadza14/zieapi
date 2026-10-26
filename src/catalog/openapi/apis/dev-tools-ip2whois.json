@@ -1,0 +1,1 @@
+{"base":"https://api.ip2whois.com/v2","auth":null,"ops":[["get","GET","/","Lookup WHOIS information",[["domain","string",1,"q",{"x":"Domain name for lookup purpose."}],["key","string",1,"q",{"x":"API key."}],["format","string",0,"q",{"x":"Returns the API response in json (default) or xml format."}]],0]]}

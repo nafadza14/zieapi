@@ -1,0 +1,1 @@
+{"base":"http://xkcd.com","auth":null,"ops":[["get-info-0-json","GET","/info.0.json","Fetch current comic and metadata.",[],0],["get-comic-id-info-0-json","GET","/{comicId}/info.0.json","Fetch comics and metadata by comic id.",[["comicId","number",1,"p"]],0]]}

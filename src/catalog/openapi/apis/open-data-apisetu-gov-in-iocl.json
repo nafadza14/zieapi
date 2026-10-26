@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/iocl/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["lpgsv","POST","/lpgsv/certificate","LPG Subscription Voucher",[],1],["lpgtv","POST","/lpgtv/certificate","Termination Voucher",[],1]]}

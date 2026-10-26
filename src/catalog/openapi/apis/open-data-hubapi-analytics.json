@@ -1,0 +1,1 @@
+{"base":"https://api.hubapi.com","auth":{"t":"key","in":"header","name":"private-app-legacy"},"ops":[["post-events-v3-send-send","POST","/events/v3/send","Send custom event completion",[],2]]}

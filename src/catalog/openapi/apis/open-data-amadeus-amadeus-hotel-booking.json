@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v1","auth":null,"ops":[["create-booking","POST","/booking/hotel-bookings","Create Orders associated to the Hotel Offers",[["Ama-Client-Ref","string",0,"h",{"x":"Client Reference to track Request/Response"}],["Accept-Encoding","string",0,"h",{"e":["gzip","identity"],"x":"Compress the Response"}]],2]]}

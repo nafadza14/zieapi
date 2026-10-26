@@ -1,0 +1,1 @@
+{"base":"https://airport-web.appspot.com/_ah/api","auth":{"t":"bearer"},"ops":[["airport-api-get-airport","GET","/airportsapi/v1/airports/{icao_code}","GET /airportsapi/v1/airports/{icao_code}",[["icao_code","string",1,"p"]],0]]}

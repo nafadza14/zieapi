@@ -1,0 +1,1 @@
+{"base":"https://www.wolframalpha.com","auth":null,"ops":[["get-wolfram-cloud-results","GET","/api/v1/cloud-plugin","Evaluate Wolfram Language code",[["input","string",1,"q",{"x":"the input expression"}]],0],["get-wolfram-alpha-results","GET","/api/v1/llm-api","Get Wolfram|Alpha results",[["input","string",1,"q",{"x":"the input"}]],0]]}

@@ -1,0 +1,1 @@
+{"base":"https://api.koomalooma.com/api","auth":{"t":"key","in":"header","name":"X-KoomaLooma-JWT"},"ops":[["post-users","POST","/users","Create a User",[],0],["post-users-user-id-commitments","POST","/users/{user_id}/commitments","Assign points to a User",[["user_id","string",1,"p",{"x":"user_id of the user to assign points to"}]],2]]}

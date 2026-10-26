@@ -1,0 +1,1 @@
+{"base":"https://cowin.gov.cin/cert/external","auth":{"t":"key","in":"header","name":"Authorization"},"ops":[["get-certificate-pdf","POST","/pdf/certificate","Download the certificate in pdf format",[],2]]}

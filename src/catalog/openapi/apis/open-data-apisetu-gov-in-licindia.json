@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/licindia/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["podoc","POST","/podoc/certificate","Policy Document",[],1]]}

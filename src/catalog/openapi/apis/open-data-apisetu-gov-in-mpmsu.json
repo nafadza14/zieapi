@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/mpmsu/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["micer","POST","/micer/certificate","Migration Certificate",[],1],["pvcer","POST","/pvcer/certificate","Provisional Certificate",[],1]]}

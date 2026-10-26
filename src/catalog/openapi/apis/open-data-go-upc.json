@@ -1,0 +1,1 @@
+{"base":"https://go-upc.com/api/v1","auth":{"t":"key","in":"query","name":"key"},"ops":[["get-product-info","GET","/code/{code}","Retrieve product info for a particular barcode number (UPC, EAN, or ISBN).",[["code","string",1,"p"]],0]]}

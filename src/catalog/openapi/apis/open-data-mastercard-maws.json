@@ -1,0 +1,1 @@
+{"base":"https://api.mastercard.com/maws","auth":null,"ops":[["abu-post","POST","/v1/maws","Access methods for merchants to ABU program.",[],2]]}

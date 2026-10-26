@@ -1,0 +1,1 @@
+{"base":"https://sandbox-api.onsched.com","auth":{"t":"bearer"},"ops":[["get-utility-v1-health-heartbeat","GET","/utility/v1/health/heartbeat","GET /utility/v1/health/heartbeat",[],0],["get-utility-v1-health-threadinfo","GET","/utility/v1/health/threadinfo","GET /utility/v1/health/threadinfo",[],0]]}

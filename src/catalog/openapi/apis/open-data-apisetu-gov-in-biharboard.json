@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/biharboard/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["sscer","POST","/sscer/certificate","Class X Marksheet",[],1],["svcer","POST","/svcer/certificate","Class X Provisional Certificate",[],1]]}

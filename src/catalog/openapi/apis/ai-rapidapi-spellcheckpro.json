@@ -1,0 +1,1 @@
+{"base":"https://spellcheckpro.p.rapidapi.com","auth":null,"ops":[["check-spelling-russian","POST","/check_spelling","Check Spelling (Russian)",[["X-RapidAPI-Key","string",0,"h"]],1]]}

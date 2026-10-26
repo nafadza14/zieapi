@@ -1,0 +1,1 @@
+{"base":"https://app.code-scan.com/api","auth":{"t":"basic"},"ops":[["get-job","GET","/job","Get the status of a job",[["jobId","string",1,"q",{"x":"Id of the Job to retrieve"}]],0],["post-job","POST","/job","Queues a job",[],2]]}

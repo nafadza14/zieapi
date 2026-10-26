@@ -1,0 +1,1 @@
+{"base":"https://wellknown.ai/api","auth":null,"ops":[["get-api-plugins","GET","/api/plugins","Returns a list of Wellknown ai-plugins json objects from the Wellknown ai-plugins registry.",[],0],["get-provider","GET","/plugins","List all the Wellknown AI Plugins.",[],0]]}

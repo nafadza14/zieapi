@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/negd/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["govid","POST","/govid/certificate","ID Card",[],1]]}

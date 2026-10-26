@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/swavlambancard/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["dpicr","POST","/dpicr/certificate","Disabled Person Identity Card/ Certificate",[],1],["govid","POST","/govid/certificate","ID Card",[],1]]}

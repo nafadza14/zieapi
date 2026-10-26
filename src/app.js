@@ -263,6 +263,7 @@ export function createApp(opts = {}) {
   async function v1(ctx, p, m, q, body) {
     const { req } = ctx;
     const caller = await apiKeyCaller(repo, req);
+    caller.upstreamAuth = upstreamAuthFrom(req.headers);
     const noStore = { "Cache-Control": "no-store, private" };
     let mm;
     if (p === "/v1/me" && m === "GET") return json(200, okContent({ user: caller.user ? publicUser(caller.user) : null, key: { id: caller.keyId, preview: caller.keyPreview }, plan: getPlan(caller.plan) }), noStore);
@@ -405,7 +406,8 @@ export function createApp(opts = {}) {
     }
     if (p === "/api/me/run" && m === "POST") {
       // dashboard / scraper-page playground: run an endpoint with the session (billed to the account)
-      const r = await executor.run({ caller: userCaller(user, req), projectKey: String(body?.project ?? ""), endpointSlug: String(body?.endpoint ?? ""), params: isPlainObject(body?.params) ? body.params : {} });
+      const up = body?.upstreamKey ? { key: String(body.upstreamKey).slice(0, 4000) } : null;
+      const r = await executor.run({ caller: userCaller(user, req), projectKey: String(body?.project ?? ""), endpointSlug: String(body?.endpoint ?? ""), params: isPlainObject(body?.params) ? body.params : {}, upstreamAuth: up });
       return json(r.status, r.body, r.headers);
     }
     throw E.notFound("Not found");
@@ -490,17 +492,24 @@ export function createApp(opts = {}) {
     let mm;
     const totals = catalog.totals();
     const html = (s, status = 200, headers = {}) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": user ? "private, no-store" : "public, max-age=0, s-maxage=60, stale-while-revalidate=600", ...headers } });
-    const items = async () => catalog.list({ limit: 1000 }, await statsFor(catalog.scrapers), await repo.disabledScrapers()).items;
+    const items = async () => catalog.list({ limit: 2000 }, await statsFor(catalog.scrapers), await repo.disabledScrapers()).items;
 
     if (p === "/") {
       const all = await items();
-      return html(homePage({ user, totals, categories: catalog.categoryList(), top: all.slice(0, 8), apiUrl, publicUrl }));
+      const pick = (keys) => keys.map((k) => all.find((i) => i.key === k)).filter(Boolean);
+      const global = pick(["business:github-api-github", "finance:stripe", "communication:twilio-api", "media:spotify", "communication:sendgrid", "business:slack", "business:trello", "open-data:nasa-asteroids-neows"]);
+      return html(homePage({ user, totals, categories: catalog.categoryList(), top: all.filter((i) => i.origin !== "directory").slice(0, 8), global, apiUrl, publicUrl }));
     }
     if (p === "/scrapers" || p === "/playground") return html(scrapersPage({ user, totals, categories: catalog.categoryList(), items: await items(), q: q.q ?? "", cat: q.cat ?? "" }));
     if ((mm = /^\/category\/([a-z0-9-]+)$/.exec(p))) {
       const cat = catalog.categoryList().find((c) => c.slug === mm[1]);
       if (!cat) return html(notFoundPage({ user }), 404);
       return html(categoryPage({ user, category: cat, items: (await items()).filter((i) => i.category === cat.slug) }));
+    }
+    if ((mm = /^\/api\/([a-z0-9-]+)\/([a-z0-9-]+)\/openapi\.json$/.exec(p))) {
+      const s = catalog.find(`${mm[1]}:${mm[2]}`);
+      if (!s) return html(notFoundPage({ user }), 404);
+      return json(200, buildOpenApi(catalog, { apiUrl, version: VERSION, only: [s] }), { "Cache-Control": "public, max-age=3600" });
     }
     if ((mm = /^\/api\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(p))) {
       const s = catalog.find(`${mm[1]}:${mm[2]}`);
@@ -602,6 +611,11 @@ export function normalizeUrl(raw) {
   return url;
 }
 const json = (status, body, headers = {}) => ({ status, body, headers });
+function upstreamAuthFrom(h) {
+  const key = typeof h["x-upstream-key"] === "string" ? h["x-upstream-key"].trim() : "";
+  const authorization = typeof h["x-upstream-authorization"] === "string" ? h["x-upstream-authorization"].trim() : "";
+  return key || authorization ? { ...(key ? { key } : {}), ...(authorization ? { authorization } : {}) } : null;
+}
 const text = (s) => ({ status: 200, body: s, headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=600" } });
 const redirect = (to, headers = {}) => ({ status: 302, body: "", headers: { Location: to, ...headers } });
 const isHttps = (req) => req.headers["x-forwarded-proto"] === "https" || !!req.socket?.encrypted;
@@ -620,7 +634,7 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, x-api-key, api-key, authorization, idempotency-key, x-request-id, mcp-protocol-version, mcp-session-id",
+    "Access-Control-Allow-Headers": "content-type, x-api-key, api-key, authorization, idempotency-key, x-request-id, mcp-protocol-version, mcp-session-id, x-upstream-key, x-upstream-authorization",
     "Access-Control-Expose-Headers": "x-request-id, X-Response-Time, Retry-After, X-Cache, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Limit-Minute, X-RateLimit-Remaining-Minute, X-RateLimit-Limit-Month, X-RateLimit-Remaining-Month",
     "Access-Control-Max-Age": "86400",
   };

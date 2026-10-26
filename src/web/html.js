@@ -82,7 +82,7 @@ ${scripts.map((s) => `<script src="${s}" defer></script>`).join("\n")}
 
 export const pageHead = (eyebrow, title, sub = "") => `<section class="page-head"><div class="wrap"><span class="eyebrow">${eyebrow}</span><h1 class="display">${title}</h1>${sub ? `<p class="lead">${sub}</p>` : ""}</div></section>`;
 
-export const statusBadge = (s) => `<span class="badge badge-${esc(s)}">${{ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Disabled" }[s] ?? esc(s)}</span>`;
+export const statusBadge = (s) => `<span class="badge badge-${esc(s)}">${{ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Disabled" }[s] ?? esc(s)}</span>`;
 
 /** Source logo tile: the source's own icon on a white tile, or a monogram when none is known. */
 export function sourceIcon(s, { size = "", color = "#8b8ba7" } = {}) {

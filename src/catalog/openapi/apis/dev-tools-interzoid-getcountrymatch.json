@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getcountrymatch","GET","/getcountrymatch","Gets a similarity key for matching purposes for country name data",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["country","string",1,"q",{"x":"Country name from which to generate similarity key"}]],0]]}

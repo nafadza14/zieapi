@@ -1,0 +1,1 @@
+{"base":"https://api.interzoid.com","auth":null,"ops":[["getaddressmatch","GET","/getaddressmatch","Gets a similarity key for matching purposes for address data",[["license","string",1,"q",{"x":"Your Interzoid license API key. Register at www.interzoid.com/register"}],["address","string",1,"q",{"x":"Address from which to generate similarity key"}]],0]]}

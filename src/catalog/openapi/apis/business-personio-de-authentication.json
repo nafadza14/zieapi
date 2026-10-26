@@ -1,0 +1,1 @@
+{"base":"https://api.personio.de/v1","auth":null,"ops":[["post-auth","POST","/auth","Request Authentication Token",[["client_id","string",1,"q",{"x":"Client id of the downloaded credentials file"}],["client_secret","string",1,"q",{"x":"Client secret of the downloaded credentials file"}]],0]]}

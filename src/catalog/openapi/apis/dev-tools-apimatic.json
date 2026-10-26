@@ -1,0 +1,1 @@
+{"base":"https://apimatic.io/api/transform","auth":{"t":"key","in":"query","name":"apikey"},"ops":[["convert-api","POST","/transform","Transform API Descriptions from/to various formats",[["format","string",1,"q",{"e":["swagger10","swagger20","swaggeryaml","apiblueprint","wadl2009","raml","apimatic"]}]],3]]}

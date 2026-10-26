@@ -1,0 +1,1 @@
+{"base":"https://rest.nexmo.com/sms","auth":null,"ops":[["send-an-sms","POST","/{format}","Send an SMS",[["format","string",1,"p",{"d":"json","e":["json","xml"],"x":"The format of the response"}]],4]]}

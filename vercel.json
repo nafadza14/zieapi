@@ -5,7 +5,7 @@
   "buildCommand": "npm test",
   "outputDirectory": "public",
   "functions": {
-    "api/zieapi.js": { "maxDuration": 60, "includeFiles": "public/**" }
+    "api/zieapi.js": { "maxDuration": 60, "includeFiles": "{public/**,src/catalog/openapi/**}" }
   },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/zieapi?__path=$1" }

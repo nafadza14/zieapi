@@ -1,0 +1,1 @@
+{"base":"https://www.who-hosts-this.com/APIEndpoint","auth":{"t":"key","in":"query","name":"key"},"ops":[["get-detect","GET","/Detect","Discover the hosting provider for a web site",[["url","string",1,"q",{"x":"The url of the page to check"}]],0],["get-status","GET","/Status","View usage details for the current billing period",[],0]]}

@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/hpsbys/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["rsbyc","POST","/rsbyc/certificate","Health Card/ Certificate",[],1]]}

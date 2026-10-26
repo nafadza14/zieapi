@@ -1,0 +1,1 @@
+{"base":"https://cal-test.adyen.com/cal/services/Hop/v6","auth":{"t":"key","in":"header","name":"X-API-Key"},"ops":[["post-get-onboarding-url","POST","/getOnboardingUrl","Get a link to a Adyen-hosted onboarding page",[],1],["post-get-pci-questionnaire-url","POST","/getPciQuestionnaireUrl","Get a link to a PCI compliance questionnaire",[],1]]}

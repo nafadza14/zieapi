@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/cholainsurance/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["cripc","POST","/cripc/certificate","Insurance Policy - Car",[],1],["twipc","POST","/twipc/certificate","Insurance Policy - Two Wheeler",[],1]]}

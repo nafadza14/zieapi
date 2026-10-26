@@ -1,0 +1,1 @@
+{"base":"https://api.mastercard.com/fraud/mtf/bintable/v1","auth":null,"ops":[["get-binlisting","GET","/binlisting","BIN Table Listing file",[],0]]}

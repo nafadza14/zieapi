@@ -1,0 +1,1 @@
+{"base":"https://rss.import.io","auth":{"t":"key","in":"query","name":"_apikey"},"ops":[["get-extractor-extractor-id-runs","GET","/extractor/{extractorId}/runs","Get a feed of the runs performed on an extractor",[["extractorId","string",1,"p",{"x":"The id of the extractor to start get the crawl run data"}]],0]]}

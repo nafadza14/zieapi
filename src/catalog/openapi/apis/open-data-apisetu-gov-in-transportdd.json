@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/transportdd/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["drvlc","POST","/drvlc/certificate","Driving License",[],1],["rvcer","POST","/rvcer/certificate","Registration of Vehicles",[],1]]}

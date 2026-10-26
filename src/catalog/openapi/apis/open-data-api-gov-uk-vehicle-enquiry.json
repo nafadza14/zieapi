@@ -1,0 +1,1 @@
+{"base":"https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry","auth":null,"ops":[["get-vehicle-details-by-registration-number","POST","/v1/vehicles","Get vehicle details by registration number",[["X-Correlation-Id","string",0,"h",{"x":"Consumer Correlation ID"}]],2]]}

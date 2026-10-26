@@ -1,0 +1,1 @@
+{"base":"http://stream-api.betfair.com:443/api","auth":null,"ops":[["post-request","POST","/request","This is a socket protocol delimited by CRLF (not http)",[],2]]}

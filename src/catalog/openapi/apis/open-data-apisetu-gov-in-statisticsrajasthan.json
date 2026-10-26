@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/statisticsrajasthan/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["btcer","POST","/btcer/certificate","Birth Certificate",[],1],["dtcer","POST","/dtcer/certificate","Death Certificate",[],1],["rmcer","POST","/rmcer/certificate","Marriage Certificate",[],1]]}

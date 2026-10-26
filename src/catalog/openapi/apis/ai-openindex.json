@@ -1,0 +1,1 @@
+{"base":"https://retriever.openindex.ai","auth":{"t":"bearer"},"ops":[["query-query-post","POST","/query","Query",[],2]]}

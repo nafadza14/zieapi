@@ -27,6 +27,7 @@ before(async () => {
     apiUrl: "http://api.test",
     publicUrl: "http://zie.test",
     scrapers: [...devtools, flaky],
+    lookup: async () => [{ address: "93.184.216.34", family: 4 }],
     kv: new MemoryKV(),
     webhookFetch: async (url, init) => { deliveries.push({ url, init }); return new Response("ok"); },
     fetch: async (url, init) => {
@@ -231,7 +232,7 @@ test("helpers: normalizeUrl + UpstashKV wire format", async () => {
 });
 
 test("source logos: catalog has icons and admins can override them", async () => {
-  const list = await (await fetch(`${base}/api/scrapers/list?limit=500`)).json();
+  const list = await (await fetch(`${base}/api/scrapers/list?limit=500&origin=native`)).json();
   const withIcon = list.content.items.filter((i) => i.iconUrl);
   assert.ok(withIcon.length > 200, `only ${withIcon.length} icons`);
   const bin = list.content.items.find((i) => i.key === "finance:binance");
@@ -249,4 +250,21 @@ test("source logos: catalog has icons and admins can override them", async () =>
   await admin("/api/admin/scrapers/finance:binance/icon", { method: "POST", body: { url: "" } });
   const d2 = await (await fetch(`${base}/api/scrapers/finance:binance`)).json();
   assert.match(d2.content.iconUrl, /binance\.com/);
+});
+
+test("global APIs: BYOK through /v1, per-API OpenAPI spec and filters", async () => {
+  const k = { "x-api-key": "zie_env_ultra_key_000000" };
+  const need = await fetch(`${base}/v1/iot:adafruit/current-user`, { headers: k });
+  assert.equal(need.status, 401);
+  assert.equal((await need.json()).error.code, "upstream_key_required");
+  const before = upstreamCalls.length;
+  const withKey = await fetch(`${base}/v1/iot:adafruit/current-user`, { headers: { ...k, "x-upstream-key": "aio_test" } });
+  assert.equal(withKey.status, 400); // mocked upstream answers 404 -> ScraperError
+  const call = upstreamCalls.slice(before).find((c) => c.url.startsWith("https://io.adafruit.com"));
+  assert.ok(call, "upstream was called");
+  assert.equal(call.init.headers["x-aio-key"], "aio_test");
+  const spec = await (await fetch(`${base}/api/iot/adafruit/openapi.json`)).json();
+  assert.ok(Object.keys(spec.paths).length > 5);
+  const nokey = await (await fetch(`${base}/api/scrapers/list?origin=directory&auth=none&limit=3`)).json();
+  assert.ok(nokey.content.items.every((i) => !i.auth));
 });

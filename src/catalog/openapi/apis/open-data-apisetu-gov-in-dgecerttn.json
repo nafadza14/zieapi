@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/dgecerttn/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["hscer","POST","/hscer/certificate","Class XII Marksheet",[],1],["sscer","POST","/sscer/certificate","Class X Marksheet",[],1]]}

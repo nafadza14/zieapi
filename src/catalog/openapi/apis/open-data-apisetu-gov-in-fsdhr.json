@@ -1,0 +1,1 @@
+{"base":"https://apisetu.gov.in/fsdhr/v3","auth":{"t":"key","in":"header","name":"X-APISETU-APIKEY"},"ops":[["ratcr","POST","/ratcr/certificate","Ration Card",[],1]]}

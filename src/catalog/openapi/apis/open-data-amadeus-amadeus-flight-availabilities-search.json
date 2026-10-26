@@ -1,0 +1,1 @@
+{"base":"https://test.api.amadeus.com/v1","auth":null,"ops":[["search-flight-availabilities","POST","/shopping/availability/flight-availabilities","Return list of Flight Availabilities based on posted searching criteria.",[["X-HTTP-Method-Override","string",1,"h",{"d":"GET","x":"the HTTP method to apply"}]],2]]}

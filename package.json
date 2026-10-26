@@ -1,0 +1,26 @@
+{
+  "name": "zieapi",
+  "version": "1.0.0",
+  "description": "Clean-room, zero-dependency scraper API gateway: one key, one envelope, catalog, rate limits, bulk jobs, webhooks and an MCP server.",
+  "type": "module",
+  "main": "src/app.js",
+  "bin": {
+    "zieapi": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "key:create": "node scripts/create-key.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": ["api", "scraper", "gateway", "mcp", "indonesia", "rate-limit"],
+  "author": "Zieads",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nafadza14/zieapi.git"
+  }
+}

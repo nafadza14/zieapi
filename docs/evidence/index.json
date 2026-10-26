@@ -1,0 +1,175 @@
+{
+  "captured_at": "2026-10-26",
+  "method": "REA methodology (morluto/rea v6.8.0). Live capture via in-app Chromium (passive DOM + performance entries + same-origin chunk fetch) and WebFetch of public docs; static read of public MIT SDK zeative/zpi-sdk@0.6.0. No login, no paid features, no brute force. All keys redacted.",
+  "redaction": "Any API key shown as zpi_•••• or zk_live_••••. Only one deliberately-invalid key ('zpi_invalid_probe') was sent, to observe the 401 envelope.",
+  "evidence": [
+    {
+      "id": "E01",
+      "source": "https://zapi.ink/",
+      "kind": "page",
+      "summary": "Hero: '318 scrapers. One API key.' 25 categories, 1,270 endpoints, 600 free req/month. Example `GET /v1/instagram/profile -H x-api-key` returning {project:'social-media:instagram-scraper', data, timestamp}."
+    },
+    {
+      "id": "E02",
+      "source": "https://zapi.ink/pricing",
+      "kind": "page",
+      "summary": "Plans Free Rp0 (600/mo, 100/min, 7d logs, no cache control), Pro Rp49.000 (25k/mo, 2,000/min, 30d, cache down to 30s), Ultra Rp129.000 (200k/mo, 5,000/min, 90d, always fresh, bulk), Max Rp399.000 (1M/mo, 15,000/min). 5xx not counted, 4xx counted; quota resets 1st of month UTC; PAYG top-up valid 12 months; header X-RateLimit-Remaining-Month."
+    },
+    {
+      "id": "E03",
+      "source": "https://zapi.ink/mcp",
+      "kind": "page",
+      "summary": "MCP server 'zapi' v1.2.0 at https://mcp.zapi.ink/mcp, Streamable HTTP, stateless. Auth: Authorization: Bearer | x-api-key | api-key. 8 tools: search_scrapers, get_scraper_schema, list_categories, run_scraper, get_account, get_usage, bulk_submit, bulk_status. No resources/prompts. Bulk tools Ultra/Max only."
+    },
+    {
+      "id": "E04",
+      "source": "https://zapi.ink/scrapers",
+      "kind": "page",
+      "summary": "Catalog UI: search (⌘K), sort (Most used / Name A–Z / Most endpoints), category sidebar, chips All / Bulk support / Indonesian sources, 'Load more' 18 per page. Links pattern /api/{category}/{scraper}."
+    },
+    {
+      "id": "E05",
+      "source": "https://zapi.ink/openapi.json",
+      "kind": "spec",
+      "summary": "OpenAPI 3.1 index, servers https://api.zapi.ink, ApiKeyAuth = header x-api-key, generic Envelope {status: success|error, message, content}. x-specs list 25 per-category specs at /category/{category}/openapi.json, totals 1,270 endpoints (Finance 501)."
+    },
+    {
+      "id": "E06",
+      "source": "https://zapi.ink/category/indonesia/openapi.json",
+      "kind": "spec",
+      "summary": "Per-category spec: paths like GET /v1/indonesia:cek-kode-pos/lookup, operationId indonesia_cek_kode_pos_lookup, query params with enums/defaults, no x- extensions for cache/plan/bulk."
+    },
+    {
+      "id": "E07",
+      "source": "https://zapi.ink/llms.txt",
+      "kind": "doc",
+      "summary": "Path convention /v1/CATEGORY:SCRAPER/ENDPOINT; success {project,data,timestamp}; error {content,message,errors}; per-scraper llms.txt at /api/{category}/{scraper}/llms.txt; llms-full.txt."
+    },
+    {
+      "id": "E08",
+      "source": "https://zapi.ink/docs/rest-api",
+      "kind": "doc",
+      "summary": "POST /v1/{category:scraper}/{endpoint} with JSON body also accepted; bulk POST /v1/{category:scraper}/{endpoint}/bulk and GET /v1/bulk/{jobId}; 401/403/429(Retry-After)/5xx."
+    },
+    {
+      "id": "E09",
+      "source": "https://zapi.ink/docs/errors",
+      "kind": "doc",
+      "summary": "Error taxonomy: 400 invalid params / exec error / bulk cap, 401 auth, 403 plan gate / bulk not enabled, 404, 405, 422 idempotency, 429 rate limit, 500, 503 disabled. requestId from x-request-id."
+    },
+    {
+      "id": "E10",
+      "source": "github.com/zeative/zpi-sdk src/core/errors.ts",
+      "kind": "code",
+      "summary": "fromResponse(): 400 exec error detected by {project,error,timestamp}; bulk errors nest error.code (bulk_cap_exceeded, bulk_not_enabled, quota_exceeded); plan gate reads error.{code,message} + upgrade_url; 429 reads content.{limit,used,window,retryAfterSec}; 405 reads content.expected then Allow header."
+    },
+    {
+      "id": "E11",
+      "source": "github.com/zeative/zpi-sdk src/core/http.ts + url.ts",
+      "kind": "code",
+      "summary": "URL = {base}/v1/{projectKey}/{endpoint}[/{pathRest}]; GET → query string (objects JSON-stringified), POST → JSON body; headers x-api-key, Idempotency-Key, User-Agent zpi-sdk/0.6.0; success returns body.data; retries only 429/502/503/504 + network; auto verb switch on 405 memoised per endpoint."
+    },
+    {
+      "id": "E12",
+      "source": "github.com/zeative/zpi-sdk src/resources/catalog.ts",
+      "kind": "code",
+      "summary": "Public catalog: GET /api/scrapers/list (q,cat,cursor,limit), /api/scrapers/{slug}, /api/public/categories, /api/public/scrapers/{slug}/endpoints/{ep}/schema, /api/public/scrapers/{slug}/stats. Types CatalogListItem, ScraperDetail, ScraperEndpoint (method, paramsSchema, cacheTtl, pathTemplate, minPlan, bulkEnabled)."
+    },
+    {
+      "id": "E13",
+      "source": "github.com/zeative/zpi-sdk src/resources/bulk.ts",
+      "kind": "code",
+      "summary": "Bulk job statuses QUEUED|RUNNING|COMPLETED|FAILED|CANCELLED; items QUEUED|RUNNING|SUCCEEDED|FAILED; job fields jobId,status,total,succeeded,failed,scraperSlug,endpointSlug,createdAt,startedAt,completedAt,pollUrl,items[]; client polls with exp backoff cap 5s."
+    },
+    {
+      "id": "E14",
+      "source": "github.com/zeative/zpi-sdk src/webhooks/verify.ts",
+      "kind": "code",
+      "summary": "Webhook events bulk.completed|bulk.failed|bulk.item|key.created|key.deleted|key.disabled|quota.exceeded|quota.warning|request.error|webhook.test; header X-Zpi-Signature = HMAC-SHA256 hex (optional 'sha256=' prefix); payload {id,event,data,deliveredAt}."
+    },
+    {
+      "id": "E15",
+      "source": "github.com/zeative/zpi-sdk src/mcp/transport.ts",
+      "kind": "code",
+      "summary": "MCP JSON-RPC 2.0 over Streamable HTTP, protocolVersion 2025-06-18, accepts application/json or SSE replies; URL {base}/mcp."
+    },
+    {
+      "id": "E16",
+      "source": "github.com/zeative/zpi-sdk docs/account.md",
+      "kind": "doc",
+      "summary": "Backend name 'zpi-backend'. /api/me/* gated by better-auth session (requireSession); only /v1 and /mcp accept requireApiKey; no API-key account endpoint exists."
+    },
+    {
+      "id": "E17",
+      "source": "browser: https://zapi.ink/scrapers (DOM + performance)",
+      "kind": "runtime",
+      "summary": "Next.js App Router with Turbopack chunks (/_next/static/chunks/turbopack-*.js, self.__next_f RSC payload, no __NEXT_DATA__); 23 JS chunks (largest ~232 KB); Sentry DSN env, Radix UI, lucide, framer-motion, sonner; analytics GA4 G-BEM8C2R7TC via GTM-K44WS4PF, Microsoft Clarity, Yandex verification, Cloudflare RUM (/cdn-cgi/rum) + beacon; /api/internal/vitals; cookies only _ga*; localStorage empty."
+    },
+    {
+      "id": "E18",
+      "source": "browser: image resources",
+      "kind": "runtime",
+      "summary": "Icons served by imgproxy at imp.zapi.ink with signed paths (/{sig}/rs:fit:128:128:0/q:85/f:webp/{base64(source)}.webp); source objects at https://s3.zapi.ink/main/scrapers/{slug}-{epochms}.{ext} and /main/categories/{slug}/{uuid}.svg."
+    },
+    {
+      "id": "E19",
+      "source": "GET https://api.zapi.ink/api/scrapers/list?limit=2",
+      "kind": "network",
+      "summary": "200 {content:{items[],nextCursor:'2',total:318},message:'OK',errors:[]}; Cache-Control: public, max-age=30, s-maxage=60, stale-while-revalidate=300; X-Response-Time header; ids are ULIDs; item fields id,slug,category,displayName,description,tags,iconUrl,endpointCount,totalRequests,maxCacheTtl,minPlan,hasBulk,hasGatedEndpoint."
+    },
+    {
+      "id": "E20",
+      "source": "GET https://api.zapi.ink/api/scrapers/instagram-scraper",
+      "kind": "network",
+      "summary": "ScraperDetail with endpoints[]: profile → method GET, paramsSchema {username:'string'}, cacheTtl 600, pathTemplate ':username', exampleResponse {...}."
+    },
+    {
+      "id": "E21",
+      "source": "GET https://api.zapi.ink/api/public/scrapers/instagram-scraper/endpoints/profile/schema",
+      "kind": "network",
+      "summary": "{content:{fields:[{name:'username',type:'string',required:true,description,example,in:'path',min:1}]},message:'OK',errors:[]}."
+    },
+    {
+      "id": "E22",
+      "source": "GET https://api.zapi.ink/api/public/scrapers/instagram-scraper/stats",
+      "kind": "network",
+      "summary": "{content:{requests:101977,successRate:72.2},message:'OK',errors:[]}."
+    },
+    {
+      "id": "E23",
+      "source": "GET https://api.zapi.ink/v1/indonesia:cek-kode-pos/lookup with x-api-key: zpi_invalid_probe",
+      "kind": "network",
+      "summary": "401 {content:null,message:'Invalid API key',errors:[]}, X-Response-Time: 1. Same request without any key failed at the browser fetch layer (CORS/opaque) — body not observable."
+    },
+    {
+      "id": "E24",
+      "source": "GET https://api.zapi.ink/api/scrapers/list?cat=indonesia&limit=1&q=nik",
+      "kind": "network",
+      "summary": "Filter by cat + q works; total:6 for indonesia∩'nik'; nextCursor:'1' (looks like an offset)."
+    },
+    {
+      "id": "E25",
+      "source": "POST https://mcp.zapi.ink/mcp initialize (no key) from zapi.ink origin",
+      "kind": "network",
+      "summary": "Browser fetch failed (CORS from page origin). MCP handshake not observed directly; contract taken from E03 + E15."
+    },
+    {
+      "id": "E26",
+      "source": "https://zapi.ink/login (HTML)",
+      "kind": "page",
+      "summary": "Login HTML mentions Google, GitHub and Discord; no Turnstile or magic-link strings in the HTML."
+    },
+    {
+      "id": "E27",
+      "source": "github.com/zeative/zpi-sdk test/fixtures/be-errors.ts + bulk-errors.ts",
+      "kind": "code",
+      "summary": "Captured backend error envelopes: 401 message 'API key required (x-api-key, Authorization: Bearer, or api-key header)'; 404 'Invalid project key \"…\"'; 429 headers X-RateLimit-Limit-Minute / X-RateLimit-Remaining-Minute; plan gate code plan_upgrade_required + required_plan; bulk codes bulk_not_enabled, bulk_cap_exceeded {cap,submitted}, idempotency_key_reuse (422), quota_exceeded {used,limit,requested}. Fixture comments reference zpi-backend/src/routes/V1.ts."
+    },
+    {
+      "id": "E28",
+      "source": "examples/zpi-sdk-parity.mjs (this repo)",
+      "kind": "verification",
+      "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local zieapi via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError — i.e. zieapi is wire-compatible with the observed contract."
+    }
+  ]
+}

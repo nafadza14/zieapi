@@ -1,3 +1,4 @@
+import { webPageLd, breadcrumb, faqLd } from "../seo.js";
 import { layout, esc, fmt, idr } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
 
@@ -11,6 +12,8 @@ const FAQ = [
   ["What about the legality of accessing public data?", "Apizie focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data. See the Acceptable Use Policy."],
   ["Can I request a source that isn't in the catalog?", "Yes. Use Report an issue → Request a scraper. Popular requests are prioritised."],
 ];
+
+export const PRICING_FAQ = FAQ;
 
 export function pricingPage({ user }) {
   const plans = Object.values(PLANS);
@@ -66,5 +69,6 @@ export function pricingPage({ user }) {
   <div class="faq">${FAQ.map(([q, a], i) => `<details${i === 0 ? " open" : ""}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>
 </main>`;
-  return layout({ title: "Pricing", active: "pricing", user, body, description: "Free 600 requests/month. Pro, Ultra and Max plans in Rupiah." });
+  const description = "Apizie pricing: Free 600 requests a month with no credit card, then Pro Rp49.000, Ultra Rp129.000 and Max Rp399.000 per month. Failed 5xx calls are refunded.";
+  return layout({ fullTitle: "Pricing: Free 600 Requests/Month, Plans from Rp49K | Apizie", active: "pricing", user, body, description, ogImage: "/assets/og/pricing.png", markdown: true, jsonLd: [webPageLd({ name: "Apizie pricing", description }), breadcrumb([["Home", "/"], ["Pricing", "/pricing"]]), faqLd(FAQ)] });
 }

@@ -282,3 +282,6 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 - Logo: simbol `//.` tetap; wordmark kini **Apizie** (Inter Display SemiBold, titik aksen di huruf "i" terakhir). Generator: `brand/logo/*.svg`, PNG di `brand/png/`.
 - Teknis: fungsi Vercel `api/apizie.js`, tabel Supabase `apizie_kv`, prefix API key baru `apz_` (kunci `zie_` lama tetap valid), env `APIZIE_*` (nama lama `ZIE_*` tetap dibaca), header webhook `X-Apizie-Signature`.
 - Repo GitHub tetap `nafadza14/zieapi` sampai di-rename; domain default `apizie.vercel.app`.
+
+# Iterasi 6: Hero, favicon, metadata, SEO dan GEO (26 Okt 2026)
+Bukti E42-E45; detail dan sumber di [`SEO-GEO.md`](SEO-GEO.md). Hero baru ("One API key for 1,600+ data sources"), logo brand live berwarna asli, favicon yang terbaca di tab terang/gelap, metadata lengkap per halaman, JSON-LD (WebAPI per API), twin Markdown, robots.txt untuk crawler AI, sitemap dengan lastmod. Diverifikasi dengan `npm test` (153 lulus) dan tangkapan layar desktop/mobile.

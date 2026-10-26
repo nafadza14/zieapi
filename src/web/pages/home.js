@@ -1,11 +1,22 @@
 import { layout, esc, fmt, idr, json, sourceIcon } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
 import { HERO_BRANDS } from "../brands.js";
+import { webPageLd, faqLd } from "../seo.js";
+
+export const HOME_FAQ = [
+  ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, BMKG, Indonesian news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
+  ["How do I use Apizie with Claude, ChatGPT or Cursor?", "Add the Apizie MCP server URL (/mcp) to your app. Claude.ai, Claude Desktop and ChatGPT connect with one click through OAuth; Cursor, VS Code and Gemini CLI use an API key header. The agent can then search the catalog and call any API as a tool."],
+  ["Is Apizie free?", "Yes. The Free plan includes 600 requests a month at 100 requests a minute on every live endpoint, with no credit card. Paid plans (Pro, Ultra, Max) raise the limits and add bulk jobs and webhooks."],
+  ["Which data sources does Apizie cover?", "Indonesian sources (BMKG earthquakes and weather, IDX stocks, prayer times, postal codes, local news), global finance and crypto (Binance, OKX, CoinGecko), research (PubMed, arXiv), developer tools (GitHub, npm, Docker Hub) and 1,300+ global APIs imported from public OpenAPI specifications."],
+  ["What does a request look like?", "GET /v1/{category}:{api}/{endpoint}?param=value with the header x-api-key. For example /v1/search-tools:wikipedia/search?query=Borobudur returns Wikipedia search results as JSON."],
+];
+
 
 const GLOBE_STILL = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg";
 const GLOBE_VIDEO = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e71aea27-a808-4ae3-8231-a469d49285d4.mp4";
 
-export function homePage({ user, totals, categories, top, global = [], apiUrl, publicUrl }) {
+export function homePage({ user, totals, categories, top, global = [], liveKeys = null, apiUrl, publicUrl }) {
+  const apiCount = `${(Math.floor((totals.scrapers ?? 0) / 100) * 100).toLocaleString("en-US")}+`;
   const examples = [
     { key: "indonesia:bmkg", ep: "gempa-terkini", qs: "", label: "Gempa BMKG" },
     { key: "finance:coingecko", ep: "simple-price", qs: "?ids=bitcoin&vs_currencies=idr", label: "Harga kripto" },
@@ -24,11 +35,11 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
     <span class="chip-coin c1">{ }</span><span class="chip-coin c2">Rp</span><span class="chip-coin c3">₿</span><span class="chip-coin c4"><svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2" opacity=".7"/></svg></span>
   </div>
   <div class="hero-inner">
-    <a href="/scrapers" class="hero-pill rise r1"><span aria-hidden="true">⚡</span> Indonesia-first, built for the world</a>
-    <h1 class="hero-title"><span class="rise r2"><span class="grad-l">Every Public</span> Data Source,</span><span class="rise r3">Behind One <span class="grad-r">API Key</span></span></h1>
-    <p class="hero-sub rise r4">${fmt(totals.scrapers)} APIs and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">Local scrapers plus ${fmt(totals.directoryApis ?? 0)} global APIs. You ship the product.</p>
+    <a href="/mcp" class="hero-pill rise r1"><span class="pill-new">New</span><span class="pill-long">MCP server for Claude, ChatGPT &amp; Cursor</span><span class="pill-short">MCP for Claude &amp; ChatGPT</span><span aria-hidden="true">→</span></a>
+    <h1 class="hero-title"><span class="rise r2"><span class="grad-l">One API key</span> for</span><span class="rise r3"><span class="grad-r">${apiCount}</span> data sources</span></h1>
+    <p class="hero-sub rise r4">Stock prices, earthquakes, news, GitHub and Wikipedia as clean JSON. Call them from your code, or let Claude, ChatGPT and Cursor use them through MCP.</p>
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
-    ${brandStrip(totals)}
+    ${brandStrip(totals, liveKeys)}
   </div>
   <a href="#steps" class="scroll-hint rise r6" aria-label="Scroll down">
     <svg viewBox="0 0 120 120" class="scroll-ring" aria-hidden="true"><defs><path id="arcL" d="M18 60a42 42 0 0 1 42-42"/><path id="arcR" d="M60 18a42 42 0 0 1 42 42"/></defs><text><textPath href="#arcL" startOffset="18%">JSON</textPath></text><text><textPath href="#arcR" startOffset="30%">MCP</textPath></text></svg>
@@ -115,7 +126,7 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
   <div class="split reverse">
     <div class="code-card"><div class="code-tabs"><button class="on">Claude Code</button></div><pre class="code"><code>claude mcp add --transport http apizie \\
   ${esc(apiUrl)}/mcp \\
-  --header "x-api-key: zie_••••••••"</code></pre>
+  --header "x-api-key: apz_••••••••"</code></pre>
       <ul class="tool-list">${["search_scrapers", "get_scraper_schema", "list_categories", "run_scraper", "get_account", "get_usage", "bulk_submit", "bulk_status"].map((t) => `<li><code>${t}</code></li>`).join("")}</ul></div>
     <div><span class="eyebrow">MCP</span><h2 class="display-2">Let your AI agent do the scraping.</h2><p class="lead">Point any MCP client at <code>/mcp</code>. Your agent searches the catalog, reads the schema and runs the endpoint, on the same key and quota as REST.</p><a href="/mcp" class="pill pill-white">Set up MCP →</a></div>
   </div>
@@ -128,7 +139,13 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
   <a href="${user ? "/dashboard/keys" : "/register"}" class="pill pill-white pill-lg">Get a free API key →</a>
 </section>`;
 
-  return layout({ title: "", active: "home", user, bodyClass: "home", publicUrl, body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
+  const faqSec = `
+<section class="section wrap narrow" id="faq">
+  <div class="section-head"><span class="eyebrow">FAQ</span><h2 class="display-2">Questions, answered.</h2></div>
+  <div class="faq">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
+</section>`;
+  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, BMKG, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 600 requests/month.`;
+  return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
 }
 
 export function scraperCard(s) {
@@ -142,13 +159,15 @@ export function scraperCard(s) {
 
 export const _json = json;
 
-function brandStrip(totals) {
+function brandStrip(totals, liveKeys) {
+  const brands = HERO_BRANDS.filter((b) => !liveKeys || liveKeys.has(b.key));
+  if (!brands.length) return "";
   const item = (b, hidden) => {
     const [cat, slug] = b.key.split(":");
-    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API"`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${b.path}"/></svg><span>${esc(b.name)}</span></a>`;
+    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API (live)"`}><span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="${esc(b.color)}" d="${b.path}"/></svg></span><span>${esc(b.name)}</span></a>`;
   };
   return `<div class="hero-brands rise r6">
-      <p class="hero-brands-label">Works with ${(Math.floor((totals.directoryApis ?? 0) / 100) * 100).toLocaleString("en-US")}+ global APIs, including</p>
-      <div class="brand-marquee"><div class="brand-track">${HERO_BRANDS.map((b) => item(b, false)).join("")}${HERO_BRANDS.map((b) => item(b, true)).join("")}</div></div>
+      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>Live right now, no extra keys needed</p>
+      <div class="brand-marquee"><div class="brand-track">${brands.map((b) => item(b, false)).join("")}${brands.map((b) => item(b, true)).join("")}</div></div>
     </div>`;
 }

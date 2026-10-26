@@ -1,3 +1,4 @@
+import { webPageLd, breadcrumb, absUrl } from "../seo.js";
 import { layout, esc } from "../html.js";
 
 const c = (code, lang = "bash") => `<div class="code-card sm"><div class="code-tabs"><button class="on">${lang}</button><button class="copy" data-copy-code>Copy</button></div><pre class="code"><code>${esc(code)}</code></pre></div>`;
@@ -157,7 +158,15 @@ export function docsPage({ user, slug = "", apiUrl }) {
 <article class="doc-body prose"><span class="eyebrow">${page.group}</span><h1 class="display-3">${page.title}</h1>${page.body(apiUrl)}
 <nav class="doc-pager">${prev ? `<a href="/docs${prev.slug ? "/" + prev.slug : ""}">← ${prev.title}</a>` : "<span></span>"}${next ? `<a href="/docs/${next.slug}">${next.title} →</a>` : ""}</nav></article>
 </main>`;
-  return layout({ title: page.slug ? `${page.title} · Docs` : "Docs", active: "docs", user, body });
+  const html0 = page.body(apiUrl);
+  const firstP = (/<p[^>]*>([\s\S]*?)<\/p>/.exec(html0)?.[1] ?? "").replace(/<[^>]+>/g, "");
+  const description = firstP || `${page.title}: Apizie documentation for the REST API, MCP server, bulk jobs and webhooks.`;
+  const jsonLd = [
+    webPageLd({ name: `${page.title} | Apizie Docs`, description, type: "TechArticle", extra: { headline: page.title, articleSection: page.group, author: { "@id": absUrl("/") + "#org" } } }),
+    breadcrumb([["Home", "/"], ["Docs", "/docs"], ...(page.slug ? [[page.title, `/docs/${page.slug}`]] : [])]),
+  ];
+  return layout({ fullTitle: page.slug ? `${page.title} | Apizie Docs` : "Apizie Docs: REST API, MCP server and SDK guide", active: "docs", user, body, description, jsonLd, markdown: true });
 }
 
 export const DOC_SLUGS = FLAT.map((p) => p.slug);
+export const DOC_PAGES = FLAT;

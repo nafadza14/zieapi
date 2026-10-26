@@ -248,6 +248,30 @@
       "source": "scratchpad e2e with @modelcontextprotocol/sdk@1.32.2 against local Apizie (memory and Postgres backends)",
       "kind": "verification",
       "summary": "API-key and OAuth (DCR + PKCE + consent + refresh + revoke) flows pass end to end with the official MCP client."
+    },
+    {
+      "id": "E42",
+      "source": "https://zapi.ink/ <head> + /robots.txt + /sitemap.xml + /api/indonesia/cek-kode-pos (browser, 26 Oct 2026)",
+      "kind": "page",
+      "summary": "Title 'Zapi: one API key for hundreds of public data sources'; hero 'Every source you need. 319 scrapers. One API key.' Full OG/Twitter (1200x630), googlebot max-snippet:-1, 7 favicon links. JSON-LD @graph Person, Organization, WebSite, SoftwareApplication, FAQPage; API pages WebPage + WebAPI + Breadcrumb with per-API OG image. robots Allow all; sitemap with lastmod + image."
+    },
+    {
+      "id": "E43",
+      "source": "https://apyhub.com/ <head> + robots.txt + llms.txt",
+      "kind": "page",
+      "summary": "'Certified APIs for Developers and Agents', 1,500+ endpoints across 400+ services; Organization + WebSite JSON-LD; robots.txt addresses AI agents, points to llms.txt / llms-full.txt, every page available as Markdown (.md or Accept: text/markdown); explicit GPTBot block."
+    },
+    {
+      "id": "E44",
+      "source": "https://serpapi.com/ and https://rapidapi.com/ <head>",
+      "kind": "page",
+      "summary": "SerpApi: description, keywords, canonical, OG, Twitter, full favicon set, llms.txt, no JSON-LD. RapidAPI (Nokia API Hub): title 'API Hub', no description/OG/JSON-LD."
+    },
+    {
+      "id": "E45",
+      "source": "Web research: anagram.ai AI crawler list 2026; techwyse.com FAQ rich results deprecation; seocrawl.ai GEO guide",
+      "kind": "research",
+      "summary": "14 AI crawler/robots tokens (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User, Googlebot, Google-Extended, meta-externalagent, meta-externalfetcher, Applebot, Applebot-Extended); FAQ rich results removed 7 May 2026 but markup still read; GEO: answer-first, statistics, no JS dependence, llms.txt."
     }
   ]
 }

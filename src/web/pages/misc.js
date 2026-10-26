@@ -1,3 +1,4 @@
+import { webPageLd, breadcrumb } from "../seo.js";
 import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
 
 // ---------- MCP ----------------------------------------------------------------
@@ -49,7 +50,8 @@ ${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.
   <div class="table-wrap"><table class="doc-table">${tools.map(([n, d]) => `<tr><td><code>${n}</code></td><td>${d}</td></tr>`).join("")}</table></div>
   <div class="grid-3 mt"><div class="card"><h3>Rate limits</h3><p>Tool calls share your plan's per-minute and monthly limits with REST.</p></div><div class="card"><h3>Plan gating</h3><p>Bulk tools need Ultra or Max. Gated endpoints return <code>plan_upgrade_required</code>.</p></div><div class="card"><h3>Revoke access</h3><p>Connected apps are listed in <a href="/dashboard/keys">Dashboard → API keys</a>. Disconnect one and its tokens stop working at once.</p></div></div>
 </section></main>`;
-  return layout({ title: "MCP server", active: "mcp", user, body });
+  const description = "Connect Claude, ChatGPT, Cursor, VS Code and Gemini CLI to 1,600+ APIs with the Apizie MCP server. One-click OAuth or an API key, 8 tools, same quota as REST.";
+  return layout({ fullTitle: "MCP Server: 1,600+ APIs for Claude, ChatGPT & Cursor | Apizie", active: "mcp", user, body, description, ogImage: "/assets/og/mcp.png", jsonLd: [webPageLd({ name: "Apizie MCP server", description, type: "TechArticle", extra: { headline: "Connect AI agents to 1,600+ APIs with MCP" } }), breadcrumb([["Home", "/"], ["MCP server", "/mcp"]])] });
 }
 
 // ---------- OAuth consent ------------------------------------------------------
@@ -198,7 +200,7 @@ export function authPage({ mode, providers, next = "/dashboard", error = "", pla
 
 // ---------- 404 ----------------------------------------------------------------
 export function notFoundPage({ user }) {
-  return layout({ title: "Not found", user, body: `<main>${pageHead("404", "This page wandered off.", "Try the catalog, or head back home.")}<div class="center section-tight"><a class="pill pill-white" href="/scrapers">Browse scrapers</a> <a class="pill pill-outline" href="/">Home</a></div></main>` });
+  return layout({ title: "Not found", user, noindex: true, body: `<main>${pageHead("404", "This page wandered off.", "Try the catalog, or head back home.")}<div class="center section-tight"><a class="pill pill-white" href="/scrapers">Browse scrapers</a> <a class="pill pill-outline" href="/">Home</a></div></main>` });
 }
 
 // ---------- Dashboard & admin shells (client-rendered by /assets/dash.js) ----------

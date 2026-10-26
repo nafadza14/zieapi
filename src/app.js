@@ -24,6 +24,11 @@ import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassw
 import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
 import { supabaseAuthConfig, pkcePair, supabaseAuthorizeUrl, supabaseExchange } from "./auth/supabase.js";
 import liveScrapers from "./scrapers/index.js";
+import { runWithSeo, robotsTxt, BUILD_DATE } from "./web/seo.js";
+import { homeMd, apiMd, pricingMd, docMd, categoryMd } from "./web/markdown.js";
+import { HOME_FAQ } from "./web/pages/home.js";
+import { PRICING_FAQ } from "./web/pages/pricing.js";
+import { DOC_PAGES } from "./web/pages/docs.js";
 
 import { homePage } from "./web/pages/home.js";
 import { scrapersPage, categoryPage, scraperPage } from "./web/pages/catalog.js";
@@ -153,7 +158,8 @@ export function createApp(opts = {}) {
     let mm;
 
     // static assets (Vercel serves /public itself; this is for local + fallback)
-    if (p.startsWith("/assets/") || p === "/favicon.ico" || p === "/robots.txt") return serveStatic(p === "/favicon.ico" ? "/assets/favicon.ico" : p);
+    if (p.startsWith("/assets/") || ["/favicon.ico", "/favicon.svg", "/apple-touch-icon.png"].includes(p)) return serveStatic(p);
+    if (p === "/robots.txt") return { status: 200, body: robotsTxt(publicUrl), headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" } };
 
     // ----- machine-readable ----------------------------------------------------
     if (p === "/healthz") return json(200, { ok: true, version: VERSION, uptimeSec: Math.round(process.uptime()), storage: kv.constructor.name });
@@ -568,11 +574,37 @@ export function createApp(opts = {}) {
     const html = (s, status = 200, headers = {}) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": user ? "private, no-store" : "public, max-age=0, s-maxage=60, stale-while-revalidate=600", ...headers } });
     const items = async () => catalog.list({ limit: 2000 }, await statsFor(catalog.scrapers), await repo.disabledScrapers()).items;
 
+    // ---- Markdown twins for AI assistants: <path>.md, /api/c/s/llms.txt, or Accept: text/markdown ----
+    const wantsMd = /\.md$/.test(p) || /^\/api\/[a-z0-9-]+\/[a-z0-9-]+\/llms\.txt$/.test(p) || /^text\/markdown/.test(String(ctx.req.headers.accept ?? ""));
+    if (wantsMd) {
+      const base = p.replace(/\/llms\.txt$/, "").replace(/\.md$/, "").replace(/^\/index$/, "/") || "/";
+      const md = (s) => ({ status: 200, body: s, headers: { "content-type": "text/markdown; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=3600", "X-Robots-Tag": "noindex", Link: `<${publicUrl}${base}>; rel="canonical"` } });
+      if (base === "/") return md(homeMd({ totals, categories: catalog.categoryList(), publicUrl, apiUrl, faq: HOME_FAQ }));
+      if (base === "/pricing") return md(pricingMd({ faq: PRICING_FAQ, publicUrl }));
+      if (base === "/docs" || (mm = /^\/docs\/([a-z0-9-]+)$/.exec(base))) {
+        const page = DOC_PAGES.find((d) => d.slug === (base === "/docs" ? "" : mm[1]));
+        if (page) return md(docMd({ page, apiUrl }));
+      }
+      if ((mm = /^\/category\/([a-z0-9-]+)$/.exec(base))) {
+        const cat = catalog.categoryList().find((c) => c.slug === mm[1]);
+        if (cat) return md(categoryMd({ category: cat, items: (await items()).filter((i) => i.category === cat.slug), publicUrl }));
+      }
+      if ((mm = /^\/api\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(base))) {
+        const sc = catalog.find(`${mm[1]}:${mm[2]}`);
+        if (sc) {
+          const d = catalog.detail(sc.key, (await statsFor([sc]))[sc.id], await repo.disabledScrapers());
+          return md(apiMd({ s: d, category: catalog.categoryList({ withEmpty: true }).find((c) => c.slug === sc.category), publicUrl, apiUrl }));
+        }
+      }
+      if (/\.md$/.test(p) || /llms\.txt$/.test(p)) return { status: 404, body: "Not found\n", headers: { "content-type": "text/plain; charset=utf-8" } };
+    }
+
     if (p === "/") {
       const all = await items();
       const pick = (keys) => keys.map((k) => all.find((i) => i.key === k)).filter(Boolean);
       const global = pick(["business:github-api-github", "finance:stripe", "communication:twilio-api", "media:spotify", "communication:sendgrid", "business:slack", "business:trello", "open-data:nasa-asteroids-neows"]);
-      return html(homePage({ user, totals, categories: catalog.categoryList(), top: all.filter((i) => i.origin !== "directory").slice(0, 8), global, apiUrl, publicUrl }));
+      const liveKeys = new Set(all.filter((i) => i.status === "live").map((i) => i.key));
+      return html(homePage({ user, totals, categories: catalog.categoryList(), top: all.filter((i) => i.origin !== "directory").slice(0, 8), global, liveKeys, apiUrl, publicUrl }));
     }
     if (p === "/scrapers" || p === "/playground") return html(scrapersPage({ user, totals, categories: catalog.categoryList(), items: await items(), q: q.q ?? "", cat: q.cat ?? "" }));
     if ((mm = /^\/category\/([a-z0-9-]+)$/.exec(p))) {
@@ -621,8 +653,16 @@ export function createApp(opts = {}) {
   }
 
   function sitemap() {
-    const urls = ["/", "/scrapers", "/pricing", "/docs", ...DOC_SLUGS.filter(Boolean).map((s) => `/docs/${s}`), "/mcp", "/showcase", "/status", ...catalog.categoryList().map((c) => `/category/${c.slug}`), ...catalog.scrapers.map((s) => `/api/${s.category}/${s.slug}`)];
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${publicUrl}${u}</loc></url>`).join("\n")}\n</urlset>\n`;
+    const day = BUILD_DATE.slice(0, 10);
+    const urls = [
+      ["/", "daily", "1.0"], ["/scrapers", "daily", "0.9"], ["/mcp", "weekly", "0.9"], ["/pricing", "weekly", "0.8"], ["/docs", "weekly", "0.8"],
+      ...DOC_SLUGS.filter(Boolean).map((s) => [`/docs/${s}`, "weekly", "0.7"]),
+      ["/showcase", "weekly", "0.4"], ["/status", "daily", "0.3"],
+      ...catalog.categoryList().map((c) => [`/category/${c.slug}`, "weekly", "0.7"]),
+      ...catalog.scrapers.map((s) => [`/api/${s.category}/${s.slug}`, "weekly", s.status === "live" ? "0.7" : "0.5"]),
+      ...["/terms", "/privacy", "/aup"].map((u) => [u, "yearly", "0.2"]),
+    ];
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, f, pr]) => `<url><loc>${publicUrl}${u}</loc><lastmod>${day}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`).join("\n")}\n</urlset>\n`;
   }
 
   async function serveStatic(p) {
@@ -651,7 +691,7 @@ export function createApp(opts = {}) {
         const user = sessionToken ? await repo.getSessionUser(sessionToken) : null;
         if (user && isAdmin(user) && user.role !== "admin") user.role = "admin";
         const body = await readBody(req);
-        out = await route({ req, url, body, user, sessionToken });
+        out = await runWithSeo({ publicUrl, path: url.pathname.replace(/\/+$/, "") || "/" }, () => route({ req, url, body, user, sessionToken }));
       }
     } catch (err) {
       if (err instanceof HttpError) {

@@ -271,3 +271,40 @@ test("global APIs: BYOK through /v1, per-API OpenAPI spec and filters", async ()
   const nokey = await (await fetch(`${base}/api/scrapers/list?origin=directory&auth=none&limit=3`)).json();
   assert.ok(nokey.content.items.every((i) => !i.auth));
 });
+
+test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", async () => {
+  const home = await (await fetch(base + "/")).text();
+  assert.match(home, /<link rel="canonical" href="http:\/\/zie\.test\/">/);
+  assert.match(home, /<meta property="og:image" content="http:\/\/zie\.test\/assets\/og\/home\.png">/);
+  assert.match(home, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.match(home, /One API key<\/span> for/);
+  const graphs = [...home.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
+  const types = graphs.flatMap((g) => g["@graph"].map((n) => n["@type"]));
+  for (const t of ["Organization", "WebSite", "SoftwareApplication", "FAQPage"]) assert.ok(types.includes(t), t);
+  const desc = /<meta name="description" content="([^"]+)"/.exec(home)[1];
+  assert.ok(desc.length <= 160, `description ${desc.length}`);
+
+  const api = await (await fetch(base + "/api/dev-tools/uuid")).text();
+  assert.match(api, /<title>.*API: \d+ Endpoints? as JSON \| Apizie<\/title>/);
+  assert.match(api, /"@type":"WebAPI"/);
+  assert.match(api, /About the .* API/);
+  assert.match(api, /type="text\/markdown" href="http:\/\/zie\.test\/api\/dev-tools\/uuid\.md"/);
+
+  const md = await fetch(base + "/api/dev-tools/uuid.md");
+  assert.equal(md.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.match(await md.text(), /^# .* API\n\n> /);
+  const acc = await fetch(base + "/docs/quickstart", { headers: { accept: "text/markdown" } });
+  assert.match(await acc.text(), /^# Quickstart/);
+
+  const robots = await (await fetch(base + "/robots.txt")).text();
+  for (const bot of ["OAI-SearchBot", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended"]) assert.match(robots, new RegExp(`User-agent: ${bot}`));
+  assert.match(robots, /Sitemap: http:\/\/zie\.test\/sitemap\.xml/);
+  assert.match(robots, /Disallow: \/dashboard/);
+  assert.doesNotMatch(robots, /Disallow: \/mcp/);
+  const sm = await (await fetch(base + "/sitemap.xml")).text();
+  assert.match(sm, /<loc>http:\/\/zie\.test\/mcp<\/loc><lastmod>\d{4}-\d\d-\d\d<\/lastmod>/);
+
+  for (const p of ["/favicon.ico", "/favicon.svg", "/apple-touch-icon.png", "/assets/og/home.png"]) assert.equal((await fetch(base + p)).status, 200, p);
+  const login = await (await fetch(base + "/login")).text();
+  assert.match(login, /noindex/);
+});

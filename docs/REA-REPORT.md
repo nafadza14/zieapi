@@ -248,3 +248,31 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 
 ## C. Verifikasi
 `npm test`: 147 tes lulus, termasuk konektor (kunci di header/query/basic/bearer, kunci env server, SSRF host privat dan redirect, 5xx ke 502), pemisahan cache per kredensial, dan alur `/v1` BYOK end-to-end.
+
+# Iterasi 4: MCP yang benar-benar bisa dipakai, Supabase, login Google (26 Okt 2026)
+
+## A. Observations baru (browser, zapi.ink)
+- **E38** `https://zapi.ink/mcp`: server `zapi · v1.2.0`, Streamable HTTP, auth `Bearer · x-api-key · api-key`. Panduan klien: Claude Code (`claude mcp add --transport http ... --header "x-api-key: ..."`), Cursor (`url` + `headers.Authorization: Bearer`), VS Code (`type: "http"`), Gemini CLI (`httpUrl`), Other (`serverUrl`).
+- **E39** `https://mcp.zapi.ink/.well-known/oauth-protected-resource` → `{resource: ".../mcp", authorization_servers: ["https://api.zapi.ink/api/auth"], scopes_supported: ["mcp","offline_access"]}`.
+- **E40** `https://mcp.zapi.ink/.well-known/oauth-authorization-server` → OAuth 2.1: `authorization_code` + `refresh_token`, PKCE `S256`, `registration_endpoint` (dynamic client registration), `token_endpoint_auth_methods_supported: ["none","client_secret_basic","client_secret_post"]`, introspection dan revocation. Artinya pengguna zapi bisa menyambungkan MCP lewat OAuth tanpa menempel API key.
+
+## B. Inferensi
+- Konektor Claude.ai/ChatGPT hanya menerima URL + OAuth, jadi OAuth adalah syarat agar MCP "bisa dipakai user" di aplikasi chat, bukan hanya di editor. (Keyakinan: tinggi, dari E40 dan perilaku klien MCP resmi.)
+
+## C. Rekonstruksi di zieapi
+| Komponen | Berkas |
+|---|---|
+| Authorization server OAuth 2.1 (metadata, DCR, consent, PKCE, refresh rotation, revoke, Client ID Metadata Document) | `src/auth/oauth.js`, rute `/oauth/*` dan `/.well-known/*` di `src/app.js` |
+| `401` MCP dengan `WWW-Authenticate: Bearer resource_metadata=...` | `src/core/mcp.js` |
+| Token OAuth (`zoa_`) diterima di `/mcp` dan `/v1`, tercatat di log sebagai `MCP · <nama app>` | `src/auth/index.js` |
+| Halaman persetujuan + daftar "Connected MCP apps" (bisa diputus) | `src/web/pages/misc.js`, `public/assets/dash.js` |
+| Tool annotations, versi protokol 2025-11-25, pemotongan hasil besar | `src/core/mcp.js` |
+| Backend Supabase (tabel `zie_kv` + RPC, RLS tanpa policy) | `supabase/migrations/0001_zieapi.sql`, `SupabaseKV` di `src/db/kv.js` |
+| Login Google lewat Supabase Auth (PKCE) | `src/auth/supabase.js` |
+| Logo brand API besar di hero (simple-icons, CC0) | `src/web/brands.js`, `src/web/pages/home.js` |
+
+## D. Verifikasi
+- `npm test`: 152 tes lulus, termasuk alur OAuth lengkap, login Google Supabase (mock), dan format wire SupabaseKV.
+- Klien resmi `@modelcontextprotocol/sdk@1.32.2`: (1) API key: initialize, tools/list (8 tool beranotasi), search, run_scraper, error BYOK, get_usage; (2) OAuth persis seperti Claude/ChatGPT: 401 → discovery → DCR → PKCE → consent → token → panggilan tool sebagai user → refresh rotation → disconnect mencabut token. Semua lulus.
+- Seluruh suite `test/app.test.js` dan skenario MCP di atas juga dijalankan terhadap Postgres 16 lokal dengan migration Supabase yang sama (lewat shim PostgREST): lulus.
+- Belum terverifikasi: koneksi ke project Supabase asli (butuh migration dijalankan, provider Google aktif, dan `SUPABASE_SECRET_KEY` di Vercel).

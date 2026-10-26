@@ -1,7 +1,10 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, normalizeUrl } from "../src/app.js";
-import { MemoryKV, UpstashKV } from "../src/db/kv.js";
+import { MemoryKV, UpstashKV, SupabaseKV } from "../src/db/kv.js";
+
+// Set ZIE_TEST_SUPABASE_URL + ZIE_TEST_SUPABASE_KEY to run the whole suite against a real Supabase (or a local Postgres shim).
+const testKv = () => (process.env.ZIE_TEST_SUPABASE_URL ? new SupabaseKV({ url: process.env.ZIE_TEST_SUPABASE_URL, key: process.env.ZIE_TEST_SUPABASE_KEY }) : new MemoryKV());
 import { verifySignature } from "../src/core/webhooks.js";
 import devtools from "../src/scrapers/live/devtools.js";
 
@@ -28,7 +31,7 @@ before(async () => {
     publicUrl: "http://zie.test",
     scrapers: [...devtools, flaky],
     lookup: async () => [{ address: "93.184.216.34", family: 4 }],
-    kv: new MemoryKV(),
+    kv: testKv(),
     webhookFetch: async (url, init) => { deliveries.push({ url, init }); return new Response("ok"); },
     fetch: async (url, init) => {
       upstreamCalls.push({ url: String(url), init });

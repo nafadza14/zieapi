@@ -20,13 +20,15 @@ import { E, HttpError, okContent, errBody } from "./core/envelope.js";
 import { PLANS, getPlan } from "./core/plans.js";
 import { ulid, monthKey } from "./core/util.js";
 import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
+import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
+import { supabaseAuthConfig, pkcePair, supabaseAuthorizeUrl, supabaseExchange } from "./auth/supabase.js";
 import liveScrapers from "./scrapers/index.js";
 
 import { homePage } from "./web/pages/home.js";
 import { scrapersPage, categoryPage, scraperPage } from "./web/pages/catalog.js";
 import { pricingPage } from "./web/pages/pricing.js";
 import { docsPage, DOC_SLUGS } from "./web/pages/docs.js";
-import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage } from "./web/pages/misc.js";
+import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage } from "./web/pages/misc.js";
 
 export const VERSION = "2.0.0";
 const MAX_BODY = 1_000_000;
@@ -42,11 +44,19 @@ export function createApp(opts = {}) {
   const production = env.NODE_ENV === "production" || serverless;
   const logger = opts.logger === undefined ? console : opts.logger;
   const adminEmails = new Set(String(env.ZIE_ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
-  const stateSecret = env.ZIE_SESSION_SECRET ?? randomBytes(32).toString("hex");
+  // Must be identical on every serverless instance; falls back to a value derived from the Supabase secret.
+  const sbSecret = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
+  const stateSecret = env.ZIE_SESSION_SECRET ?? (sbSecret ? createHmac("sha256", "zieapi-state").update(sbSecret).digest("hex") : randomBytes(32).toString("hex"));
   const bank = env.ZIE_BANK_INFO ?? "Bank transfer details are not configured yet. Set ZIE_BANK_INFO on the server.";
   const upstream = env.ZIE_UPSTREAM_URL ? { url: env.ZIE_UPSTREAM_URL.replace(/\/+$/, ""), key: env.ZIE_UPSTREAM_KEY ?? "", header: (env.ZIE_UPSTREAM_HEADER ?? "x-api-key").toLowerCase() } : null;
 
   const kv = opts.kv ?? kvFromEnv(env, { file: opts.dataFile ?? env.ZIE_DATA_FILE ?? null });
+  const sbAuth = opts.supabaseAuth === undefined ? supabaseAuthConfig(env) : opts.supabaseAuth;
+  const loginProviders = () => {
+    const own = enabledProviders(env);
+    const sb = (sbAuth?.providers ?? []).filter((id) => PROVIDERS[id] && !own.some((o) => o.id === id)).map((id) => ({ id, label: PROVIDERS[id].label }));
+    return [...sb, ...own].sort((a, b) => (a.id === "google" ? -1 : b.id === "google" ? 1 : 0));
+  };
   const repo = new Repo(kv);
   repo.seedEnvKeys(opts.keys ?? env.ZIE_KEYS);
   const catalog = opts.catalog ?? new Catalog({ live: opts.scrapers ?? liveScrapers, upstream: !!upstream, seed: opts.seed !== false });
@@ -67,7 +77,8 @@ export function createApp(opts = {}) {
   });
   const executor = new Executor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookupImpl: opts.lookup ?? null, upstream, logger });
   const bulk = new BulkManager({ catalog, repo, executor, limiter, webhooks, publicUrl, apiUrl });
-  const mcp = createMcpHandler({ catalog, repo, executor, limiter, bulk, version: VERSION, authenticate: (req) => apiKeyCaller(repo, req) });
+  const oauth = createOAuth({ repo, apiUrl, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookup: opts.lookup ?? null });
+  const mcp = createMcpHandler({ catalog, repo, executor, limiter, bulk, version: VERSION, authenticate: (req) => apiKeyCaller(repo, req, oauth), wwwAuthenticate: oauth.wwwAuthenticate });
 
   const cacheText = new Map();
   const memo = (k, fn) => (cacheText.has(k) ? cacheText.get(k) : (cacheText.set(k, fn()), cacheText.get(k)));
@@ -152,6 +163,10 @@ export function createApp(opts = {}) {
       if (!catalog.categories.some((c) => c.slug === mm[1])) throw E.notFound("Unknown category");
       return mm[2] === "llms.txt" ? text(buildLlmsTxt(catalog, { apiUrl, publicUrl, category: mm[1] })) : json(200, buildOpenApi(catalog, { apiUrl, version: VERSION, category: mm[1] }));
     }
+    // ----- OAuth 2.1 for MCP clients ------------------------------------------------
+    if (m === "GET" && (p === "/.well-known/oauth-protected-resource" || p === "/.well-known/oauth-protected-resource/mcp")) return json(200, oauth.metadata.protectedResource(), { "Cache-Control": "public, max-age=3600" });
+    if (m === "GET" && (p === "/.well-known/oauth-authorization-server" || p === "/.well-known/oauth-authorization-server/mcp" || p === "/.well-known/openid-configuration")) return json(200, oauth.metadata.authorizationServer(), { "Cache-Control": "public, max-age=3600" });
+    if (p.startsWith("/oauth/")) return oauthRoutes(ctx, p, m, q, body);
     if (p === "/sitemap.xml") return { status: 200, body: memo("sm", sitemap), headers: { "content-type": "application/xml; charset=utf-8" } };
 
     // ----- public catalog API -----------------------------------------------
@@ -176,6 +191,27 @@ export function createApp(opts = {}) {
     }
 
     // ----- auth ------------------------------------------------------------------
+    // Supabase Auth (Google by default) when the provider is not configured directly.
+    if ((mm = /^\/auth\/(github|google|discord)$/.exec(p)) && m === "GET" && sbAuth?.providers.includes(mm[1]) && !enabledProviders(env).some((x) => x.id === mm[1])) {
+      const { verifier, challenge } = pkcePair();
+      const st = signState(`${verifier}|${safeNext(q.next)}`);
+      return redirect(supabaseAuthorizeUrl(sbAuth, { provider: mm[1], redirectTo: `${publicUrl}/auth/supabase/callback`, challenge }), { "Set-Cookie": cookie("zie_sb", st, { maxAge: 600, secure: isHttps(req) }) });
+    }
+    if (p === "/auth/supabase/callback" && m === "GET") {
+      const raw = checkState(parseCookies(req.headers.cookie).zie_sb);
+      const [verifier, next] = raw ? raw.split("|") : [];
+      if (q.error) return redirect("/login?error=" + encodeURIComponent(String(q.error_description ?? q.error).slice(0, 200)));
+      if (!verifier || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
+      try {
+        const prof = await supabaseExchange(sbAuth, { code: q.code, verifier, fetchImpl: opts.oauthFetch ?? globalThis.fetch });
+        const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: "supabase", pid: prof.id });
+        if (u.status !== "active") return redirect("/login?error=" + encodeURIComponent("Account suspended"));
+        return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("zie_sb", "", { maxAge: 0 })] });
+      } catch (e) {
+        logger?.warn?.(e.message);
+        return redirect("/login?error=" + encodeURIComponent("Google sign-in failed, please try again"));
+      }
+    }
     if ((mm = /^\/auth\/(github|google|discord)$/.exec(p)) && m === "GET") {
       if (!enabledProviders(env).some((x) => x.id === mm[1])) return redirect(`/login?error=${encodeURIComponent(PROVIDERS[mm[1]].label + " sign-in is not configured")}`);
       const nonce = randomBytes(16).toString("base64url");
@@ -260,9 +296,40 @@ export function createApp(opts = {}) {
     return pages(ctx, p, q);
   }
 
+  async function oauthRoutes(ctx, p, m, q, body) {
+    const { req, user } = ctx;
+    const noStore = { "Cache-Control": "no-store", Pragma: "no-cache" };
+    const htmlOut = (s, status = 200) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+    try {
+      if (p === "/oauth/register" && m === "POST") return json(201, await oauth.register(body), noStore);
+      if (p === "/oauth/token" && m === "POST") return json(200, await oauth.token(req, body), noStore);
+      if (p === "/oauth/revoke" && m === "POST") return json(200, await oauth.revoke(req, body), noStore);
+      if (p === "/oauth/authorize" && m === "GET") {
+        const v = await oauth.validateAuthorize(q);
+        if (v.fatal) return htmlOut(oauthErrorPage({ user, message: v.fatal }), 400);
+        if (v.redirect) return redirect(v.redirect);
+        if (!user) return redirect(`/login?next=${encodeURIComponent(p + ctx.url.search)}`);
+        const tx = signState(Buffer.from(JSON.stringify({ ...v.params, uid: user.id, exp: Date.now() + 600_000 })).toString("base64url"));
+        return htmlOut(consentPage({ user, client: v.client, scope: v.params.scope, tx, redirectHost: safeHost(v.params.redirect_uri) }));
+      }
+      if (p === "/oauth/authorize" && m === "POST") {
+        const raw = checkState(String(body?.tx ?? ""));
+        const params = raw ? JSON.parse(Buffer.from(raw, "base64url").toString()) : null;
+        if (!params || params.exp < Date.now()) return htmlOut(oauthErrorPage({ user, message: "This request expired. Start the connection again from your app." }), 400);
+        if (!user || user.id !== params.uid) return redirect("/login");
+        const { uid, exp, ...rest } = params;
+        return redirect(body?.decision === "approve" ? await oauth.approve(user, rest) : oauth.deny(rest));
+      }
+    } catch (e) {
+      if (e instanceof OAuthError || e instanceof HttpError) return json(e.status === 401 ? 401 : 400, oauthErrorBody(e), noStore);
+      throw e;
+    }
+    throw E.notFound("Not found");
+  }
+
   async function v1(ctx, p, m, q, body) {
     const { req } = ctx;
-    const caller = await apiKeyCaller(repo, req);
+    const caller = await apiKeyCaller(repo, req, oauth);
     caller.upstreamAuth = upstreamAuthFrom(req.headers);
     const noStore = { "Cache-Control": "no-store, private" };
     let mm;
@@ -338,6 +405,11 @@ export function createApp(opts = {}) {
         }
         return json(200, okContent(publicKey(await repo.updateKey(k.id, patch))));
       }
+    }
+    if (p === "/api/me/apps" && m === "GET") return json(200, okContent(await oauth.listGrants(user.id)));
+    if ((mm = /^\/api\/me\/apps\/([^/]+)$/.exec(p)) && m === "DELETE") {
+      await oauth.revokeGrant(user.id, decodeURIComponent(mm[1]));
+      return json(200, okContent({ ok: true }));
     }
     if (p === "/api/me/usage" && m === "GET") {
       const [snap, days, scr] = await Promise.all([limiter.snapshot(user.id, plan), repo.dailyUsage(user.id, 30), repo.scraperUse(user.id, q.month || monthKey())]);
@@ -523,14 +595,14 @@ export function createApp(opts = {}) {
       const page = DOC_SLUGS.includes(slug) ? docsPage({ user, slug, apiUrl }) : null;
       return page ? html(page) : html(notFoundPage({ user }), 404);
     }
-    if (p === "/mcp") return html(mcpPage({ user, apiUrl }));
+    if (p === "/mcp") return html(mcpPage({ user, apiUrl, totals }));
     if (p === "/showcase") return html(showcasePage({ user, items: (await repo.listItems("showcase")).filter((s) => s.status === "approved") }));
     if (p === "/report") return html(reportPage({ user, type: q.type, scraper: q.scraper }));
     if (p === "/status") return html(statusPage({ user, categories: catalog.categoryList(), totals, uptimeSec: Math.round(process.uptime()), requests: await repo.globalRequests() }));
     if (["/terms", "/privacy", "/cookies", "/aup", "/refund"].includes(p)) return html(legalPage({ user, slug: p.slice(1) }));
     if (p === "/login" || p === "/register") {
       if (user) return redirect(safeNext(q.next));
-      return html(authPage({ mode: p.slice(1), providers: enabledProviders(env), next: safeNext(q.next), error: q.error ?? "", plan: q.plan ?? "" }));
+      return html(authPage({ mode: p.slice(1), providers: loginProviders(), next: safeNext(q.next), error: q.error ?? "", plan: q.plan ?? "" }));
     }
     if (p === "/dashboard" || (mm = /^\/dashboard\/([a-z]+)$/.exec(p))) {
       if (!user) return redirect(`/login?next=${encodeURIComponent(p + (q.plan ? `?plan=${q.plan}` : ""))}`);
@@ -569,7 +641,7 @@ export function createApp(opts = {}) {
     const requestId = /^[A-Za-z0-9._-]{6,64}$/.test(req.headers["x-request-id"] ?? "") ? req.headers["x-request-id"] : ulid();
     let out;
     const url = normalizeUrl(req.url);
-    const isApi = /^\/(v1|api\/(me|admin|public|scrapers|info|report|showcase)|mcp|auth\/(login|register|logout))(\/|$)/.test(url.pathname) && !(req.method === "GET" && url.pathname === "/mcp" && !/event-stream/.test(req.headers.accept ?? ""));
+    const isApi = /^\/(v1|api\/(me|admin|public|scrapers|info|report|showcase)|mcp|auth\/(login|register|logout)|\.well-known|oauth\/(register|token|revoke))(\/|$)/.test(url.pathname) && !(req.method === "GET" && url.pathname === "/mcp" && !/event-stream/.test(req.headers.accept ?? ""));
     try {
       if (req.method === "OPTIONS") out = { status: 204, body: "", headers: {} };
       else {
@@ -619,6 +691,14 @@ function upstreamAuthFrom(h) {
 const text = (s) => ({ status: 200, body: s, headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=600" } });
 const redirect = (to, headers = {}) => ({ status: 302, body: "", headers: { Location: to, ...headers } });
 const isHttps = (req) => req.headers["x-forwarded-proto"] === "https" || !!req.socket?.encrypted;
+const safeHost = (u) => {
+  try {
+    const x = new URL(u);
+    return x.protocol === "http:" || x.protocol === "https:" ? x.host : x.protocol.replace(/:$/, "") + " app";
+  } catch {
+    return "";
+  }
+};
 const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const safeDecode = (s) => {
   try {

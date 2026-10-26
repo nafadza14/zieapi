@@ -224,6 +224,30 @@
       "source": "Browser pane fetch of favicone.com/{domain}?s=128 (user machine, 26 Oct 2026)",
       "kind": "verification",
       "summary": "528 provider domains requested: 474 returned an icon, 91 were the service placeholder and were dropped, 382 logos kept and mapped to 383 provider hosts (884 of 1,383 global APIs show a logo)."
+    },
+    {
+      "id": "E38",
+      "source": "https://zapi.ink/mcp (browser, 26 Oct 2026)",
+      "kind": "page",
+      "summary": "MCP page: endpoint mcp.zapi.ink/mcp, server zapi v1.2.0, Streamable HTTP, auth Bearer/x-api-key/api-key. Client tabs: Claude Code (claude mcp add --transport http ... --header x-api-key), Cursor (url + headers Authorization Bearer), VS Code (servers.*.type http), Gemini CLI (httpUrl), Other (serverUrl)."
+    },
+    {
+      "id": "E39",
+      "source": "GET https://mcp.zapi.ink/.well-known/oauth-protected-resource",
+      "kind": "network",
+      "summary": "{resource:'https://mcp.zapi.ink/mcp', authorization_servers:['https://api.zapi.ink/api/auth'], scopes_supported:['mcp','offline_access'], bearer_methods_supported:['header'], resource_name:'Zapi MCP'}"
+    },
+    {
+      "id": "E40",
+      "source": "GET https://mcp.zapi.ink/.well-known/oauth-authorization-server",
+      "kind": "network",
+      "summary": "issuer https://api.zapi.ink/api/auth; endpoints /oauth2/authorize, /token, /register, /introspect, /revoke; grant types authorization_code + refresh_token; PKCE S256 only; token auth none/client_secret_basic/client_secret_post; authorization_response_iss_parameter_supported true."
+    },
+    {
+      "id": "E41",
+      "source": "scratchpad e2e with @modelcontextprotocol/sdk@1.32.2 against local zieapi (memory and Postgres backends)",
+      "kind": "verification",
+      "summary": "API-key and OAuth (DCR + PKCE + consent + refresh + revoke) flows pass end to end with the official MCP client."
     }
   ]
 }

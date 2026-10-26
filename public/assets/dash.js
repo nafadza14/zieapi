@@ -51,12 +51,16 @@
     async keys() {
       const { content: keys } = await api("/api/me/keys");
       const { content: me } = await api("/api/me");
+      const apps = (await api("/api/me/apps").catch(() => ({ content: [] }))).content;
       const canIp = me.plan.webhooks;
       set(`<div class="dash-head"><h1>API keys</h1></div>
         <form class="card inline-form" data-new-key><input name="name" placeholder="Key name, e.g. production" maxlength="60" aria-label="Key name"><button class="pill pill-white">Create key</button></form>
         <div data-new-secret></div>
         ${table(["Name", "Key", "Status", "Last used", "Created", ""], keys.map((k) => `<tr><td>${esc(k.name)}</td><td><code>${esc(k.preview)}</code>${k.ipAllowlist?.length ? `<div class="small muted">IPs: ${esc(k.ipAllowlist.join(", "))}</div>` : ""}</td><td>${badge(k.status)}</td><td>${ago(k.lastUsedAt)}</td><td>${date(k.createdAt)}</td><td><div class="row-actions"><button class="pill pill-outline pill-sm" data-act="rename" data-id="${k.id}">Rename</button><button class="pill pill-outline pill-sm" data-act="${k.status === "active" ? "disable" : "enable"}" data-id="${k.id}">${k.status === "active" ? "Disable" : "Enable"}</button>${canIp ? `<button class="pill pill-outline pill-sm" data-act="ip" data-id="${k.id}">IP allowlist</button>` : ""}<button class="pill pill-danger pill-sm" data-act="delete" data-id="${k.id}">Delete</button></div></td></tr>`), "No keys yet. Create one above.")}
-        <p class="small muted">Send the key as <code>x-api-key</code>, <code>Authorization: Bearer</code> or <code>api-key</code>. ${canIp ? "" : "IP allowlists are available on Pro and above."}</p>`);
+        <p class="small muted">Send the key as <code>x-api-key</code>, <code>Authorization: Bearer</code> or <code>api-key</code>. ${canIp ? "" : "IP allowlists are available on Pro and above."}</p>
+        <h2 class="dash-sub">Connected MCP apps</h2>
+        ${table(["App", "Returns to", "Active tokens", ""], apps.map((a) => `<tr><td>${esc(a.name)}</td><td class="small muted">${esc(a.redirect ? a.redirect.replace(/^(https?:\/\/[^/]+).*$/, "$1") : "")}</td><td>${a.tokens}</td><td><button class="pill pill-danger pill-sm" data-act="disconnect" data-id="${esc(a.clientId)}">Disconnect</button></td></tr>`), "No apps connected yet. Add zieapi in Claude, ChatGPT or another MCP app to see it here.")}
+        <p class="small muted">Apps connected with OAuth (see <a href="/mcp">MCP setup</a>) do not need an API key.</p>`);
       $("[data-new-key]").addEventListener("submit", async (e) => {
         e.preventDefault();
         try {
@@ -70,6 +74,7 @@
         if (!b) return;
         const id = b.dataset.id;
         try {
+          if (b.dataset.act === "disconnect") { if (!confirm("Disconnect this app? It will lose access immediately.")) return; await api(`/api/me/apps/${encodeURIComponent(id)}`, { method: "DELETE" }); }
           if (b.dataset.act === "delete") { if (!confirm("Delete this key? Apps using it will stop working.")) return; await api(`/api/me/keys/${id}`, { method: "DELETE" }); }
           if (b.dataset.act === "disable" || b.dataset.act === "enable") await api(`/api/me/keys/${id}`, { method: "PATCH", body: { status: b.dataset.act === "disable" ? "disabled" : "active" } });
           if (b.dataset.act === "rename") { const n = prompt("New name"); if (!n) return; await api(`/api/me/keys/${id}`, { method: "PATCH", body: { name: n } }); }

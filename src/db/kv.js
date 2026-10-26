@@ -1,6 +1,8 @@
-// Tiny Redis-like key/value layer with two backends:
-//   MemoryKV  – in-process (optionally snapshotted to a JSON file) for local dev / single server
-//   UpstashKV – Upstash Redis REST (works on Vercel; set UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN)
+// Tiny Redis-like key/value layer with three backends:
+//   SupabaseKV – Supabase Postgres via PostgREST RPC (supabase/migrations/0001_zieapi.sql);
+//                set SUPABASE_URL (or SUPABASE_PROJECT_ID) + SUPABASE_SECRET_KEY
+//   UpstashKV  – Upstash Redis REST (set UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN)
+//   MemoryKV   – in-process (optionally snapshotted to a JSON file) for local dev / single server
 // All methods are async so the rest of the app is backend-agnostic.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -193,7 +195,79 @@ export class UpstashKV {
   flush() {}
 }
 
+export class SupabaseKV {
+  constructor({ url, key, fetchImpl = globalThis.fetch }) {
+    this.url = url.replace(/\/+$/, "") + "/rest/v1/rpc/zie_kv";
+    this.key = key;
+    this.fetch = fetchImpl;
+    // New-style keys (sb_secret_...) go in the apikey header only; legacy JWT keys also as Bearer.
+    this.headers = { apikey: key, "content-type": "application/json", ...(key.startsWith("sb_") ? {} : { authorization: `Bearer ${key}` }) };
+  }
+  async pipeline(cmds) {
+    const res = await this.fetch(this.url, { method: "POST", headers: this.headers, body: JSON.stringify({ cmds }) });
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(j)) throw new Error(`Supabase KV: ${j?.message ?? j?.hint ?? res.status}`);
+    return j;
+  }
+  async cmd(...args) {
+    return (await this.pipeline([args]))[0];
+  }
+  get(k) {
+    return this.cmd("GET", k);
+  }
+  set(k, v, { ex } = {}) {
+    return ex ? this.cmd("SET", k, String(v), ex) : this.cmd("SET", k, String(v));
+  }
+  del(k) {
+    return this.cmd("DEL", k);
+  }
+  async incrby(k, n = 1, ex) {
+    return Number(await (ex ? this.cmd("INCRBY", k, n, ex) : this.cmd("INCRBY", k, n)));
+  }
+  expire(k, s) {
+    return this.cmd("EXPIRE", k, s);
+  }
+  async hincrby(k, field, n = 1) {
+    return Number(await this.cmd("HINCRBY", k, field, n));
+  }
+  async hgetall(k) {
+    const o = (await this.cmd("HGETALL", k)) ?? {};
+    for (const f of Object.keys(o)) o[f] = Number(o[f]);
+    return o;
+  }
+  lpush(k, v, cap = 1000) {
+    return this.cmd("LPUSH", k, String(v), cap);
+  }
+  async lrange(k, a, b) {
+    return (await this.cmd("LRANGE", k, a, b)) ?? [];
+  }
+  sadd(k, m) {
+    return this.cmd("SADD", k, String(m));
+  }
+  srem(k, m) {
+    return this.cmd("SREM", k, String(m));
+  }
+  async smembers(k) {
+    return (await this.cmd("SMEMBERS", k)) ?? [];
+  }
+  async mget(keys) {
+    if (!keys.length) return [];
+    return (await this.cmd("MGET", keys)) ?? [];
+  }
+  flush() {}
+}
+
+export function supabaseUrl(env = process.env) {
+  if (env.SUPABASE_URL) return env.SUPABASE_URL.replace(/\/+$/, "");
+  if (env.NEXT_PUBLIC_SUPABASE_URL) return env.NEXT_PUBLIC_SUPABASE_URL.replace(/\/+$/, "");
+  if (env.SUPABASE_PROJECT_ID) return `https://${env.SUPABASE_PROJECT_ID}.supabase.co`;
+  return null;
+}
+
 export function kvFromEnv(env = process.env, { file } = {}) {
+  const sbUrl = supabaseUrl(env);
+  const sbKey = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
+  if (sbUrl && sbKey) return new SupabaseKV({ url: sbUrl, key: sbKey });
   const url = env.UPSTASH_REDIS_REST_URL ?? env.KV_REST_API_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN ?? env.KV_REST_API_TOKEN;
   if (url && token) return new UpstashKV({ url, token });

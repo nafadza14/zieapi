@@ -1,39 +1,84 @@
 import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
 
 // ---------- MCP ----------------------------------------------------------------
-export function mcpPage({ user, apiUrl }) {
+export function mcpPage({ user, apiUrl, totals }) {
   const url = `${apiUrl}/mcp`;
-  const clients = [
-    ["Claude Code", `claude mcp add --transport http zieapi ${url} \\\n  --header "x-api-key: zie_xxx"`],
-    ["Claude Desktop", JSON.stringify({ mcpServers: { zieapi: { command: "npx", args: ["-y", "mcp-remote", url, "--header", "x-api-key:zie_xxx"] } } }, null, 2)],
-    ["Cursor", JSON.stringify({ mcpServers: { zieapi: { url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
-    ["VS Code", JSON.stringify({ servers: { zieapi: { type: "http", url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
-    ["Gemini CLI", JSON.stringify({ mcpServers: { zieapi: { httpUrl: url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
-    ["Windsurf", JSON.stringify({ mcpServers: { zieapi: { serverUrl: url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
+  const key = "zie_xxxxxxxx";
+  const oauthClients = [
+    ["Claude.ai / Claude Desktop", `Settings → Connectors → Add custom connector\n\nName: zieapi\nURL:  ${url}\n\nClick Connect, sign in to zieapi, press Allow. No API key needed.`],
+    ["ChatGPT", `Settings → Apps & Connectors → Advanced → Developer mode\nCreate → MCP server URL: ${url}\nAuthentication: OAuth\n\nSign in to zieapi and press Allow.`],
+    ["Claude Code (OAuth)", `claude mcp add --transport http zieapi ${url}\n# then run /mcp inside Claude Code and choose "Authenticate"`],
+  ];
+  const keyClients = [
+    ["Claude Code", `claude mcp add --transport http zieapi \\\n  ${url} \\\n  --header "x-api-key: ${key}"`],
+    ["Cursor", `// .cursor/mcp.json\n` + JSON.stringify({ mcpServers: { zieapi: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["VS Code", `// .vscode/mcp.json\n` + JSON.stringify({ servers: { zieapi: { type: "http", url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Gemini CLI", `// ~/.gemini/settings.json\n` + JSON.stringify({ mcpServers: { zieapi: { httpUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Windsurf", `// ~/.codeium/windsurf/mcp_config.json\n` + JSON.stringify({ mcpServers: { zieapi: { serverUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Claude Desktop (key)", `// claude_desktop_config.json\n` + JSON.stringify({ mcpServers: { zieapi: { command: "npx", args: ["-y", "mcp-remote", url, "--header", `Authorization:Bearer ${key}`] } } }, null, 2)],
+    ["curl", `curl ${url} \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "content-type: application/json" \\\n  -H "accept: application/json, text/event-stream" \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`],
   ];
   const tools = [
-    ["search_scrapers", "Find scrapers by name, source or the data they return."],
-    ["get_scraper_schema", "Return an endpoint's parameters, verb, path and status."],
-    ["list_categories", "List every category with scraper and endpoint counts."],
-    ["run_scraper", "Call any endpoint and return clean JSON."],
-    ["get_account", "Show your plan, key and limits."],
+    ["search_scrapers", "Find APIs and scrapers by name, source or the data they return."],
+    ["get_scraper_schema", "Read an endpoint's parameters, verb, path and status."],
+    ["list_categories", "Every category with its counts."],
+    ["run_scraper", "Call any endpoint and get clean JSON. BYOK APIs take upstream_key."],
+    ["get_account", "Plan, key status and limits."],
     ["get_usage", "Requests used this month and this minute."],
     ["bulk_submit", "Submit many inputs as one bulk job (Ultra/Max)."],
-    ["bulk_status", "Fetch a bulk job and its results."],
+    ["bulk_status", "Poll a bulk job and fetch its results."],
   ];
+  const tabs = (id, list) => `<div class="code-card tabs-card" data-tabs>
+    <div class="code-tabs" role="tablist">${list.map(([n], i) => `<button role="tab" class="${i ? "" : "on"}" data-tab="${i}">${esc(n)}</button>`).join("")}<button class="copy" data-copy-code>Copy</button></div>
+    ${list.map(([, code], i) => `<pre class="code" data-panel="${i}"${i ? " hidden" : ""}><code>${esc(code)}</code></pre>`).join("")}
+  </div>`;
   const body = `<main>
-${pageHead("MCP server", "Let your AI agent do the scraping.", "A remote, stateless MCP server that turns the whole catalog into tools. Same key, same quota, same errors as REST.")}
+${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.`, "Claude, ChatGPT, Cursor, VS Code or Gemini CLI can search the catalog and call any API as a tool, with your account and your quota.")}
 <section class="wrap section-tight">
-  <div class="grid-3 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Transport</span><b>Streamable HTTP · stateless</b></div><div class="card"><span class="muted">Auth</span><b>x-api-key · Bearer · api-key</b></div></div>
-  <div class="code-card tabs-card" data-tabs>
-    <div class="code-tabs" role="tablist">${clients.map(([n], i) => `<button role="tab" class="${i ? "" : "on"}" data-tab="${i}">${n}</button>`).join("")}<button class="copy" data-copy-code>Copy</button></div>
-    ${clients.map(([, code], i) => `<pre class="code" data-panel="${i}"${i ? " hidden" : ""}><code>${esc(code)}</code></pre>`).join("")}
+  <div class="grid-4 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Server</span><b>zieapi · Streamable HTTP</b></div><div class="card"><span class="muted">Sign-in</span><b>OAuth 2.1 (no key needed)</b></div><div class="card"><span class="muted">Or use a key</span><b>Bearer · x-api-key · api-key</b></div></div>
+  <div class="steps-row mt">
+    <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open a zieapi sign-in window. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
+    <div class="card"><span class="step-n">02</span><h3>Ask in plain language</h3><p>“Latest BMKG earthquakes”, “Bitcoin price in rupiah”, “Search GitHub repos about MCP”. The agent picks the tools.</p></div>
+    <div class="card"><span class="step-n">03</span><h3>Watch usage</h3><p>Every tool call shows up in your request logs and counts against your plan, exactly like REST.</p></div>
   </div>
-  <h2 class="display-2 mt">Tools</h2>
+  <h2 class="display-2 mt">Connect with one click (OAuth)</h2>
+  ${tabs("oauth", oauthClients)}
+  <h2 class="display-2 mt">Connect with an API key</h2>
+  ${tabs("key", keyClients)}
+  <h2 class="display-2 mt">8 tools</h2>
   <div class="table-wrap"><table class="doc-table">${tools.map(([n, d]) => `<tr><td><code>${n}</code></td><td>${d}</td></tr>`).join("")}</table></div>
-  <div class="grid-2 mt"><div class="card"><h3>Limits</h3><p>Tool calls that run scrapers count against the same per-minute and monthly limits as REST. Bulk tools need Ultra or Max.</p></div><div class="card"><h3>Errors</h3><p>Failures come back as tool errors with the REST status and code, e.g. <code>{"status":403,"code":"plan_upgrade_required"}</code>.</p></div></div>
+  <div class="grid-3 mt"><div class="card"><h3>Rate limits</h3><p>Tool calls share your plan's per-minute and monthly limits with REST.</p></div><div class="card"><h3>Plan gating</h3><p>Bulk tools need Ultra or Max. Gated endpoints return <code>plan_upgrade_required</code>.</p></div><div class="card"><h3>Revoke access</h3><p>Connected apps are listed in <a href="/dashboard/keys">Dashboard → API keys</a>. Disconnect one and its tokens stop working at once.</p></div></div>
 </section></main>`;
   return layout({ title: "MCP server", active: "mcp", user, body });
+}
+
+// ---------- OAuth consent ------------------------------------------------------
+export function consentPage({ user, client, scope, tx, redirectHost }) {
+  const body = `<main class="auth">
+<div class="auth-glow" aria-hidden="true"></div>
+<section class="auth-card card consent">
+  <a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a>
+  <h1>Connect ${esc(client.client_name)}?</h1>
+  <p class="muted"><b>${esc(client.client_name)}</b> wants to use zieapi as <b>${esc(user.email ?? user.name)}</b>.</p>
+  <ul class="consent-list">
+    <li>Search the catalog and run APIs through MCP</li>
+    <li>Use your plan's quota (calls appear in your logs)</li>
+    <li>Read your plan and usage</li>
+  </ul>
+  <p class="muted small">After you allow, you will be sent back to <b>${esc(redirectHost)}</b>. It cannot see your password or API keys, and you can disconnect it any time in the dashboard.</p>
+  <form method="post" action="/oauth/authorize" class="consent-actions">
+    <input type="hidden" name="tx" value="${esc(tx)}">
+    <button class="pill pill-outline" name="decision" value="deny">Cancel</button>
+    <button class="pill pill-white" name="decision" value="approve" autofocus>Allow</button>
+  </form>
+  <p class="muted tiny">Scope: ${esc(scope)}</p>
+</section></main>`;
+  return layout({ title: "Authorize app", body, bare: true, bodyClass: "auth-body", noindex: true });
+}
+
+export function oauthErrorPage({ user, message }) {
+  const body = `<main class="auth"><section class="auth-card card"><a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a><h1>Can't connect this app</h1><p class="form-error" role="alert">${esc(message)}</p><a class="pill pill-outline" href="/mcp">How to connect</a></section></main>`;
+  return layout({ title: "Authorization error", user, body, bare: true, bodyClass: "auth-body", noindex: true });
 }
 
 // ---------- Showcase -----------------------------------------------------------

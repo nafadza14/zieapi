@@ -1,5 +1,6 @@
 import { layout, esc, fmt, idr, json, sourceIcon } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
+import { HERO_BRANDS } from "../brands.js";
 
 const GLOBE_STILL = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg";
 const GLOBE_VIDEO = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e71aea27-a808-4ae3-8231-a469d49285d4.mp4";
@@ -27,6 +28,7 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
     <h1 class="hero-title"><span class="rise r2"><span class="grad-l">Every Public</span> Data Source,</span><span class="rise r3">Behind One <span class="grad-r">API Key</span></span></h1>
     <p class="hero-sub rise r4">${fmt(totals.scrapers)} APIs and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">Local scrapers plus ${fmt(totals.directoryApis ?? 0)} global APIs. You ship the product.</p>
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
+    ${brandStrip(totals)}
   </div>
   <a href="#steps" class="scroll-hint rise r6" aria-label="Scroll down">
     <svg viewBox="0 0 120 120" class="scroll-ring" aria-hidden="true"><defs><path id="arcL" d="M18 60a42 42 0 0 1 42-42"/><path id="arcR" d="M60 18a42 42 0 0 1 42 42"/></defs><text><textPath href="#arcL" startOffset="18%">JSON</textPath></text><text><textPath href="#arcR" startOffset="30%">MCP</textPath></text></svg>
@@ -139,3 +141,14 @@ export function scraperCard(s) {
 }
 
 export const _json = json;
+
+function brandStrip(totals) {
+  const item = (b, hidden) => {
+    const [cat, slug] = b.key.split(":");
+    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API"`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${b.path}"/></svg><span>${esc(b.name)}</span></a>`;
+  };
+  return `<div class="hero-brands rise r6">
+      <p class="hero-brands-label">Works with ${(Math.floor((totals.directoryApis ?? 0) / 100) * 100).toLocaleString("en-US")}+ global APIs, including</p>
+      <div class="brand-marquee"><div class="brand-track">${HERO_BRANDS.map((b) => item(b, false)).join("")}${HERO_BRANDS.map((b) => item(b, true)).join("")}</div></div>
+    </div>`;
+}

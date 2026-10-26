@@ -22,6 +22,18 @@ zieapi is a complete, self-hostable public-data API platform with zero runtime d
 
 The architecture and API contract come from an evidence-backed reverse-engineering study of zapi.ink, done with the [REA](https://github.com/morluto/rea) methodology. See [`docs/REA-REPORT.md`](docs/REA-REPORT.md) (Bahasa Indonesia) and [`docs/evidence/`](docs/evidence). No zapi code, scraper internals, branding or copy is reused. The catalog *structure* (sources, endpoint names, parameter schemas) was imported from their public OpenAPI index, with the circumvention category (Bypass Tools) removed.
 
+## Supabase backend + Google sign-in
+
+1. Supabase SQL editor: run `supabase/migrations/0001_zieapi.sql` once.
+2. Supabase → Authentication → Providers: enable **Google** (Google Cloud redirect URI: `https://hfscpcwrntvdslxwddjy.supabase.co/auth/v1/callback`).
+3. Supabase → Authentication → URL Configuration → Redirect URLs: add `https://<your-domain>/auth/supabase/callback` (and `http://localhost:8787/auth/supabase/callback` for local).
+4. Vercel env vars: `SUPABASE_PROJECT_ID`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ZIE_SESSION_SECRET`, `ZIE_ADMIN_EMAILS`, `ZIE_PUBLIC_URL`.
+5. `/healthz` reports `"storage":"SupabaseKV"` when connected.
+
+## MCP for end users
+
+`https://<your-domain>/mcp` (Streamable HTTP). Apps that support OAuth (Claude.ai and Claude Desktop custom connectors, ChatGPT, Claude Code `/mcp`) only need the URL: they discover `/.well-known/oauth-protected-resource`, register themselves, and the user signs in and presses Allow. Other apps send an API key (`Authorization: Bearer zie_…` or `x-api-key`). Setup snippets are on `/mcp`.
+
 ## Run locally
 
 ```bash

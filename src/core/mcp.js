@@ -5,14 +5,17 @@
 import { HttpError } from "./envelope.js";
 import { getPlan } from "./plans.js";
 
-export const MCP_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
+export const MCP_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+const MAX_TEXT = 120_000; // keep tool results small enough for any MCP client
 
 const s = (type, description, extra = {}) => ({ type, description, ...extra });
 
 export const MCP_TOOLS = [
   {
     name: "search_scrapers",
-    description: "Find scrapers by name, source, tag or the data they return. Returns catalog items (id, slug, category, endpointCount, ...).",
+    title: "Search the catalog",
+    annotations: { title: "Search the catalog", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: "Find APIs and scrapers by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount.",
     inputSchema: {
       type: "object",
       properties: {
@@ -24,6 +27,8 @@ export const MCP_TOOLS = [
   },
   {
     name: "get_scraper_schema",
+    title: "Endpoint schema",
+    annotations: { title: "Endpoint schema", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "Return an endpoint's parameters, HTTP method, path template, cache TTL, plan gate and example response.",
     inputSchema: {
       type: "object",
@@ -33,11 +38,15 @@ export const MCP_TOOLS = [
   },
   {
     name: "list_categories",
+    title: "List categories",
+    annotations: { title: "List categories", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "List every category with its scraper and endpoint counts.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "run_scraper",
+    title: "Run an endpoint",
+    annotations: { title: "Run an endpoint", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     description: "Call any endpoint and return clean JSON. Counts against your per-minute and monthly limits.",
     inputSchema: {
       type: "object",
@@ -52,16 +61,22 @@ export const MCP_TOOLS = [
   },
   {
     name: "get_account",
+    title: "Account and plan",
+    annotations: { title: "Account and plan", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "Show your plan, key status and plan limits.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "get_usage",
+    title: "Usage this month",
+    annotations: { title: "Usage this month", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "Show requests used this month and in the current minute.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "bulk_submit",
+    title: "Submit a bulk job",
+    annotations: { title: "Submit a bulk job", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     description: "Submit many inputs for one endpoint as a single bulk job (Ultra/Max plans). Returns jobId to poll.",
     inputSchema: {
       type: "object",
@@ -76,17 +91,22 @@ export const MCP_TOOLS = [
   },
   {
     name: "bulk_status",
+    title: "Bulk job status",
+    annotations: { title: "Bulk job status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     description: "Poll a bulk job and fetch its per-item results.",
     inputSchema: { type: "object", required: ["job_id"], properties: { job_id: s("string", "Bulk job id") } },
   },
 ];
 
-export function createMcpHandler({ catalog, repo, executor, limiter, bulk, version, authenticate }) {
-  const toolResult = (data) => ({
-    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    structuredContent: data && typeof data === "object" && !Array.isArray(data) ? data : { result: data },
-    isError: false,
-  });
+export function createMcpHandler({ catalog, repo, executor, limiter, bulk, version, authenticate, wwwAuthenticate = () => 'Bearer realm="zieapi"' }) {
+  const toolResult = (data) => {
+    const text = JSON.stringify(data, null, 2) ?? "null";
+    if (text.length > MAX_TEXT) {
+      const note = `\n\n[truncated: result was ${text.length} characters; ask for fewer items or a narrower query]`;
+      return { content: [{ type: "text", text: text.slice(0, MAX_TEXT) + note }], isError: false };
+    }
+    return { content: [{ type: "text", text }], structuredContent: data && typeof data === "object" && !Array.isArray(data) ? data : { result: data }, isError: false };
+  };
   const toolError = (status, body) => {
     const message = body?.message ?? body?.error?.message ?? (typeof body?.error === "string" ? body.error : "Error");
     const code = body?.error?.code ?? codeFor(status);
@@ -167,7 +187,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "zieapi", version },
           instructions:
-            "zieapi exposes a catalog of scrapers. Use search_scrapers → get_scraper_schema → run_scraper. Project keys look like 'category:slug'.",
+            "zieapi is one gateway to Indonesian data sources and 1,300+ global APIs. Workflow: search_scrapers to find a source, get_scraper_schema to read its parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's zieapi quota (see get_usage).",
         });
       }
       case "notifications/initialized":
@@ -198,7 +218,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
       caller = await authenticate(req);
     } catch (e) {
       if (e instanceof HttpError)
-        return { status: e.status, body: { jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32001, message: e.body.message, data: { status: e.status } } }, headers: { "WWW-Authenticate": 'Bearer realm="zieapi"' } };
+        return { status: e.status, body: { jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32001, message: e.body.message, data: { status: e.status } } }, headers: e.status === 401 ? { "WWW-Authenticate": wwwAuthenticate(/expired|invalid/i.test(e.body.message ?? "") ? ', error="invalid_token"' : "") } : {} };
       throw e;
     }
     if (body === undefined) return { status: 400, body: { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } } };

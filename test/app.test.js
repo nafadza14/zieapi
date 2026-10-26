@@ -229,3 +229,24 @@ test("helpers: normalizeUrl + UpstashKV wire format", async () => {
   assert.deepEqual(sent[0].body, ["GET", "k"]);
   assert.deepEqual(sent[1].body, [["INCRBY", "c", "2"], ["EXPIRE", "c", "60", "NX"]]);
 });
+
+test("source logos: catalog has icons and admins can override them", async () => {
+  const list = await (await fetch(`${base}/api/scrapers/list?limit=500`)).json();
+  const withIcon = list.content.items.filter((i) => i.iconUrl);
+  assert.ok(withIcon.length > 200, `only ${withIcon.length} icons`);
+  const bin = list.content.items.find((i) => i.key === "finance:binance");
+  assert.match(bin.iconUrl, /^\/assets\/sources\/binance\.com\.(png|svg)$/);
+  assert.equal(bin.sourceUrl, "https://binance.com");
+  const icon = await fetch(base + bin.iconUrl);
+  assert.equal(icon.status, 200);
+  const admin = client();
+  await admin("/auth/login", { method: "POST", body: { email: "boss@zieads.com", password: "password1" } });
+  const bad = await admin("/api/admin/scrapers/finance:binance/icon", { method: "POST", body: { url: "javascript:alert(1)" } });
+  assert.equal(bad.status, 400);
+  await admin("/api/admin/scrapers/finance:binance/icon", { method: "POST", body: { url: "https://example.com/logo.png" } });
+  const d = await (await fetch(`${base}/api/scrapers/finance:binance`)).json();
+  assert.equal(d.content.iconUrl, "https://example.com/logo.png");
+  await admin("/api/admin/scrapers/finance:binance/icon", { method: "POST", body: { url: "" } });
+  const d2 = await (await fetch(`${base}/api/scrapers/finance:binance`)).json();
+  assert.match(d2.content.iconUrl, /binance\.com/);
+});

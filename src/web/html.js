@@ -83,3 +83,10 @@ ${scripts.map((s) => `<script src="${s}" defer></script>`).join("\n")}
 export const pageHead = (eyebrow, title, sub = "") => `<section class="page-head"><div class="wrap"><span class="eyebrow">${eyebrow}</span><h1 class="display">${title}</h1>${sub ? `<p class="lead">${sub}</p>` : ""}</div></section>`;
 
 export const statusBadge = (s) => `<span class="badge badge-${esc(s)}">${{ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Disabled" }[s] ?? esc(s)}</span>`;
+
+/** Source logo tile: the source's own icon on a white tile, or a monogram when none is known. */
+export function sourceIcon(s, { size = "", color = "#8b8ba7" } = {}) {
+  const mono = esc((s.displayName ?? "?").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?");
+  if (s.iconUrl) return `<span class="sc-icon has-img ${size}"><img src="${esc(s.iconUrl)}" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.parentNode.classList.remove('has-img');this.parentNode.textContent='${mono}'"></span>`;
+  return `<span class="sc-icon ${size}" style="--c:${esc(color)}">${mono}</span>`;
+}

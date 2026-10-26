@@ -411,3 +411,11 @@ p code, li code, td code { overflow-wrap: anywhere; }
 .ep-main > *, .doc-body > *, .dash-main > * { min-width: 0; max-width: 100%; }
 .prose .doc-table, .doc-table { display: block; overflow-x: auto; max-width: 100%; }
 .try .row input { flex: 1 1 200px; min-width: 0; }
+
+/* source logos */
+.sc-icon.has-img { background: #fff; border-color: rgba(255, 255, 255, 0.85); overflow: hidden; padding: 6px; }
+.sc-icon.has-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.sc-icon.lg.has-img { padding: 9px; }
+.src-link { color: var(--muted); }
+.src-link:hover { color: #fff; }
+.adm-icon { width: 28px; height: 28px; border-radius: 8px; background: #fff; object-fit: contain; padding: 3px; vertical-align: middle; }

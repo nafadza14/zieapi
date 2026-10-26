@@ -4,6 +4,8 @@
 import { stableId } from "./util.js";
 import { maxPlan } from "./plans.js";
 import { SEED_CATEGORIES, SEED_SCRAPERS } from "../catalog/seed.js";
+import { SOURCE_DOMAINS } from "../catalog/domains.js";
+import { SOURCE_ICONS } from "../catalog/icons.js";
 
 const CATEGORY_BLURBS = {
   ads: "Public ad-library intelligence.",
@@ -44,13 +46,16 @@ export class Catalog {
     if (seed) for (const s of SEED_SCRAPERS) this._addSeed(s);
     for (const def of live) this._addLive(def);
     this.scrapers = [...this.map.values()];
+    this.overrides = {}; // admin-set logo URLs, refreshed per request by the app
     for (const s of this.scrapers) s.status = s.endpoints.some((e) => e.status === "live") ? "live" : upstream ? "upstream" : "planned";
   }
 
   _blank(key, displayName, tags = []) {
     const [category, slug] = key.split(":");
     if (!this.categories.some((c) => c.slug === category)) this.categories.push({ slug: category, displayName: titleCase(category), color: "#94a3b8", iconUrl: null, description: "" });
-    return { id: stableId(key), key, category, slug, displayName, description: null, tags, iconUrl: null, enabled: true, minPlan: null, indonesian: category === "indonesia" || tags.some((t) => ["indonesia", "idx", "saham"].includes(t)), endpoints: [] };
+    const domain = SOURCE_DOMAINS[key] ?? null;
+    const host = domain ? domain.split("/")[0] : null;
+    return { id: stableId(key), key, category, slug, displayName, description: null, tags, iconUrl: host ? SOURCE_ICONS[host] ?? null : null, sourceUrl: domain ? `https://${domain}` : null, enabled: true, minPlan: null, indonesian: category === "indonesia" || tags.some((t) => ["indonesia", "idx", "saham"].includes(t)), endpoints: [] };
   }
 
   _addSeed(s) {
@@ -68,6 +73,7 @@ export class Catalog {
     sc.description = def.description ?? sc.description;
     sc.tags = [...new Set([...(sc.tags ?? []), ...(def.tags ?? [])])];
     sc.minPlan = def.minPlan ?? sc.minPlan;
+    if (def.iconUrl) sc.iconUrl = def.iconUrl;
     if (def.indonesian) sc.indonesian = true;
     for (const ep of def.endpoints) {
       const built = this._endpoint(key, ep, ep.handler);
@@ -120,7 +126,8 @@ export class Catalog {
       displayName: s.displayName,
       description: s.description,
       tags: s.tags,
-      iconUrl: s.iconUrl,
+      iconUrl: this.overrides[s.key] || s.iconUrl,
+      sourceUrl: s.sourceUrl,
       endpointCount: s.endpoints.length,
       liveEndpoints: s.endpoints.filter((e) => e.status === "live").length,
       status: disabled?.has(s.key) ? "disabled" : s.status,

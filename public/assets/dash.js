@@ -212,17 +212,53 @@
     },
     async scrapers() {
       const { content: list } = await api("/api/admin/scrapers");
-      set(`<div class="dash-head"><h1>Scrapers</h1><input data-sq placeholder="Filter" style="max-width:240px"></div><div data-stable></div>`);
-      const draw = (f = "") => ($("[data-stable]").innerHTML = table(["Scraper", "Status", "Live / total", "Requests", "Success", ""], list.filter((s) => !f || s.key.includes(f)).map((s) => `<tr><td><a href="/api/${esc(s.key.replace(":", "/"))}">${esc(s.displayName)}</a><div class="small muted"><code>${esc(s.key)}</code></div></td><td>${badge(s.enabled ? s.status : "disabled")}</td><td>${s.live}/${s.endpoints}</td><td>${fmt(s.requests)}</td><td>${s.successRate ?? "-"}${s.successRate !== null ? "%" : ""}</td><td><button class="pill pill-outline pill-sm" data-toggle="${esc(s.key)}" data-to="${!s.enabled}">${s.enabled ? "Disable" : "Enable"}</button></td></tr>`)));
+      set(`<div class="dash-head"><h1>Scrapers</h1><div class="row-actions"><input data-sq placeholder="Filter" style="max-width:220px"><label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-nologo style="width:auto"> no logo only</label></div></div><input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/x-icon" data-file hidden><div data-stable></div>`);
+      const mono = (s) => esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase());
+      const draw = () => {
+        const f = $("[data-sq]").value.toLowerCase();
+        const only = $("[data-nologo]").checked;
+        $("[data-stable]").innerHTML = table(["Logo", "Scraper", "Status", "Live / total", "Requests", "Success", ""], list.filter((s) => (!f || s.key.includes(f) || s.displayName.toLowerCase().includes(f)) && (!only || !s.iconUrl)).map((s) => `<tr><td>${s.iconUrl ? `<img class="adm-icon" src="${esc(s.iconUrl)}" alt="">` : `<span class="sc-icon" style="width:28px;height:28px;border-radius:8px;font-size:10px">${mono(s)}</span>`}</td><td><a href="/api/${esc(s.key.replace(":", "/"))}">${esc(s.displayName)}</a><div class="small muted"><code>${esc(s.key)}</code>${s.sourceUrl ? ` · <a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener nofollow">${esc(s.sourceUrl.replace("https://", ""))}</a>` : ""}</div></td><td>${badge(s.enabled ? s.status : "disabled")}</td><td>${s.live}/${s.endpoints}</td><td>${fmt(s.requests)}</td><td>${s.successRate ?? "-"}${s.successRate !== null ? "%" : ""}</td><td><div class="row-actions"><button class="pill pill-outline pill-sm" data-logo="${esc(s.key)}">Set logo</button><button class="pill pill-outline pill-sm" data-toggle="${esc(s.key)}" data-to="${!s.enabled}">${s.enabled ? "Disable" : "Enable"}</button></div></td></tr>`));
+      };
+      const saveIcon = async (key, url) => {
+        const r = await api(`/api/admin/scrapers/${encodeURIComponent(key)}/icon`, { method: "POST", body: { url } });
+        list.find((x) => x.key === key).iconUrl = r.content.iconUrl;
+        draw();
+        toast(url ? "Logo saved" : "Logo removed");
+      };
+      const fileToDataUrl = (file) => new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); const s = Math.min(128 / img.width, 128 / img.height); x.drawImage(img, (128 - img.width * s) / 2, (128 - img.height * s) / 2, img.width * s, img.height * s); res(c.toDataURL("image/png")); };
+        img.onerror = rej;
+        img.src = URL.createObjectURL(file);
+      });
+      let pending = null;
+      $("[data-file]").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        e.target.value = "";
+        if (!file || !pending) return;
+        try { await saveIcon(pending, await fileToDataUrl(file)); } catch (err) { toast(err.message || "Could not read that image"); }
+      });
       draw();
-      $("[data-sq]").addEventListener("input", (e) => draw(e.target.value.toLowerCase()));
+      $("[data-sq]").addEventListener("input", draw);
+      $("[data-nologo]").addEventListener("change", draw);
       root.addEventListener("click", async (e) => {
+        const lg = e.target.closest("[data-logo]");
+        if (lg) {
+          const v = prompt("Paste a logo image URL (https://...). Leave empty and press OK to upload a file instead. Type 'reset' to go back to the default.");
+          if (v === null) return;
+          try {
+            if (v.trim().toLowerCase() === "reset") return await saveIcon(lg.dataset.logo, "");
+            if (v.trim()) return await saveIcon(lg.dataset.logo, v.trim());
+            pending = lg.dataset.logo;
+            $("[data-file]").click();
+          } catch (err) { toast(err.message); }
+          return;
+        }
         const b = e.target.closest("[data-toggle]");
         if (!b) return;
         await api(`/api/admin/scrapers/${encodeURIComponent(b.dataset.toggle)}`, { method: "POST", body: { enabled: b.dataset.to === "true" } });
-        const s = list.find((x) => x.key === b.dataset.toggle);
-        s.enabled = b.dataset.to === "true";
-        draw($("[data-sq]").value.toLowerCase());
+        list.find((x) => x.key === b.dataset.toggle).enabled = b.dataset.to === "true";
+        draw();
       });
     },
     async reports() {

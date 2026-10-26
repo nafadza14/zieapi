@@ -119,7 +119,8 @@
     let state = { q: $("[data-q]").value.toLowerCase(), cat: initialCat || "", filter: "", sort: "popular", shown: 18 };
     const badge = (s) => ({ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Off" })[s] ?? "";
     const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n));
-    const cardHtml = (s) => `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}"><div class="sc-top"><span class="sc-icon" style="--c:#8b8ba7">${esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?")}</span><span class="badge badge-${esc(s.status)}">${badge(s.status)}</span></div><h3>${esc(s.displayName)}</h3><p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p><div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div></a>`;
+    const iconHtml = (s) => { const m = esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"); return s.iconUrl ? `<span class="sc-icon has-img"><img src="${esc(s.iconUrl)}" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.parentNode.classList.remove('has-img');this.parentNode.textContent='${m}'"></span>` : `<span class="sc-icon" style="--c:#8b8ba7">${m}</span>`; };
+    const cardHtml = (s) => `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}"><div class="sc-top">${iconHtml(s)}<span class="badge badge-${esc(s.status)}">${badge(s.status)}</span></div><h3>${esc(s.displayName)}</h3><p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p><div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div></a>`;
     const colors = Object.fromEntries($$(".cat-item[data-cat]").map((b) => [b.dataset.cat, getComputedStyle(b).getPropertyValue("--c")]));
     const render = () => {
       let rows = items.filter((s) => {
@@ -133,7 +134,7 @@
       if (state.sort === "name") rows.sort((a, b) => a.displayName.localeCompare(b.displayName));
       else if (state.sort === "endpoints") rows.sort((a, b) => b.endpointCount - a.endpointCount);
       grid.innerHTML = rows.slice(0, state.shown).map(cardHtml).join("") || '<div class="card empty"><h3>No scrapers match.</h3><p>Try another word, or <a href="/report?type=request">request a source</a>.</p></div>';
-      $$(".sc-icon", grid).forEach((el, i) => { const c = colors[rows[i]?.category]; if (c) el.style.setProperty("--c", c); });
+      $$(".scraper-card", grid).forEach((el, i) => { const c = colors[rows[i]?.category]; if (c) el.querySelector(".sc-icon")?.style.setProperty("--c", c); });
       $("[data-count]").textContent = `${rows.length} scraper${rows.length === 1 ? "" : "s"}`;
       $("[data-more]").hidden = rows.length <= state.shown;
       $$("[data-cat]").forEach((b) => b.classList.toggle("on", b.dataset.cat === state.cat));

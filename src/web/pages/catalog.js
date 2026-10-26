@@ -1,4 +1,4 @@
-import { layout, esc, fmt, json, pageHead, statusBadge } from "../html.js";
+import { layout, esc, fmt, json, pageHead, statusBadge, sourceIcon } from "../html.js";
 import { scraperCard } from "./home.js";
 
 export function scrapersPage({ user, totals, categories, items, q = "", cat = "" }) {
@@ -56,8 +56,8 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
 <section class="detail-head wrap">
   <nav class="crumbs" aria-label="Breadcrumb"><a href="/scrapers">Scrapers</a><span>/</span><a href="/category/${esc(s.category)}">${esc(category?.displayName ?? s.category)}</a></nav>
   <div class="dh-row">
-    <span class="sc-icon lg" style="--c:${esc(category?.color ?? "#8b8ba7")}">${esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase())}</span>
-    <div><h1 class="display-3">${esc(s.displayName)}</h1><p class="sc-key">${esc(s.key)}</p></div>
+    ${sourceIcon(s, { size: "lg", color: category?.color ?? "#8b8ba7" })}
+    <div><h1 class="display-3">${esc(s.displayName)}</h1><p class="sc-key">${esc(s.key)}${s.sourceUrl ? ` · <a class="src-link" href="${esc(s.sourceUrl)}" rel="noopener nofollow" target="_blank">${esc(s.sourceUrl.replace(/^https:\/\//, ""))} ↗</a>` : ""}</p></div>
     <div class="dh-actions">${statusBadge(s.status)}<button class="pill pill-outline pill-sm" data-mcp-open>Use from MCP</button></div>
   </div>
   ${s.description ? `<p class="lead">${esc(s.description)}</p>` : ""}

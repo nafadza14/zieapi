@@ -240,6 +240,22 @@ export class Repo {
     else await this.kv.sadd("scr_off", key);
   }
 
+  // ---------- admin logo overrides -----------------------------------------
+  async iconOverrides() {
+    try {
+      return JSON.parse((await this.kv.get("scr_icons")) ?? "{}");
+    } catch {
+      return {};
+    }
+  }
+  async setIconOverride(key, url) {
+    const all = await this.iconOverrides();
+    if (url) all[key] = url;
+    else delete all[key];
+    await this.kv.set("scr_icons", JSON.stringify(all));
+    return all;
+  }
+
   // ---------- global ----------------------------------------------------------
   async globalRequests() {
     return Number(await this.kv.get("g:requests")) || 0;

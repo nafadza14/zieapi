@@ -1,4 +1,4 @@
-import { layout, esc, fmt, idr, json } from "../html.js";
+import { layout, esc, fmt, idr, json, sourceIcon } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
 
 const GLOBE_STILL = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg";
@@ -121,7 +121,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
 
 export function scraperCard(s) {
   return `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}">
-  <div class="sc-top"><span class="sc-icon" style="--c:var(--cat-${esc(s.category)}, #8b8ba7)">${esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?")}</span><span class="badge badge-${esc(s.status)}">${{ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span></div>
+  <div class="sc-top">${sourceIcon(s)}<span class="badge badge-${esc(s.status)}">${{ live: "Live", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span></div>
   <h3>${esc(s.displayName)}</h3>
   <p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p>
   <div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div>

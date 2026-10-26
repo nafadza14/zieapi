@@ -72,6 +72,7 @@ export function createApp(opts = {}) {
   const cacheText = new Map();
   const memo = (k, fn) => (cacheText.has(k) ? cacheText.get(k) : (cacheText.set(k, fn()), cacheText.get(k)));
   const statsFor = async (scrapers) => {
+    catalog.overrides = await repo.iconOverrides();
     const st = await repo.getStats(scrapers.map((s) => s.id));
     return st;
   };
@@ -456,7 +457,16 @@ export function createApp(opts = {}) {
     if (p === "/api/admin/scrapers" && m === "GET") {
       const off = await repo.disabledScrapers();
       const st = await statsFor(catalog.scrapers);
-      return json(200, okContent(catalog.scrapers.map((s) => ({ key: s.key, displayName: s.displayName, status: s.status, enabled: !off.has(s.key), endpoints: s.endpoints.length, live: s.endpoints.filter((e) => e.status === "live").length, requests: st[s.id].requests, successRate: st[s.id].requests ? Math.round((st[s.id].success / st[s.id].requests) * 1000) / 10 : null }))));
+      return json(200, okContent(catalog.scrapers.map((s) => ({ key: s.key, displayName: s.displayName, iconUrl: catalog.overrides[s.key] || s.iconUrl, sourceUrl: s.sourceUrl, status: s.status, enabled: !off.has(s.key), endpoints: s.endpoints.length, live: s.endpoints.filter((e) => e.status === "live").length, requests: st[s.id].requests, successRate: st[s.id].requests ? Math.round((st[s.id].success / st[s.id].requests) * 1000) / 10 : null }))));
+    }
+    if ((mm = /^\/api\/admin\/scrapers\/([^/]+)\/icon$/.exec(p)) && m === "POST") {
+      const key = decodeURIComponent(mm[1]);
+      if (!catalog.find(key)) throw E.notFound("Scraper not found");
+      const raw = String(body?.url ?? "").trim();
+      if (raw && !/^(https:\/\/|\/assets\/|data:image\/(png|svg\+xml|webp|jpeg);base64,)/.test(raw)) throw E.invalidParams([{ path: "url", message: "Use an https:// image URL or a data:image URL" }]);
+      if (raw.length > 200_000) throw E.invalidParams([{ path: "url", message: "Image too large (max ~150 KB)" }]);
+      await repo.setIconOverride(key, raw || null);
+      return json(200, okContent({ key, iconUrl: raw || null }));
     }
     if ((mm = /^\/api\/admin\/scrapers\/([^/]+)$/.exec(p)) && m === "POST") {
       const key = decodeURIComponent(mm[1]);

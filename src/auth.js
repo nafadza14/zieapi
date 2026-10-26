@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { E } from "./envelope.js";
-import { sha256, ulid } from "./util.js";
+import { sha256, ulid, stableId } from "./util.js";
 import { PLANS } from "./plans.js";
 
 export const KEY_PREFIX = "zie_";
@@ -59,3 +59,25 @@ export function clientIp(req) {
 }
 
 export const redactKey = (s) => (typeof s === "string" && s.length > 8 ? `${s.slice(0, 6)}••••` : "••••");
+
+/**
+ * Seed fixed keys from an env string — needed on serverless hosts (Vercel) where
+ * nothing written at runtime survives. Format: "plan:zie_secret,plan:zie_secret2".
+ * Ids derive from the hash, so every instance agrees on the same key id.
+ */
+export function seedKeysFromEnv(store, spec) {
+  if (!spec) return [];
+  const added = [];
+  for (const part of String(spec).split(",").map((s) => s.trim()).filter(Boolean)) {
+    const i = part.indexOf(":");
+    const [plan, secret] = i > 0 ? [part.slice(0, i), part.slice(i + 1)] : ["free", part];
+    if (!PLANS[plan]) throw new Error(`ZIE_KEYS: unknown plan "${plan}"`);
+    if (!secret.startsWith(KEY_PREFIX) || secret.length < 16) throw new Error(`ZIE_KEYS: keys must start with ${KEY_PREFIX} and be ≥16 chars`);
+    const hash = sha256(secret);
+    if (store.keyByHash(hash)) continue;
+    const rec = { id: stableId(hash), name: `env-${plan}`, owner: null, plan, hash, preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, status: "active", ipAllowlist: [], createdAt: null };
+    store.addKey(rec);
+    added.push(rec);
+  }
+  return added;
+}

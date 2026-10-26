@@ -80,7 +80,7 @@ export const MCP_TOOLS = [
   },
 ];
 
-export function createMcpHandler({ catalog, store, executor, limiter, bulk, version, authenticate }) {
+export function createMcpHandler({ catalog, store, executor, limiter, bulk, version, authenticate, syncBulk = false }) {
   const toolResult = (data) => ({
     content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
     structuredContent: data && typeof data === "object" && !Array.isArray(data) ? data : { result: data },
@@ -134,6 +134,10 @@ export function createMcpHandler({ catalog, store, executor, limiter, bulk, vers
           return toolResult({ plan: keyRec.plan, ...limiter.snapshot(keyRec) });
         case "bulk_submit": {
           const job = bulk.submit(keyRec, String(args.scraper ?? ""), String(args.endpoint ?? ""), args.items, args.idempotency_key);
+          if (syncBulk) {
+            await bulk.settle(job.jobId);
+            return toolResult(bulk.status(keyRec, job.jobId));
+          }
           return toolResult(job);
         }
         case "bulk_status":

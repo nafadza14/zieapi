@@ -24,7 +24,34 @@ curl "http://localhost:8787/v1/indonesia:terbilang/convert?number=1250000&curren
 # {"project":"indonesia:terbilang","data":{"number":1250000,"text":"satu juta dua ratus lima puluh ribu rupiah","formatted":"Rp1.250.000"},"timestamp":"…"}
 ```
 
+Open **http://localhost:8787** in your browser for the **playground**: paste the key, pick a scraper, fill the form, and press Run.
+
 Run the tests: `npm test`
+
+## Deploy to Vercel
+
+The repo is ready for Vercel: `api/zieapi.js` is the serverless entry, and `vercel.json` rewrites every path to it.
+
+1. Generate one or more keys:
+   ```bash
+   npm run key:generate -- ultra     # → ultra:zie_xxxxxxxx
+   ```
+2. In Vercel, go to **Add New → Project**, import `nafadza14/zieapi`, and keep the defaults (Framework: *Other*). The build command (`npm test`) and output (`public`) come from `vercel.json`.
+3. Under **Settings → Environment Variables**, add:
+   | Name | Value |
+   |---|---|
+   | `ZIE_KEYS` | `ultra:zie_xxx` (comma-separate several, e.g. `ultra:zie_a,free:zie_b`) |
+   | `ZIE_ADMIN_TOKEN` | optional |
+4. Deploy, then open `https://<project>.vercel.app/` and paste your key into the playground.
+
+Or use the CLI: `npm i -g vercel`, then `vercel`, then `vercel env add ZIE_KEYS`, then `vercel --prod`.
+
+**Serverless limitations.** Every function instance keeps its own memory. On Vercel:
+- usage counters, the cache and rate limits are per instance, which is fine for previews;
+- bulk jobs finish inside the submit request, so the response already contains the results;
+- keys minted with `/admin/keys` vanish on cold start, so use `ZIE_KEYS`.
+
+For real production, back `src/store.js` with a database such as Upstash Redis or Postgres.
 
 ## The contract
 
@@ -109,6 +136,7 @@ Copy [`src/scrapers/_template.js`](src/scrapers/_template.js), then register it 
 | `ZIE_ADMIN_TOKEN` | – | Enables `/admin/*` |
 | `ZIE_DATA_FILE` | `./data/zieapi.json` | JSON snapshot of keys, usage and webhooks |
 | `ZIE_DEV_KEY_PLAN` | `ultra` | Plan for the first-run dev key |
+| `ZIE_KEYS` | – | Fixed keys `plan:zie_…,plan:zie_…` (required on Vercel) |
 | `NODE_ENV=production` | | Disables the dev key |
 
 Create keys from the CLI: `npm run key:create -- --plan pro --name "my app"`
@@ -126,6 +154,7 @@ src/auth.js        API keys                      src/ratelimit.js minute + month
 src/cache.js       TTL cache + plan rules        src/bulk.js      bulk jobs + idempotency
 src/webhooks.js    HMAC-signed delivery          src/mcp.js       MCP server
 src/openapi.js     OpenAPI + llms.txt            src/scrapers/    scraper modules
+src/playground.js  browser playground (GET /)    api/zieapi.js    Vercel function entry
 docs/REA-REPORT.md reverse-engineering report    test/            node:test suites
 ```
 

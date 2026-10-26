@@ -18,7 +18,8 @@ import { BulkManager } from "./bulk.js";
 import { WebhookDispatcher, WEBHOOK_EVENTS, newWebhookSecret } from "./webhooks.js";
 import { createMcpHandler } from "./mcp.js";
 import { buildOpenApi, buildLlmsTxt } from "./openapi.js";
-import { authenticate, createApiKey, clientIp } from "./auth.js";
+import { authenticate, createApiKey, clientIp, seedKeysFromEnv } from "./auth.js";
+import { PLAYGROUND_HTML } from "./playground.js";
 import { E, HttpError, okContent, errBody } from "./envelope.js";
 import { PLANS, getPlan } from "./plans.js";
 import { ulid } from "./util.js";
@@ -28,7 +29,10 @@ export const VERSION = "1.0.0";
 const MAX_BODY = 1_000_000;
 
 export function createApp(opts = {}) {
-  const apiUrl = (opts.apiUrl ?? process.env.ZIE_API_URL ?? "http://localhost:8787").replace(/\/+$/, "");
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  const apiUrl = (opts.apiUrl ?? process.env.ZIE_API_URL ?? (vercelHost ? `https://${vercelHost}` : "http://localhost:8787")).replace(/\/+$/, "");
+  // Serverless (Vercel): no background work after the response, no writable disk.
+  const serverless = opts.serverless ?? process.env.VERCEL === "1";
   const publicUrl = (opts.publicUrl ?? process.env.ZIE_PUBLIC_URL ?? apiUrl).replace(/\/+$/, "");
   const adminToken = opts.adminToken ?? process.env.ZIE_ADMIN_TOKEN ?? null;
   const logger = opts.logger === undefined ? console : opts.logger;
@@ -36,6 +40,7 @@ export function createApp(opts = {}) {
   const store = opts.store ?? new Store({ file: opts.dataFile ?? process.env.ZIE_DATA_FILE ?? null });
   const catalog = new Catalog({ publicUrl });
   for (const s of opts.scrapers ?? defaultScrapers) catalog.register(s);
+  seedKeysFromEnv(store, opts.keys ?? process.env.ZIE_KEYS);
 
   const webhooks = new WebhookDispatcher(store, { fetchImpl: opts.webhookFetch ?? globalThis.fetch, backoffMs: opts.webhookBackoffMs ?? 500, logger });
   const limiter = new RateLimiter(store, {
@@ -50,7 +55,7 @@ export function createApp(opts = {}) {
   const executor = new Executor({ catalog, store, limiter, cache, webhooks, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookupImpl: opts.lookup ?? null, logger });
   const bulk = new BulkManager({ catalog, store, executor, limiter, webhooks, publicUrl, apiUrl, concurrency: opts.bulkConcurrency ?? 4 });
   const auth = (req) => authenticate(store, req);
-  const mcp = createMcpHandler({ catalog, store, executor, limiter, bulk, version: VERSION, authenticate: auth });
+  const mcp = createMcpHandler({ catalog, store, executor, limiter, bulk, version: VERSION, authenticate: auth, syncBulk: serverless });
   const stats = (id) => store.getStat(id);
 
   let openapiCache = null;
@@ -62,8 +67,10 @@ export function createApp(opts = {}) {
     const m = req.method;
 
     // ---------- public ------------------------------------------------------
-    if (p === "/" && m === "GET")
-      return json(200, okContent({ name: "zieapi", version: VERSION, ...catalog.totals(), docs: `${apiUrl}/llms.txt`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp` }));
+    if (m === "GET" && (p === "/playground" || (p === "/" && /text\/html/.test(req.headers.accept ?? ""))))
+      return { status: 200, body: PLAYGROUND_HTML, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60", Vary: "Accept" } };
+    if ((p === "/" || p === "/api/info") && m === "GET")
+      return json(200, okContent({ name: "zieapi", version: VERSION, ...catalog.totals(), docs: `${apiUrl}/llms.txt`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp`, playground: `${apiUrl}/playground` }), { Vary: "Accept" });
     if (p === "/healthz") return json(200, { ok: true, version: VERSION, uptimeSec: Math.round(process.uptime()) });
     if (p === "/openapi.json" && m === "GET") return json(200, (openapiCache ??= buildOpenApi(catalog, { apiUrl, version: VERSION })), { "Cache-Control": "public, max-age=300" });
     if (p === "/llms.txt" && m === "GET")
@@ -139,6 +146,10 @@ export function createApp(opts = {}) {
       if (rest === "bulk" && m === "POST") {
         const items = Array.isArray(body) ? body : body?.items;
         const job = bulk.submit(key, projectKey, endpointSlug, items, req.headers["idempotency-key"]);
+        if (serverless) {
+          await bulk.settle(job.jobId);
+          return json(202, bulk.status(key, job.jobId), noStore);
+        }
         return json(202, job, noStore);
       }
       if (m !== "GET" && m !== "POST" && m !== "HEAD") throw E.methodNotAllowed(catalog.resolve(projectKey, endpointSlug).endpoint?.method ?? "GET");
@@ -211,7 +222,7 @@ export function createApp(opts = {}) {
     const requestId = sanitizeId(req.headers["x-request-id"]) ?? ulid();
     let out;
     try {
-      const url = new URL(req.url, "http://local");
+      const url = normalizeUrl(req.url);
       if (req.method === "OPTIONS") out = { status: 204, body: "", headers: {} };
       else {
         const body = await readBody(req);
@@ -239,10 +250,21 @@ export function createApp(opts = {}) {
   }
 
   const server = createServer(handler);
-  return { server, handler, store, catalog, limiter, cache, executor, bulk, webhooks, apiUrl, publicUrl };
+  return { server, handler, serverless, store, catalog, limiter, cache, executor, bulk, webhooks, apiUrl, publicUrl };
 }
 
 // ---------- helpers ---------------------------------------------------------
+// Vercel rewrites every path to /api/zieapi?__path=<original>. Depending on the
+// runtime, req.url is either the original URL or the rewritten one — handle both.
+export function normalizeUrl(raw) {
+  const url = new URL(raw ?? "/", "http://local");
+  if (url.searchParams.has("__path") && /^\/api\/zieapi\/?$/.test(url.pathname)) {
+    url.pathname = "/" + url.searchParams.get("__path").replace(/^\/+/, "");
+    url.searchParams.delete("__path");
+  }
+  return url;
+}
+
 function json(status, body, headers = {}) {
   return { status, body, headers };
 }
@@ -295,7 +317,17 @@ async function readBody(req) {
     if (size > MAX_BODY) throw new HttpError(413, errBody("Payload too large"));
     chunks.push(c);
   }
-  if (!size) return undefined;
+  if (!size) {
+    // Some hosts (Vercel helpers) pre-read the stream and expose req.body instead.
+    try {
+      const pre = req.body;
+      if (pre === undefined || pre === null || pre === "") return undefined;
+      if (typeof pre === "object" && !Buffer.isBuffer(pre)) return pre;
+      return JSON.parse(Buffer.isBuffer(pre) ? pre.toString("utf8") : String(pre));
+    } catch {
+      throw new HttpError(400, errBody("Invalid JSON body", { errors: [{ path: "body", message: "Malformed JSON" }] }));
+    }
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
   try {
     return JSON.parse(raw);

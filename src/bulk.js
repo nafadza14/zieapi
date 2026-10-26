@@ -97,6 +97,11 @@ export class BulkManager {
     return { ...pub, pollUrl: `${this.apiUrl}/v1/bulk/${job.jobId}` };
   }
 
+  /** Wait for a job to finish (serverless mode: no background work after the response). */
+  async settle(jobId) {
+    await this.store.jobs.get(jobId)?._promise;
+  }
+
   cancel(keyRec, jobId) {
     const job = this.store.jobs.get(jobId);
     if (!job || job.keyId !== keyRec.id) throw E.notFound(`Bulk job "${jobId}" not found`);

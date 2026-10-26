@@ -11,12 +11,21 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",
-    "key:create": "node scripts/create-key.js"
+    "key:create": "node scripts/create-key.js",
+    "key:generate": "node scripts/gen-key.js",
+    "vercel:dev": "vercel dev"
   },
   "engines": {
     "node": ">=20.0.0"
   },
-  "keywords": ["api", "scraper", "gateway", "mcp", "indonesia", "rate-limit"],
+  "keywords": [
+    "api",
+    "scraper",
+    "gateway",
+    "mcp",
+    "indonesia",
+    "rate-limit"
+  ],
   "author": "Zieads",
   "license": "MIT",
   "repository": {

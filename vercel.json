@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "npm test",
+  "outputDirectory": "public",
+  "functions": {
+    "api/zieapi.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/zieapi?__path=$1" }
+  ]
+}

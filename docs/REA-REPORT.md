@@ -1,6 +1,6 @@
 # Laporan REA: zapi.ink
 
-> Metodologi: REA (morluto/rea v6.8.0) — reverse engineering berbasis bukti.
+> Metodologi: REA (morluto/rea v6.8.0): reverse engineering berbasis bukti.
 > Tanggal capture: 26 Oktober 2026. Semua klaim mengutip `E##` dari [`evidence/index.json`](evidence/index.json).
 > Cakupan: hanya permukaan publik. Tidak login, tidak memakai fitur berbayar, tidak brute-force endpoint.
 > Satu-satunya API key yang dikirim adalah key palsu `zpi_invalid_probe` untuk melihat bentuk error 401.
@@ -23,7 +23,7 @@ Zapi (zapi.ink, sebelumnya `zpi.web.id`) adalah **gateway API scraper terkelola*
 
 | Plan | Harga | Req/bulan | Req/menit | Log | Cache control | Fitur ekstra |
 |---|---|---|---|---|---|---|
-| Free | Rp0 | 600 | 100 | 7 hari | — | MCP, dashboard |
+| Free | Rp0 | 600 | 100 | 7 hari | - | MCP, dashboard |
 | Pro | Rp49.000 | 25.000 | 2.000 | 30 hari | hingga 30 dtk | webhook kuota, IP whitelist |
 | Ultra | Rp129.000 | 200.000 | 5.000 | 90 hari | selalu fresh | bulk, request log |
 | Max | Rp399.000 | 1.000.000 | 15.000 | 90 hari | selalu fresh | bulk, log tiap call |
@@ -36,7 +36,7 @@ Zapi (zapi.ink, sebelumnya `zpi.web.id`) adalah **gateway API scraper terkelola*
 - Analitik: GA4 via GTM, Microsoft Clarity, Yandex Webmaster, Cloudflare RUM; endpoint `/api/internal/vitals` (E17).
 - Storage browser di halaman publik: cookie `_ga*` saja, `localStorage` kosong (E17).
 - Gambar: imgproxy bertanda tangan di `imp.zapi.ink`, objek asli di `s3.zapi.ink/main/...` (E18).
-- Chunk publik **tidak** berisi URL `api.zapi.ink` — halaman katalog di-render server (RSC) (E17).
+- Chunk publik **tidak** berisi URL `api.zapi.ink`: halaman katalog di-render server (RSC) (E17).
 
 ### 2.3 Kontrak REST (A3)
 - Base: `https://api.zapi.ink`. Auth: header `x-api-key` (E05, E07).
@@ -107,9 +107,9 @@ AI agent  ──► mcp.zapi.ink/mcp (JSON-RPC, stateless) ──► katalog + /
 | I3 | Cache respons per endpoint dengan TTL `cacheTtl`, override per plan lewat param `ttl` | Sedang (E02 + SDK `opts.ttl` E11) | Cache hanya di edge |
 | I4 | OpenAPI `Envelope {status,message,content}` sudah usang/generik; kontrak nyata adalah `{project,data,timestamp}` | Tinggi (E05 vs E01/E07/E11) | Dua envelope untuk dua generasi endpoint |
 | I5 | Satu proses gateway memvalidasi param via `paramsSchema` sebelum memanggil worker | Sedang (pesan `Invalid params`, E10) | Validasi di dalam tiap scraper |
-| I6 | `minPlan` di level scraper dan endpoint menghasilkan 403 plan gate | Tinggi (E12, E19) | — |
-| I7 | Dashboard dan `/api/me/*` memakai better-auth session cookie | Tinggi (E16) | — |
-| I8 | Gambar diunggah admin ke S3-compatible storage dengan nama `{slug}-{epochms}` | Tinggi (E18) | — |
+| I6 | `minPlan` di level scraper dan endpoint menghasilkan 403 plan gate | Tinggi (E12, E19) | - |
+| I7 | Dashboard dan `/api/me/*` memakai better-auth session cookie | Tinggi (E16) | - |
+| I8 | Gambar diunggah admin ke S3-compatible storage dengan nama `{slug}-{epochms}` | Tinggi (E18) | - |
 
 ---
 
@@ -117,34 +117,34 @@ AI agent  ──► mcp.zapi.ink/mcp (JSON-RPC, stateless) ──► katalog + /
 
 | ID | Pertanyaan | Penghalang | Otoritas yang dibutuhkan | Probe berikutnya (terbatas) |
 |---|---|---|---|---|
-| U1 | Bentuk respons `/v1` tanpa key | Fetch browser gagal (CORS) | — | `curl` dari mesin yang diizinkan ke 1 endpoint, tanpa key |
+| U1 | Bentuk respons `/v1` tanpa key | Fetch browser gagal (CORS) | - | `curl` dari mesin yang diizinkan ke 1 endpoint, tanpa key |
 | U2 | Handshake MCP (`initialize`, `tools/list` JSON Schema argumen) | CORS dari origin halaman; butuh key | Akun Free | `claude mcp add` dengan key Free milik sendiri, catat `tools/list` |
 | U3 | Header rate-limit lengkap (selain `X-RateLimit-Remaining-Month`, `Retry-After`) | Butuh key valid | Akun Free | 1 request valid, catat semua header |
 | U4 | Alur pembayaran (gateway apa: Midtrans/Xendit/Tripay?) | Di balik login | Akun + persetujuan | Observasi pasif halaman billing dashboard |
 | U5 | Runtime worker scraper, proxy pool, penanganan anti-bot | Server-side | Tidak bisa diakses | Tidak diprobe (di luar cakupan) |
 | U6 | Batas bulk (cap item, konkurensi) | Butuh plan Ultra | Plan Ultra | Baca docs `/docs/bulk` |
 | U7 | Format log request & retensi aktual | Butuh login | Akun | Observasi dashboard |
-| U8 | Isi `exampleResponse` per endpoint apakah snapshot nyata | Tidak bisa dibedakan | — | Bandingkan dengan respons nyata (U3) |
+| U8 | Isi `exampleResponse` per endpoint apakah snapshot nyata | Tidak bisa dibedakan | - | Bandingkan dengan respons nyata (U3) |
 | U9 | Bundle dashboard (`/dashboard`) | Hanya dimuat setelah login | Akun | `rea inspect-web-page` di dashboard sendiri |
 
 ---
 
-## 6. Spesifikasi rekonstruksi clean-room (A5) — **zieapi**
+## 6. Spesifikasi rekonstruksi clean-room (A5): **zieapi**
 
 Implementasi ada di repo ini. Prinsip: meniru **kontrak publik** dan arsitektur, **bukan** kode atau scraper proprietary.
 
 ### 6.1 Komponen
-1. **Gateway** (`src/server.js`) — routing `/v1`, `/api`, `/mcp`, CORS, `x-request-id`, `X-Response-Time`.
-2. **Auth & keys** (`src/auth.js`) — key `zie_…`, disimpan sebagai SHA-256, diterima di `x-api-key` / `Authorization: Bearer` / `api-key`.
-3. **Plans & metering** (`src/plans.js`, `src/ratelimit.js`) — kuota bulanan (reset tgl 1 UTC), window per menit, 5xx tidak dihitung.
-4. **Katalog** (`src/catalog.js`) — registry scraper → endpoint dengan `paramsSchema`, `cacheTtl`, `pathTemplate`, `minPlan`, `bulkEnabled`.
-5. **Validator** (`src/validate.js`) — dari schema → `400 Invalid params`.
-6. **Cache** (`src/cache.js`) — TTL per endpoint, `ttl` override dibatasi per plan.
-7. **Bulk** (`src/bulk.js`) — job queue in-process + `Idempotency-Key`.
-8. **Webhook** (`src/webhooks.js`) — HMAC-SHA256 `X-Zie-Signature`.
-9. **MCP** (`src/mcp.js`) — 8 tool setara, JSON-RPC stateless.
+1. **Gateway** (`src/server.js`): routing `/v1`, `/api`, `/mcp`, CORS, `x-request-id`, `X-Response-Time`.
+2. **Auth & keys** (`src/auth.js`): key `zie_…`, disimpan sebagai SHA-256, diterima di `x-api-key` / `Authorization: Bearer` / `api-key`.
+3. **Plans & metering** (`src/plans.js`, `src/ratelimit.js`): kuota bulanan (reset tgl 1 UTC), window per menit, 5xx tidak dihitung.
+4. **Katalog** (`src/catalog.js`): registry scraper → endpoint dengan `paramsSchema`, `cacheTtl`, `pathTemplate`, `minPlan`, `bulkEnabled`.
+5. **Validator** (`src/validate.js`): dari schema → `400 Invalid params`.
+6. **Cache** (`src/cache.js`): TTL per endpoint, `ttl` override dibatasi per plan.
+7. **Bulk** (`src/bulk.js`): job queue in-process + `Idempotency-Key`.
+8. **Webhook** (`src/webhooks.js`): HMAC-SHA256 `X-Zie-Signature`.
+9. **MCP** (`src/mcp.js`): 8 tool setara, JSON-RPC stateless.
 10. **OpenAPI & llms.txt** dibangkitkan dari katalog.
-11. **Store** (`src/store.js`) — in-memory + persistensi JSON opsional (ganti Postgres untuk produksi).
+11. **Store** (`src/store.js`): in-memory + persistensi JSON opsional (ganti Postgres untuk produksi).
 
 ### 6.2 Model data
 `User(id, email)` · `ApiKey(id, userId, hash, prefix, plan, status, ipAllowlist[])` · `Plan(id, monthly, perMinute, minCacheTtl, bulk, webhooks)` · `UsageLedger(keyId, month, count)` · `Scraper(id, category, slug, …)` · `Endpoint(id, scraperId, slug, method, fields[], cacheTtl, pathTemplate, minPlan, bulkEnabled, enabled)` · `Job(id, keyId, status, items[])` · `Webhook(keyId, url, secret, events[])`.
@@ -165,11 +165,11 @@ Implementasi ada di repo ini. Prinsip: meniru **kontrak publik** dan arsitektur,
 ### 6.5 Rencana uji
 **Bukti paritas (E28):** `zpi-sdk@0.6.0` resmi dari npm, tanpa modifikasi, berjalan terhadap zieapi lokal (`examples/zpi-sdk-parity.mjs`): `run()`, auto-verb POST, path template, katalog, bulk, dan pemetaan error ke kelas yang benar.
 
-Lihat juga `test/*.test.js` (35 tes) — envelope, tiga header auth, plan gate, 405, invalid params, rate limit menit & bulan, 5xx tidak dihitung, cache hit, bulk & idempotency, webhook signature, MCP.
+Lihat juga `test/*.test.js` (35 tes): envelope, tiga header auth, plan gate, 405, invalid params, rate limit menit & bulan, 5xx tidak dihitung, cache hit, bulk & idempotency, webhook signature, MCP.
 
 ### 6.6 Di luar cakupan (sengaja)
 - Logika scraper pihak ketiga milik Zapi, teknik bypass captcha/anti-bot, rotasi proxy.
-- Kategori "Bypass Tools" (pemendek URL/paywall) — tidak direplikasi.
+- Kategori "Bypass Tools" (pemendek URL/paywall): tidak direplikasi.
 - Penyalinan aset merek, teks marketing, atau ikon Zapi.
 
 ---
@@ -184,7 +184,7 @@ Indeks bukti: [`docs/evidence/index.json`](evidence/index.json) (E01–E28).
 
 ---
 
-# Iterasi 2 — Reverse engineering seluruh website & sistem (26 Okt 2026)
+# Iterasi 2: Reverse engineering seluruh website & sistem (26 Okt 2026)
 
 Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh website dan sistem** zapi.ink lalu membangun ulang semuanya sebagai **zieapi v2**, dengan desain sendiri (hero globe partikel).
 

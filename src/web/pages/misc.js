@@ -54,7 +54,7 @@ ${pageHead("Showcase", "Built with zieapi.", "Bots, research pipelines and tools
 export function reportPage({ user, type = "issue", scraper = "" }) {
   const body = `<main>
 ${pageHead("Support", type === "request" ? "Request a scraper" : "Report an issue", "Tell us what broke or what source you need. Include the x-request-id if you have one.")}
-<section class="wrap narrow section-tight"><form class="card form" data-form="/api/report" data-success="Received — thank you. We'll follow up by email if needed.">
+<section class="wrap narrow section-tight"><form class="card form" data-form="/api/report" data-success="Received, thank you. We'll follow up by email if needed.">
   <label>Type<select name="type"><option value="issue"${type === "issue" ? " selected" : ""}>Something is broken</option><option value="request"${type === "request" ? " selected" : ""}>Request a new source</option><option value="other">Other</option></select></label>
   <label>Email<input name="email" type="email" value="${esc(user?.email ?? "")}" required></label>
   <label>Scraper (optional)<input name="scraper" value="${esc(scraper)}" placeholder="e.g. finance:idx"></label>
@@ -116,7 +116,7 @@ export function legalPage({ user, slug }) {
   const doc = LEGAL[slug];
   if (!doc) return null;
   const [title, sections] = doc;
-  const body = `<main>${pageHead("Legal", title, "Last updated 26 October 2026. This template is a starting point — have it reviewed by a lawyer before launch.")}
+  const body = `<main>${pageHead("Legal", title, "Last updated 26 October 2026. This template is a starting point. Have it reviewed by a lawyer before launch.")}
 <article class="wrap narrow prose section-tight">${sections.map(([h, p]) => `<h2>${esc(h)}</h2><p>${esc(p)}</p>`).join("")}</article></main>`;
   return layout({ title, user, body });
 }

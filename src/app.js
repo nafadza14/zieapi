@@ -31,7 +31,7 @@ import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, not
 export const VERSION = "2.0.0";
 const MAX_BODY = 1_000_000;
 const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
-const MIME = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".webp": "image/webp", ".jpg": "image/jpeg" };
+const MIME = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".webp": "image/webp", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json" };
 
 export function createApp(opts = {}) {
   const env = opts.env ?? process.env;
@@ -139,7 +139,7 @@ export function createApp(opts = {}) {
     let mm;
 
     // static assets (Vercel serves /public itself; this is for local + fallback)
-    if (p.startsWith("/assets/") || p === "/favicon.ico" || p === "/robots.txt") return serveStatic(p === "/favicon.ico" ? "/assets/favicon.svg" : p);
+    if (p.startsWith("/assets/") || p === "/favicon.ico" || p === "/robots.txt") return serveStatic(p === "/favicon.ico" ? "/assets/favicon.ico" : p);
 
     // ----- machine-readable ----------------------------------------------------
     if (p === "/healthz") return json(200, { ok: true, version: VERSION, uptimeSec: Math.round(process.uptime()), storage: kv.constructor.name });
@@ -204,7 +204,7 @@ export function createApp(opts = {}) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ path: "email", message: "Enter a valid email" });
       if (password.length < 8) errors.push({ path: "password", message: "At least 8 characters" });
       if (errors.length) throw E.invalidParams(errors);
-      if (await repo.getUserByEmail(email)) throw new HttpError(409, errBody("An account with this email already exists — sign in instead."));
+      if (await repo.getUserByEmail(email)) throw new HttpError(409, errBody("An account with this email already exists. Sign in instead."));
       const u = await findOrCreateUser({ email, name: name || email.split("@")[0] });
       await repo.updateUser(u.id, { passwordHash: await hashPassword(password) });
       return json(200, okContent({ ok: true }), { "Set-Cookie": await login(u, req) });
@@ -313,7 +313,7 @@ export function createApp(opts = {}) {
       if (keys.length >= 20) throw E.invalidParams([{ path: "name", message: "Maximum 20 keys per account" }]);
       const { secret, rec } = await repo.createKey(user.id, { name: String(body?.name ?? "New key").slice(0, 60) });
       webhooks.emit(user.id, "key.created", { keyId: rec.id, name: rec.name });
-      return json(201, okContent({ key: secret, record: publicKey(rec) }, "Created — copy this key now, it is shown only once."));
+      return json(201, okContent({ key: secret, record: publicKey(rec) }, "Created. Copy this key now, it is shown only once."));
     }
     if ((mm = /^\/api\/me\/keys\/([^/]+)$/.exec(p))) {
       const k = await repo.getKeyById(mm[1]);
@@ -388,7 +388,7 @@ export function createApp(opts = {}) {
       const months = Math.min(12, Math.max(1, Number(body?.months) || 1));
       if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
       const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
-      if (open.length >= 3) throw E.invalidParams([{ path: "plan", message: "You already have open invoices — pay or cancel them first" }]);
+      if (open.length >= 3) throw E.invalidParams([{ path: "plan", message: "You already have open invoices. Pay or cancel them first" }]);
       const unique = 1 + Math.floor(Math.random() * 999);
       const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, plan: target.id, months, base: target.priceIdr * months, uniqueCode: unique, amount: target.priceIdr * months + unique, currency: "IDR", method: "bank_transfer", status: "pending", reference: null, createdAt: new Date().toISOString() };
       return json(201, okContent(await repo.put("invoice", inv, user.id)));

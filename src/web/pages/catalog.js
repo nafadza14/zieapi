@@ -48,7 +48,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
     [401, "Missing or invalid API key"],
     [403, "Your plan does not include this endpoint"],
     [404, "Unknown scraper or endpoint"],
-    [429, "Per-minute or monthly limit reached — see Retry-After"],
+    [429, "Per-minute or monthly limit reached. See Retry-After"],
     [501, "Listed in the catalog but not live on this server yet"],
     [503, "Temporarily disabled or missing server configuration"],
   ];
@@ -71,9 +71,9 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
   </aside>
   <section class="ep-main" data-ep-main></section>
 </div>
-<dialog class="modal" data-mcp-modal><form method="dialog"><h2>Use ${esc(s.displayName)} from MCP</h2><p>Add zieapi to your agent once, then ask for “${esc(s.displayName)}” — the agent calls <code>run_scraper</code> with <code>${esc(s.key)}</code>.</p><pre class="code"><code>claude mcp add --transport http zieapi ${esc(apiUrl)}/mcp \\
+<dialog class="modal" data-mcp-modal><form method="dialog"><h2>Use ${esc(s.displayName)} from MCP</h2><p>Add zieapi to your agent once, then ask for “${esc(s.displayName)}”: the agent calls <code>run_scraper</code> with <code>${esc(s.key)}</code>.</p><pre class="code"><code>claude mcp add --transport http zieapi ${esc(apiUrl)}/mcp \\
   --header "x-api-key: zie_••••••••"</code></pre><div class="center"><a href="/mcp" class="pill pill-outline pill-sm">Other clients</a> <button class="pill pill-white pill-sm">Close</button></div></form></dialog>
 <script type="application/json" id="detail-data">${json({ scraper: { key: s.key, displayName: s.displayName, category: s.category, slug: s.slug }, endpoints: s.endpoints, current: ep.slug, apiUrl, errors, langs: CODE_LANGS, loggedIn: !!user })}</script>
 </main>`;
-  return layout({ title: `${s.displayName} API`, active: "scrapers", user, body, description: `${s.displayName} (${s.key}) — ${s.endpointCount} endpoints via one API key.` });
+  return layout({ title: `${s.displayName} API`, active: "scrapers", user, body, description: `${s.displayName} (${s.key}): ${s.endpointCount} endpoints via one API key.` });
 }

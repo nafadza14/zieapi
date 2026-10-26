@@ -59,7 +59,7 @@ export const NEWS = [
   rss({
     slug: "antara",
     displayName: "ANTARA News",
-    description: "Kantor berita nasional ANTARA — berita terbaru dari RSS resminya, bisa per kanal.",
+    description: "Kantor berita nasional ANTARA: berita terbaru dari RSS resminya, bisa per kanal.",
     indonesian: true,
     tags: ["indonesia", "antara"],
     base: "https://www.antaranews.com/rss/terkini.xml",

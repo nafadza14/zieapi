@@ -37,7 +37,7 @@ export class Limiter {
       const retryAfterSec = secondsToMonthReset(new Date(now));
       throw new HttpError(
         429,
-        { content: { limit: p.monthly, used, window: "month", retryAfterSec }, message: `Monthly quota exceeded — ${p.monthly} requests/month (used ${used}). Upgrade your plan or wait for the reset on the 1st (UTC).`, errors: [] },
+        { content: { limit: p.monthly, used, window: "month", retryAfterSec }, message: `Monthly quota exceeded: ${p.monthly} requests/month (used ${used}). Upgrade your plan or wait for the reset on the 1st (UTC).`, errors: [] },
         this.headers(plan, 0, used, { "Retry-After": String(retryAfterSec) })
       );
     }
@@ -49,7 +49,7 @@ export class Limiter {
       const retryAfterSec = Math.max(1, 60 - Math.floor((now / 1000) % 60));
       throw new HttpError(
         429,
-        { content: { limit: p.perMinute, used, window: "minute", retryAfterSec }, message: `Rate limit exceeded — ${p.perMinute} requests/minute (used ${used}). Upgrade your plan or wait ~${retryAfterSec}s.`, errors: [] },
+        { content: { limit: p.perMinute, used, window: "minute", retryAfterSec }, message: `Rate limit exceeded: ${p.perMinute} requests/minute (used ${used}). Upgrade your plan or wait ~${retryAfterSec}s.`, errors: [] },
         this.headers(plan, used, monthUsed - n, { "Retry-After": String(retryAfterSec) })
       );
     }

@@ -25,7 +25,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
   <div class="hero-inner">
     <a href="/scrapers" class="hero-pill rise r1"><span aria-hidden="true">⚡</span> Indonesia-first public data API</a>
     <h1 class="hero-title"><span class="rise r2"><span class="grad-l">Every Public</span> Data Source,</span><span class="rise r3">Behind One <span class="grad-r">API Key</span></span></h1>
-    <p class="hero-sub rise r4">${fmt(totals.scrapers)} scrapers and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">We keep the sources working — you ship the product.</p>
+    <p class="hero-sub rise r4">${fmt(totals.scrapers)} scrapers and ${fmt(totals.endpoints)} endpoints with one clean JSON shape. <br class="br-md">We keep the sources working. You ship the product.</p>
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} scrapers</a></div>
   </div>
   <a href="#steps" class="scroll-hint rise r6" aria-label="Scroll down">
@@ -47,7 +47,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
 <section class="section wrap" id="steps">
   <div class="section-head"><span class="eyebrow">How it works</span><h2 class="display-2">Three steps to clean data.</h2></div>
   <div class="grid-3">
-    <article class="card step"><span class="step-n">01</span><h3>Get a free API key</h3><p>Sign up with Google, GitHub, Discord or email. Your first key is ready in seconds — no card.</p></article>
+    <article class="card step"><span class="step-n">01</span><h3>Get a free API key</h3><p>Sign up with Google, GitHub, Discord or email. Your first key is ready in seconds. No card needed.</p></article>
     <article class="card step"><span class="step-n">02</span><h3>Pick a scraper</h3><p>Search ${fmt(totals.scrapers)} sources across ${totals.categories} categories. Every endpoint documents its parameters.</p></article>
     <article class="card step"><span class="step-n">03</span><h3>Call it, get JSON</h3><p>Same URL pattern, same envelope, every source: <code>{ project, data, timestamp }</code>.</p></article>
   </div>
@@ -68,7 +68,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
     <div>
       <span class="eyebrow">One pattern</span>
       <h2 class="display-2">Change one word.<br>Scrape any source.</h2>
-      <p class="lead">Every source lives at <code>/v1/{category}:{scraper}/{endpoint}</code>. Swap the project key and you are talking to a different website — same auth, same envelope, same errors.</p>
+      <p class="lead">Every source lives at <code>/v1/{category}:{scraper}/{endpoint}</code>. Swap the project key and you are talking to a different website. Same auth, same envelope, same errors.</p>
       <div class="swap-chips" role="tablist" aria-label="Example sources">${examples.map((e, i) => `<button role="tab" class="swap${i === 0 ? " on" : ""}" data-swap='${esc(JSON.stringify(e))}' aria-selected="${i === 0}">${esc(e.label)}</button>`).join("")}</div>
     </div>
     <div class="code-card" data-codecard data-api="${esc(apiUrl)}">
@@ -86,7 +86,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
     <article class="card feat f-wide"><h3>We keep every scraper working</h3><p>Sources change their markup and APIs constantly. Health checks run around the clock and every endpoint reports its live status in the catalog, so you never guess.</p><div class="mini-status">${["live", "live", "live", "upstream", "live", "live", "planned", "live"].map((s) => `<i class="dot-${s}"></i>`).join("")}</div></article>
     <article class="card feat"><h3>One response shape</h3><p><code>project</code>, <code>data</code>, <code>timestamp</code>. Errors use the same codes everywhere.</p></article>
     <article class="card feat"><h3>Built for AI agents</h3><p>A remote MCP server exposes the whole catalog as tools for Claude, Cursor and VS Code.</p></article>
-    <article class="card feat"><h3>Indonesian sources, first class</h3><p>IDX, BMKG, Kemenag, wilayah, Rupiah, local news and jobs — not an afterthought.</p></article>
+    <article class="card feat"><h3>Indonesian sources, first class</h3><p>IDX, BMKG, Kemenag, wilayah, Rupiah, local news and jobs. Not an afterthought.</p></article>
     <article class="card feat"><h3>Pay for what you use</h3><p>A 5xx never costs you a request. Quotas reset on the 1st (UTC) and every response tells you what is left.</p></article>
   </div>
 </section>`;
@@ -105,7 +105,7 @@ export function homePage({ user, totals, categories, top, apiUrl, publicUrl }) {
   ${esc(apiUrl)}/mcp \\
   --header "x-api-key: zie_••••••••"</code></pre>
       <ul class="tool-list">${["search_scrapers", "get_scraper_schema", "list_categories", "run_scraper", "get_account", "get_usage", "bulk_submit", "bulk_status"].map((t) => `<li><code>${t}</code></li>`).join("")}</ul></div>
-    <div><span class="eyebrow">MCP</span><h2 class="display-2">Let your AI agent do the scraping.</h2><p class="lead">Point any MCP client at <code>/mcp</code>. Your agent searches the catalog, reads the schema and runs the endpoint — on the same key and quota as REST.</p><a href="/mcp" class="pill pill-white">Set up MCP →</a></div>
+    <div><span class="eyebrow">MCP</span><h2 class="display-2">Let your AI agent do the scraping.</h2><p class="lead">Point any MCP client at <code>/mcp</code>. Your agent searches the catalog, reads the schema and runs the endpoint, on the same key and quota as REST.</p><a href="/mcp" class="pill pill-white">Set up MCP →</a></div>
   </div>
 </section>`;
 

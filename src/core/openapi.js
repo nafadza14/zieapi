@@ -64,7 +64,7 @@ export function buildOpenApi(catalog, { apiUrl, version, category = null }) {
   }
   return {
     openapi: "3.1.0",
-    info: { title: category ? `zieapi — ${category}` : "zieapi", version, description: "One API key, one envelope, many public data sources." },
+    info: { title: category ? `zieapi: ${category}` : "zieapi", version, description: "One API key, one envelope, many public data sources." },
     servers: [{ url: apiUrl }],
     security: [{ ApiKeyAuth: [] }],
     paths,
@@ -99,7 +99,7 @@ function fieldSchema(f) {
 export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full = true }) {
   const t = catalog.totals();
   const lines = [
-    category ? `# zieapi — ${category}` : "# zieapi",
+    category ? `# zieapi: ${category}` : "# zieapi",
     "",
     `> ${t.scrapers} scrapers, ${t.endpoints} endpoints, ${t.categories} categories behind one API key.`,
     "",
@@ -116,13 +116,13 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   ];
   for (const s of catalog.scrapers.filter((x) => !category || x.category === category)) {
     if (!full) {
-      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\` — ${s.endpoints.length} endpoints`);
+      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\`: ${s.endpoints.length} endpoints`);
       continue;
     }
     lines.push("", `### ${s.displayName} (\`${s.key}\`)`, s.description ?? "");
     for (const e of s.endpoints) {
       const fields = e.fields.map((f) => `${f.name}${f.required ? "*" : ""}:${f.type}`).join(", ");
-      lines.push(`- ${e.method} /v1/${s.key}/${e.slug}${e.pathTemplate ? "/" + e.pathTemplate : ""} — ${e.displayName}${fields ? ` (${fields})` : ""}${e.status === "live" ? "" : " [" + e.status + "]"}`);
+      lines.push(`- ${e.method} /v1/${s.key}/${e.slug}${e.pathTemplate ? "/" + e.pathTemplate : ""}: ${e.displayName}${fields ? ` (${fields})` : ""}${e.status === "live" ? "" : " [" + e.status + "]"}`);
     }
   }
   lines.push("", `Pricing: ${publicUrl}/pricing`);

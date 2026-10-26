@@ -1600,7 +1600,7 @@ const cryptoPrice = {
 };
 
 // ======================================================================
-// Frankfurter (ECB reference rates) — used by currency-convert and fx
+// Frankfurter (ECB reference rates): used by currency-convert and fx
 // ======================================================================
 const FX = "https://api.frankfurter.dev/v1";
 const up = (s) => String(s ?? "").toUpperCase().trim();
@@ -1643,7 +1643,7 @@ const fx = {
   category: "finance",
   slug: "fx",
   displayName: "Kurs Valuta (ECB)",
-  description: "Kurs referensi harian Bank Sentral Eropa (ECB) via Frankfurter: kurs terbaru, konversi, riwayat, dan daftar mata uang — termasuk Rupiah (IDR).",
+  description: "Kurs referensi harian Bank Sentral Eropa (ECB) via Frankfurter: kurs terbaru, konversi, riwayat, dan daftar mata uang, termasuk Rupiah (IDR).",
   tags: ["kurs", "forex", "idr", "rupiah", "usd", "currency", "finance"],
   indonesian: true,
   endpoints: [
@@ -1831,7 +1831,7 @@ const gleif = {
 };
 
 // ======================================================================
-// US Treasury — Fiscal Data API + Treasury yield-curve XML feed
+// US Treasury: Fiscal Data API + Treasury yield-curve XML feed
 // ======================================================================
 const FD = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service";
 const fdFilter = (parts) => parts.filter(Boolean).join(",") || undefined;
@@ -2271,7 +2271,7 @@ const secEdgar = {
 };
 
 // ======================================================================
-// FRED (St. Louis Fed) — needs FRED_API_KEY
+// FRED (St. Louis Fed): needs FRED_API_KEY
 // ======================================================================
 const FRED = "https://api.stlouisfed.org/fred";
 async function fred(ctx, path, params = {}) {

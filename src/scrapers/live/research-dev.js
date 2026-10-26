@@ -1409,7 +1409,7 @@ const discord = {
     ep(
       "widget",
       "Get Server Widget",
-      "Public widget (online members, voice channels, instant invite) of a guild — by guild ID, or by invite code which is resolved first. The guild must have its widget enabled.",
+      "Public widget (online members, voice channels, instant invite) of a guild, by guild ID, or by invite code which is resolved first. The guild must have its widget enabled.",
       [f.str("guild", { example: "613425648685547541", pattern: "^\\d{15,25}$" }), f.str("code", { example: "discord-developers" })],
       async (p, ctx) => {
         let guild = p.guild;
@@ -1637,7 +1637,7 @@ const binLookup = {
       "lookup",
       "Lookup BIN",
       "Look up the first 6–8 digits of a payment card number.",
-      [f.req("bin", { example: "45717360", pattern: "^\\d{6,8}$", description: "First 6-8 digits only — never send a full card number" })],
+      [f.req("bin", { example: "45717360", pattern: "^\\d{6,8}$", description: "First 6-8 digits only. Never send a full card number" })],
       async (p, ctx) => {
         if (!/^\d{6,8}$/.test(p.bin)) throw new ScraperError("bin must be 6-8 digits");
         let j;

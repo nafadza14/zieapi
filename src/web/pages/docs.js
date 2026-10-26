@@ -17,7 +17,7 @@ export const DOCS = [
 <a class="card" href="/docs/mcp"><h3>MCP server</h3><p>Give AI agents the whole catalog as tools.</p></a>
 </div>
 <h2>Base URL</h2><p><code>${esc(api)}</code></p>
-<h2>Machine-readable</h2><ul><li><a href="/openapi.json">/openapi.json</a> — OpenAPI 3.1 for every endpoint (per category: <code>/category/{slug}/openapi.json</code>)</li><li><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a> — compact references for LLMs</li></ul>`,
+<h2>Machine-readable</h2><ul><li><a href="/openapi.json">/openapi.json</a>: OpenAPI 3.1 for every endpoint (per category: <code>/category/{slug}/openapi.json</code>)</li><li><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a>: compact references for LLMs</li></ul>`,
       },
       {
         slug: "quickstart",
@@ -46,7 +46,7 @@ ${c(`curl "${api}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: zie_xxx"
         slug: "rest-api",
         title: "REST API",
         body: (api) => `<h2>URL pattern</h2><p><code>${esc(api)}/v1/{category}:{scraper}/{endpoint}[/{path-params}]</code></p>
-<p>The <em>project key</em> <code>{category}:{scraper}</code> identifies the source (e.g. <code>finance:binance</code>). Each endpoint documents its verb — most are <code>GET</code> with query parameters; <code>POST</code> endpoints take a JSON body. Calling with the wrong verb returns <code>405</code> with <code>content.expected</code> and an <code>Allow</code> header.</p>
+<p>The <em>project key</em> <code>{category}:{scraper}</code> identifies the source (e.g. <code>finance:binance</code>). Each endpoint documents its verb. Most are <code>GET</code> with query parameters; <code>POST</code> endpoints take a JSON body. Calling with the wrong verb returns <code>405</code> with <code>content.expected</code> and an <code>Allow</code> header.</p>
 <h2>Path parameters</h2><p>Endpoints such as <code>profile/:username</code> take the value in the path: <code>/v1/social-media:github-user/profile/torvalds</code>. You can also pass it as a query parameter.</p>
 <h2>Success envelope</h2>${c(`{ "project": "finance:binance", "data": { … }, "timestamp": "2026-10-26T03:00:00.000Z" }`, "json")}
 <h2>Response headers</h2><table class="doc-table"><tr><td><code>X-RateLimit-Remaining</code></td><td>Requests left this minute</td></tr><tr><td><code>X-RateLimit-Remaining-Month</code></td><td>Requests left this month</td></tr><tr><td><code>X-Cache</code></td><td><code>HIT</code>, <code>MISS</code>, <code>BYPASS</code> or <code>NONE</code></td></tr><tr><td><code>x-request-id</code></td><td>Include it when reporting an issue</td></tr></table>
@@ -88,13 +88,13 @@ ${c(`curl -X POST "${api}/v1/finance:coingecko/simple-price/bulk" \\\n  -H "x-ap
         title: "Webhooks",
         body: () => `<p>Pro and above can register up to 5 HTTPS endpoints in <a href="/dashboard/webhooks">Dashboard → Webhooks</a>.</p>
 <p>Events: <code>quota.warning</code> (80%), <code>quota.exceeded</code>, <code>request.error</code>, <code>bulk.completed</code>, <code>bulk.failed</code>, <code>key.created</code>, <code>key.disabled</code>, <code>plan.changed</code>, <code>webhook.test</code>.</p>
-<p>Each delivery is a <code>POST</code> with body <code>{ id, event, data, deliveredAt }</code> and header <code>X-Zie-Signature: sha256=&lt;hex&gt;</code> — an HMAC-SHA256 of the raw body using your webhook secret.</p>
+<p>Each delivery is a <code>POST</code> with body <code>{ id, event, data, deliveredAt }</code> and header <code>X-Zie-Signature: sha256=&lt;hex&gt;</code>, an HMAC-SHA256 of the raw body using your webhook secret.</p>
 ${c(`import { createHmac, timingSafeEqual } from "node:crypto";\n\nfunction verify(rawBody, header, secret) {\n  const want = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");\n  return header && want.length === header.length &&\n    timingSafeEqual(Buffer.from(want), Buffer.from(header));\n}`, "javascript")}`,
       },
       {
         slug: "catalog",
         title: "Catalog API",
-        body: (api) => `<p>The catalog is public — no key needed.</p><table class="doc-table">
+        body: (api) => `<p>The catalog is public. No key needed.</p><table class="doc-table">
 <tr><td><code>GET /api/public/categories</code></td><td>Categories with counts</td></tr>
 <tr><td><code>GET /api/scrapers/list?q=&amp;cat=&amp;cursor=&amp;limit=&amp;sort=</code></td><td>Search scrapers</td></tr>
 <tr><td><code>GET /api/scrapers/{category:slug}</code></td><td>Scraper detail with endpoints</td></tr>

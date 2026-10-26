@@ -1,4 +1,4 @@
-/* zieapi website behaviour — vanilla JS, no build step */
+/* zieapi website behaviour: vanilla JS, no build step */
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];

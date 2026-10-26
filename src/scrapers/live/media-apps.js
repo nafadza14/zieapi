@@ -42,7 +42,7 @@ function randomString(len, alphabet = "abcdefghijklmnopqrstuvwxyz0123456789") {
 }
 
 // ---------------------------------------------------------------------------
-// TVmaze — https://www.tvmaze.com/api
+// TVmaze: https://www.tvmaze.com/api
 
 const TVMAZE = "https://api.tvmaze.com";
 
@@ -188,7 +188,7 @@ const tvmaze = {
 };
 
 // ---------------------------------------------------------------------------
-// AniList — GraphQL https://graphql.anilist.co
+// AniList: GraphQL https://graphql.anilist.co
 
 const ANILIST = "https://graphql.anilist.co";
 const MEDIA_FIELDS = `id idMal type format status season seasonYear episodes duration chapters volumes genres averageScore meanScore popularity favourites isAdult siteUrl bannerImage
@@ -369,7 +369,7 @@ const anilistScraper = {
 };
 
 // ---------------------------------------------------------------------------
-// MyAnimeList via Jikan v4 — https://docs.api.jikan.moe
+// MyAnimeList via Jikan v4: https://docs.api.jikan.moe
 
 const JIKAN = "https://api.jikan.moe/v4";
 function jikanEntry(a) {
@@ -498,7 +498,7 @@ const myanimelist = {
 };
 
 // ---------------------------------------------------------------------------
-// iTunes Search / Lookup API — https://performance-partners.apple.com/search-api
+// iTunes Search / Lookup API: https://performance-partners.apple.com/search-api
 
 const ITUNES = "https://itunes.apple.com";
 function itItem(r) {
@@ -608,7 +608,7 @@ const appleMusic = {
 };
 
 // ---------------------------------------------------------------------------
-// Deezer — https://developers.deezer.com/api
+// Deezer: https://developers.deezer.com/api
 
 const DEEZER = "https://api.deezer.com";
 async function deezer(ctx, target) {
@@ -698,7 +698,7 @@ const deezerScraper = {
 };
 
 // ---------------------------------------------------------------------------
-// MusicBrainz — https://musicbrainz.org/doc/MusicBrainz_API
+// MusicBrainz: https://musicbrainz.org/doc/MusicBrainz_API
 
 const MB = "https://musicbrainz.org/ws/2";
 const mbCredit = (ac) => (ac ?? []).map((c) => ({ id: c.artist?.id ?? null, name: c.name ?? c.artist?.name, joinphrase: c.joinphrase || undefined }));
@@ -779,7 +779,7 @@ const musicbrainz = {
 };
 
 // ---------------------------------------------------------------------------
-// PokeAPI — https://pokeapi.co/docs/v2
+// PokeAPI: https://pokeapi.co/docs/v2
 
 const pokeapi = {
   category: "games",
@@ -811,7 +811,7 @@ const pokeapi = {
 };
 
 // ---------------------------------------------------------------------------
-// CheapShark — https://apidocs.cheapshark.com
+// CheapShark: https://apidocs.cheapshark.com
 
 const CS = "https://www.cheapshark.com/api/1.0";
 const cheapshark = {
@@ -863,7 +863,7 @@ const cheapshark = {
 };
 
 // ---------------------------------------------------------------------------
-// TheMealDB — https://www.themealdb.com/api.php
+// TheMealDB: https://www.themealdb.com/api.php
 
 const mealBase = () => `https://www.themealdb.com/api/json/v1/${env("THEMEALDB_KEY") || "1"}`;
 function meal(m) {
@@ -911,7 +911,7 @@ const themealdb = {
 };
 
 // ---------------------------------------------------------------------------
-// Open Food Facts — https://openfoodfacts.github.io/openfoodfacts-server/api/
+// Open Food Facts: https://openfoodfacts.github.io/openfoodfacts-server/api/
 
 const OFF = "https://world.openfoodfacts.org";
 const OFF_FIELDS = "code,product_name,generic_name,brands,quantity,categories,categories_tags,labels,countries,image_url,image_front_url,ingredients_text,allergens_tags,traces_tags,nutriscore_grade,nova_group,ecoscore_grade,nutriments,serving_size,stores";
@@ -975,7 +975,7 @@ const openfoodfacts = {
 };
 
 // ---------------------------------------------------------------------------
-// WHO Global Health Observatory OData — https://www.who.int/data/gho/info/gho-odata-api
+// WHO Global Health Observatory OData: https://www.who.int/data/gho/info/gho-odata-api
 
 const GHO = "https://ghoapi.azureedge.net/api";
 const odq = (s) => `'${String(s).replace(/'/g, "''")}'`;
@@ -1090,7 +1090,7 @@ const who = {
 };
 
 // ---------------------------------------------------------------------------
-// NLM Clinical Table Search Service — https://clinicaltables.nlm.nih.gov
+// NLM Clinical Table Search Service: https://clinicaltables.nlm.nih.gov
 
 const CTSS = "https://clinicaltables.nlm.nih.gov";
 const CT_COMMON = () => [
@@ -1189,7 +1189,7 @@ const clinicalTables = {
 };
 
 // ---------------------------------------------------------------------------
-// MedlinePlus — web service, MedlinePlus Connect, Genetics JSON
+// MedlinePlus: web service, MedlinePlus Connect, Genetics JSON
 
 const MLP_CS = {
   icd10cm: "2.16.840.1.113883.6.90",
@@ -1300,7 +1300,7 @@ const medlineplus = {
 };
 
 // ---------------------------------------------------------------------------
-// Flathub — https://flathub.org/api/v2/docs
+// Flathub: https://flathub.org/api/v2/docs
 
 const FLATHUB = "https://flathub.org/api/v2";
 const flatHit = (h) => ({
@@ -1379,7 +1379,7 @@ const flathub = {
 };
 
 // ---------------------------------------------------------------------------
-// Snapcraft store API — https://api.snapcraft.io/docs/
+// Snapcraft store API: https://api.snapcraft.io/docs/
 
 const SNAP = "https://api.snapcraft.io/v2/snaps";
 const SNAP_HEADERS = { "Snap-Device-Series": "16" };
@@ -1431,7 +1431,7 @@ const snapcraft = {
 };
 
 // ---------------------------------------------------------------------------
-// addons.mozilla.org API v5 — https://mozilla.github.io/addons-server/topics/api/
+// addons.mozilla.org API v5: https://mozilla.github.io/addons-server/topics/api/
 
 const AMO = "https://addons.mozilla.org/api/v5";
 const tr = (v) => (v == null ? null : typeof v === "string" ? v : v["en-US"] ?? v[v._default] ?? Object.values(v)[0] ?? null);
@@ -1555,7 +1555,7 @@ const firefoxAddons = {
 };
 
 // ---------------------------------------------------------------------------
-// App Store — iTunes Search/Lookup, customer-review RSS, chart RSS
+// App Store: iTunes Search/Lookup, customer-review RSS, chart RSS
 
 const APP_ENTITIES = ["software", "iPadSoftware", "macSoftware", "tvSoftware"];
 const appItem = (r) => ({
@@ -1700,7 +1700,7 @@ const appStore = {
 };
 
 // ---------------------------------------------------------------------------
-// Mail.tm / Mail.gw — documented Hydra REST APIs (https://docs.mail.tm)
+// Mail.tm / Mail.gw: documented Hydra REST APIs (https://docs.mail.tm)
 
 const hydra = (j) => (Array.isArray(j) ? j : j?.["hydra:member"] ?? []);
 function tempMail(slug, displayName, base, site) {

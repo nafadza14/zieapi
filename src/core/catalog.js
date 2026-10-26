@@ -14,7 +14,7 @@ const CATEGORY_BLURBS = {
   "dev-tools": "DNS, WHOIS, hashing and other developer utilities.",
   downloader: "Media download helpers.",
   esport: "Players, teams and tournaments.",
-  finance: "Stocks, crypto, FX, gold and macro data — IDX first.",
+  finance: "Stocks, crypto, FX, gold and macro data, IDX first.",
   food: "Recipes, menus and food products.",
   games: "Game profiles and game data.",
   health: "Medical vocabularies, WHO and public-health data.",

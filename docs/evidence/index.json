@@ -139,7 +139,7 @@
       "id": "E23",
       "source": "GET https://api.zapi.ink/v1/indonesia:cek-kode-pos/lookup with x-api-key: zpi_invalid_probe",
       "kind": "network",
-      "summary": "401 {content:null,message:'Invalid API key',errors:[]}, X-Response-Time: 1. Same request without any key failed at the browser fetch layer (CORS/opaque) — body not observable."
+      "summary": "401 {content:null,message:'Invalid API key',errors:[]}, X-Response-Time: 1. Same request without any key failed at the browser fetch layer (CORS/opaque), so the body was not observable."
     },
     {
       "id": "E24",
@@ -169,7 +169,7 @@
       "id": "E28",
       "source": "examples/zpi-sdk-parity.mjs (this repo)",
       "kind": "verification",
-      "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local zieapi via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError — i.e. zieapi is wire-compatible with the observed contract."
+      "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local zieapi via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError, which shows zieapi is wire-compatible with the observed contract."
     },
     {
       "id": "E29",
@@ -187,7 +187,7 @@
       "id": "E31",
       "source": "https://zapi.ink/login and /register (HTML text)",
       "kind": "page",
-      "summary": "Both render the same OAuth-only card: 'Sign in — Welcome back' with GitHub, Google and Discord buttons; no email/password form."
+      "summary": "Both render the same OAuth-only card: 'Sign in / Welcome back' with GitHub, Google and Discord buttons; no email/password form."
     },
     {
       "id": "E32",

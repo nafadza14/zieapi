@@ -3,13 +3,13 @@ import { PLANS, PLAN_COPY } from "../../core/plans.js";
 
 const FAQ = [
   ["Is zieapi really free?", "Yes. The Free plan gives every account 600 requests a month at up to 100 requests a minute, on every live endpoint, with no credit card. It does not expire."],
-  ["What happens when I hit the quota?", "Requests return HTTP 429 with a clear message, the limit you hit and a Retry-After header. Nothing is charged automatically — upgrade from the dashboard or wait for the reset on the 1st (UTC)."],
+  ["What happens when I hit the quota?", "Requests return HTTP 429 with a clear message, the limit you hit and a Retry-After header. Nothing is charged automatically. Upgrade from the dashboard or wait for the reset on the 1st (UTC)."],
   ["Do failed requests use up my quota?", "Server-side failures (5xx) are refunded automatically. Client errors (4xx such as invalid parameters) are counted, because the work was done."],
   ["Which tier do I need?", "Start on Free while you build. Move to Pro when real users arrive, Ultra when you need bulk jobs or always-fresh data, and Max for heavy pipelines."],
-  ["How do I pay?", "Upgrades are invoiced in Rupiah. Create an invoice from Billing, pay by bank transfer and submit the reference — your plan is activated as soon as the payment is verified."],
+  ["How do I pay?", "Upgrades are invoiced in Rupiah. Create an invoice from Billing, pay by bank transfer and submit the reference. Your plan is activated as soon as the payment is verified."],
   ["How is zieapi different from a scraping framework?", "You don't run browsers, proxies or parsers. You call an endpoint and get stable JSON. We maintain the integrations; you maintain your product."],
-  ["What about the legality of accessing public data?", "zieapi focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data — see the Acceptable Use Policy."],
-  ["Can I request a source that isn't in the catalog?", "Yes — use Report an issue → Request a scraper. Popular requests are prioritised."],
+  ["What about the legality of accessing public data?", "zieapi focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data. See the Acceptable Use Policy."],
+  ["Can I request a source that isn't in the catalog?", "Yes. Use Report an issue → Request a scraper. Popular requests are prioritised."],
 ];
 
 export function pricingPage({ user }) {
@@ -17,15 +17,15 @@ export function pricingPage({ user }) {
   const rows = [
     ["Monthly requests", (p) => fmt(p.monthly)],
     ["Requests per minute", (p) => fmt(p.perMinute)],
-    ["Price per 1,000 requests", (p) => (p.priceIdr ? idr(Math.round((p.priceIdr / p.monthly) * 1000)) : "—")],
+    ["Price per 1,000 requests", (p) => (p.priceIdr ? idr(Math.round((p.priceIdr / p.monthly) * 1000)) : "-")],
     ["All live endpoints", () => "✓"],
     ["MCP server", () => "✓"],
     ["Usage dashboard", () => "✓"],
     ["Request log retention", (p) => `${p.logDays} days`],
-    ["Cache control (ttl)", (p) => (p.minCacheTtl === null ? "—" : p.minCacheTtl === 0 ? "Always fresh" : `≥ ${p.minCacheTtl}s`)],
-    ["Webhooks", (p) => (p.webhooks ? "✓" : "—")],
-    ["Per-key IP allowlist", (p) => (p.rank >= 1 ? "✓" : "—")],
-    ["Bulk jobs", (p) => (p.bulk ? `${fmt(p.bulkCap)} items` : "—")],
+    ["Cache control (ttl)", (p) => (p.minCacheTtl === null ? "-" : p.minCacheTtl === 0 ? "Always fresh" : `≥ ${p.minCacheTtl}s`)],
+    ["Webhooks", (p) => (p.webhooks ? "✓" : "-")],
+    ["Per-key IP allowlist", (p) => (p.rank >= 1 ? "✓" : "-")],
+    ["Bulk jobs", (p) => (p.bulk ? `${fmt(p.bulkCap)} items` : "-")],
     ["Support", (p) => ["Community", "Email", "Email", "Priority"][p.rank]],
   ];
   const body = `<main>

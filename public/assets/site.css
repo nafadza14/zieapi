@@ -1,4 +1,4 @@
-/* zieapi — night globe theme */
+/* zieapi: night globe theme */
 :root {
   --bg: #05050a;
   --bg-2: #0b0b13;
@@ -76,8 +76,10 @@ select option { background: #13131d; }
 /* ---------- nav ---------- */
 .nav { position: fixed; inset: 0 0 auto; z-index: 50; height: var(--nav-h); display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 clamp(16px, 3vw, 40px); transition: background 0.25s, border-color 0.25s; border-bottom: 1px solid transparent; }
 .nav.scrolled, body:not(.home) .nav { background: rgba(5, 5, 10, 0.72); backdrop-filter: blur(16px) saturate(1.3); border-color: var(--line); }
-.logo { display: inline-flex; align-items: center; gap: 8px; font: 600 19px/1 var(--body); letter-spacing: -0.02em; }
-.logo-mark { width: 28px; height: 28px; color: #fff; }
+.logo { display: inline-flex; align-items: center; line-height: 0; }
+.logo-svg { height: 30px; width: auto; display: block; }
+.footer-brand .logo-svg { height: 34px; }
+.auth-logo .logo-svg { height: 36px; }
 .nav-links { display: flex; gap: 4px; align-items: center; padding: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); backdrop-filter: blur(10px); }
 .nav-link { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; font-size: 14px; color: var(--muted); }
 .nav-link.active { background: rgba(255, 255, 255, 0.09); color: #fff; }

@@ -8,7 +8,7 @@
     const s = (Date.now() - Date.parse(iso)) / 1000;
     return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 86400)}d ago`;
   };
-  const date = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+  const date = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
   const badge = (s) => `<span class="badge badge-${esc(s)}">${esc(String(s).replace(/_/g, " "))}</span>`;
   const bar = (used, limit) => `<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${limit}" aria-valuenow="${used}"><i style="width:${Math.min(100, (used / Math.max(1, limit)) * 100).toFixed(1)}%"></i></div>`;
   const chart = (days) => {
@@ -16,7 +16,7 @@
     return `<div class="chart" role="img" aria-label="Requests per day">${days.map((d) => `<div style="height:${Math.max(2, (d.requests / max) * 100)}%" data-tip="${d.date}: ${fmt(d.requests)}"></div>`).join("")}</div><div class="chart-axis"><span>${days[0]?.date ?? ""}</span><span>${days.at(-1)?.date ?? ""}</span></div>`;
   };
   const table = (head, rows, empty = "Nothing here yet.") => (rows.length ? `<div class="table-wrap"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>` : `<div class="card empty"><p>${empty}</p></div>`);
-  const secretBox = (key) => `<div class="secret"><code style="background:none;border:0">${esc(key)}</code><button class="pill pill-white pill-sm" data-copy="${esc(key)}">Copy</button></div><p class="small muted">Copy it now — for your security we only store a hash and can't show it again.</p>`;
+  const secretBox = (key) => `<div class="secret"><code style="background:none;border:0">${esc(key)}</code><button class="pill pill-white pill-sm" data-copy="${esc(key)}">Copy</button></div><p class="small muted">Copy it now. For your security we only store a hash and can't show it again.</p>`;
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-copy]");
     if (b) navigator.clipboard?.writeText(b.dataset.copy).then(() => toast("Copied"));
@@ -42,7 +42,7 @@
         </div>
         <div class="card"><h3>Requests, last 14 days</h3>${chart(o.days)}</div>
         <div class="grid-2">
-          <div class="card"><h3>Top scrapers this month</h3>${o.top.length ? `<ul class="checks">${o.top.map((t) => `<li><a href="/api/${esc(t.project.replace(":", "/"))}">${esc(t.project)}</a> — ${fmt(t.requests)}</li>`).join("")}</ul>` : '<p class="muted">No calls yet.</p>'}</div>
+          <div class="card"><h3>Top scrapers this month</h3>${o.top.length ? `<ul class="checks">${o.top.map((t) => `<li><a href="/api/${esc(t.project.replace(":", "/"))}">${esc(t.project)}</a>: ${fmt(t.requests)}</li>`).join("")}</ul>` : '<p class="muted">No calls yet.</p>'}</div>
           <div class="card"><h3>Recent requests</h3>${o.recent.length ? `<ul class="checks">${o.recent.map((l) => `<li>${badge(l.status)} ${esc(l.project)}/${esc(l.endpoint)} <span class="muted small">${ago(l.at)}</span></li>`).join("")}</ul>` : '<p class="muted">No calls yet.</p>'}<a class="small" href="/dashboard/logs">All logs →</a></div>
         </div>
         <div class="card"><h3>Quick start</h3><pre class="out">curl "${esc(D.apiUrl)}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: ${o.keys[0] ? esc(o.keys[0].preview) : "zie_…"}"</pre></div>`);
@@ -55,7 +55,7 @@
       set(`<div class="dash-head"><h1>API keys</h1></div>
         <form class="card inline-form" data-new-key><input name="name" placeholder="Key name, e.g. production" maxlength="60" aria-label="Key name"><button class="pill pill-white">Create key</button></form>
         <div data-new-secret></div>
-        ${table(["Name", "Key", "Status", "Last used", "Created", ""], keys.map((k) => `<tr><td>${esc(k.name)}</td><td><code>${esc(k.preview)}</code>${k.ipAllowlist?.length ? `<div class="small muted">IPs: ${esc(k.ipAllowlist.join(", "))}</div>` : ""}</td><td>${badge(k.status)}</td><td>${ago(k.lastUsedAt)}</td><td>${date(k.createdAt)}</td><td><div class="row-actions"><button class="pill pill-outline pill-sm" data-act="rename" data-id="${k.id}">Rename</button><button class="pill pill-outline pill-sm" data-act="${k.status === "active" ? "disable" : "enable"}" data-id="${k.id}">${k.status === "active" ? "Disable" : "Enable"}</button>${canIp ? `<button class="pill pill-outline pill-sm" data-act="ip" data-id="${k.id}">IP allowlist</button>` : ""}<button class="pill pill-danger pill-sm" data-act="delete" data-id="${k.id}">Delete</button></div></td></tr>`), "No keys yet — create one above.")}
+        ${table(["Name", "Key", "Status", "Last used", "Created", ""], keys.map((k) => `<tr><td>${esc(k.name)}</td><td><code>${esc(k.preview)}</code>${k.ipAllowlist?.length ? `<div class="small muted">IPs: ${esc(k.ipAllowlist.join(", "))}</div>` : ""}</td><td>${badge(k.status)}</td><td>${ago(k.lastUsedAt)}</td><td>${date(k.createdAt)}</td><td><div class="row-actions"><button class="pill pill-outline pill-sm" data-act="rename" data-id="${k.id}">Rename</button><button class="pill pill-outline pill-sm" data-act="${k.status === "active" ? "disable" : "enable"}" data-id="${k.id}">${k.status === "active" ? "Disable" : "Enable"}</button>${canIp ? `<button class="pill pill-outline pill-sm" data-act="ip" data-id="${k.id}">IP allowlist</button>` : ""}<button class="pill pill-danger pill-sm" data-act="delete" data-id="${k.id}">Delete</button></div></td></tr>`), "No keys yet. Create one above.")}
         <p class="small muted">Send the key as <code>x-api-key</code>, <code>Authorization: Bearer</code> or <code>api-key</code>. ${canIp ? "" : "IP allowlists are available on Pro and above."}</p>`);
       $("[data-new-key]").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -144,9 +144,9 @@
       const { content: b } = await api("/api/me/billing");
       const want = new URLSearchParams(location.search).get("plan");
       set(`<div class="dash-head"><h1>Billing</h1></div>
-        <div class="card metric"><span>Current plan</span><b style="text-transform:capitalize">${esc(b.plan.id)}</b><span>${b.planExpiresAt && b.plan.id !== "free" ? `Active until ${date(b.planExpiresAt)}` : "Free plan — no expiry"}</span></div>
+        <div class="card metric"><span>Current plan</span><b style="text-transform:capitalize">${esc(b.plan.id)}</b><span>${b.planExpiresAt && b.plan.id !== "free" ? `Active until ${date(b.planExpiresAt)}` : "Free plan, no expiry"}</span></div>
         <div class="card"><h3>Upgrade or renew</h3><form class="inline-form" data-checkout>
-          <select name="plan" aria-label="Plan">${b.plans.filter((p) => p.id !== "free").map((p) => `<option value="${p.id}"${p.id === want ? " selected" : ""}>${p.id[0].toUpperCase() + p.id.slice(1)} — ${idr(p.priceIdr)}/month · ${fmt(p.monthly)} req</option>`).join("")}</select>
+          <select name="plan" aria-label="Plan">${b.plans.filter((p) => p.id !== "free").map((p) => `<option value="${p.id}"${p.id === want ? " selected" : ""}>${p.id[0].toUpperCase() + p.id.slice(1)}: ${idr(p.priceIdr)}/month · ${fmt(p.monthly)} req</option>`).join("")}</select>
           <select name="months" aria-label="Months">${[1, 3, 6, 12].map((m) => `<option value="${m}">${m} month${m > 1 ? "s" : ""}</option>`).join("")}</select>
           <button class="pill pill-white">Create invoice</button></form>
           <p class="small muted" style="margin-top:12px">Pay by bank transfer to the account below, using the exact amount (it includes a 3-digit code so we can match your payment). Then submit your transfer reference.</p>
@@ -159,13 +159,13 @@
           await api("/api/me/invoices", { method: "POST", body: { plan: e.target.plan.value, months: Number(e.target.months.value) } });
           history.replaceState(null, "", "/dashboard/billing");
           await dash.billing();
-          toast("Invoice created — transfer the exact amount");
+          toast("Invoice created. Transfer the exact amount");
         } catch (err) { toast(err.message); }
       });
       $$("[data-confirm]").forEach((x) => x.addEventListener("click", async () => {
         const ref = prompt("Transfer reference or sender account name");
         if (!ref) return;
-        try { await api(`/api/me/invoices/${x.dataset.confirm}/confirm`, { method: "POST", body: { reference: ref } }); await dash.billing(); toast("Thanks — we'll verify it shortly"); } catch (err) { toast(err.message); }
+        try { await api(`/api/me/invoices/${x.dataset.confirm}/confirm`, { method: "POST", body: { reference: ref } }); await dash.billing(); toast("Thanks, we'll verify it shortly"); } catch (err) { toast(err.message); }
       }));
       $$("[data-cancel]").forEach((x) => x.addEventListener("click", async () => {
         try { await api(`/api/me/invoices/${x.dataset.cancel}/cancel`, { method: "POST" }); await dash.billing(); } catch (err) { toast(err.message); }
@@ -213,7 +213,7 @@
     async scrapers() {
       const { content: list } = await api("/api/admin/scrapers");
       set(`<div class="dash-head"><h1>Scrapers</h1><input data-sq placeholder="Filter" style="max-width:240px"></div><div data-stable></div>`);
-      const draw = (f = "") => ($("[data-stable]").innerHTML = table(["Scraper", "Status", "Live / total", "Requests", "Success", ""], list.filter((s) => !f || s.key.includes(f)).map((s) => `<tr><td><a href="/api/${esc(s.key.replace(":", "/"))}">${esc(s.displayName)}</a><div class="small muted"><code>${esc(s.key)}</code></div></td><td>${badge(s.enabled ? s.status : "disabled")}</td><td>${s.live}/${s.endpoints}</td><td>${fmt(s.requests)}</td><td>${s.successRate ?? "—"}${s.successRate !== null ? "%" : ""}</td><td><button class="pill pill-outline pill-sm" data-toggle="${esc(s.key)}" data-to="${!s.enabled}">${s.enabled ? "Disable" : "Enable"}</button></td></tr>`)));
+      const draw = (f = "") => ($("[data-stable]").innerHTML = table(["Scraper", "Status", "Live / total", "Requests", "Success", ""], list.filter((s) => !f || s.key.includes(f)).map((s) => `<tr><td><a href="/api/${esc(s.key.replace(":", "/"))}">${esc(s.displayName)}</a><div class="small muted"><code>${esc(s.key)}</code></div></td><td>${badge(s.enabled ? s.status : "disabled")}</td><td>${s.live}/${s.endpoints}</td><td>${fmt(s.requests)}</td><td>${s.successRate ?? "-"}${s.successRate !== null ? "%" : ""}</td><td><button class="pill pill-outline pill-sm" data-toggle="${esc(s.key)}" data-to="${!s.enabled}">${s.enabled ? "Disable" : "Enable"}</button></td></tr>`)));
       draw();
       $("[data-sq]").addEventListener("input", (e) => draw(e.target.value.toLowerCase()));
       root.addEventListener("click", async (e) => {

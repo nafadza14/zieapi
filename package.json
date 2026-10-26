@@ -1,7 +1,7 @@
 {
   "name": "zieapi",
-  "version": "1.0.0",
-  "description": "Clean-room, zero-dependency scraper API gateway: one key, one envelope, catalog, rate limits, bulk jobs, webhooks and an MCP server.",
+  "version": "2.0.0",
+  "description": "zieapi \u2014 full public-data API platform: website, dashboard, admin, 290+ scrapers catalog, API keys, plans, billing, webhooks, bulk and MCP. Zero dependencies.",
   "type": "module",
   "main": "src/app.js",
   "bin": {
@@ -11,9 +11,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test",
-    "key:create": "node scripts/create-key.js",
     "key:generate": "node scripts/gen-key.js",
-    "vercel:dev": "vercel dev"
+    "import:catalog": "node scripts/import-catalog.js docs/evidence/zapi-catalog-capture.json"
   },
   "engines": {
     "node": ">=20.0.0"

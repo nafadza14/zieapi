@@ -181,3 +181,49 @@ Lihat juga `test/*.test.js` (35 tes) — envelope, tiga header auth, plan gate, 
 
 ## 8. Lampiran
 Indeks bukti: [`docs/evidence/index.json`](evidence/index.json) (E01–E28).
+
+---
+
+# Iterasi 2 — Reverse engineering seluruh website & sistem (26 Okt 2026)
+
+Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh website dan sistem** zapi.ink lalu membangun ulang semuanya sebagai **zieapi v2**, dengan desain sendiri (hero globe partikel).
+
+## A. Observations baru
+
+- **Peta situs (E29):** ada 84 rute publik, 16 halaman docs, 5 halaman legal, `llms.txt` dan `llms-full.txt`, OpenAPI per kategori, serta 636 halaman detail scraper `/api/{category}/{scraper}`.
+- **Area login (E30):** rute `/dashboard` dengan sub-halaman `keys`, `usage`, `logs`, `billing`, `webhooks`, `settings` dan `bulk`, plus `/admin`. Semuanya redirect ke login. Tidak ada `/dashboard/invoices` atau `/dashboard/topup`.
+- **Autentikasi (E31):** hanya OAuth (GitHub, Google, Discord). Tidak ada form email/password.
+- **Katalog (E32):** 25 spesifikasi OpenAPI per kategori. Setelah kategori Bypass Tools dikeluarkan, ada 291 scraper dan 1.243 endpoint (1.223 GET, 20 POST).
+- **Struktur halaman (E33):** susunan section pada homepage, pricing, detail scraper dan docs.
+
+## B. Pemetaan zapi.ink → zieapi v2
+
+| zapi.ink (teramati) | zieapi v2 |
+|---|---|
+| Next.js App Router + Cloudflare | Node `http` tanpa dependency, SSR template + vanilla JS; deploy ke Vercel/Docker |
+| `api.zapi.ink` + `mcp.zapi.ink` (host terpisah) | Satu host: `/v1`, `/api/*`, `/mcp` |
+| better-auth session, OAuth (E16, E31) | Sesi cookie (token di KV, HttpOnly, SameSite=Lax), OAuth GitHub/Google/Discord **dan** email/password (scrypt) |
+| `/api/me/*` hanya untuk sesi (E16) | `/api/me/*` (sesi) **plus** `/v1/me` dan `/v1/usage` (API key) |
+| Dashboard keys/usage/logs/billing/webhooks/settings/bulk (E30) | Semua halaman tersebut, ditambah overview dan panel admin (users, invoices, scrapers, reports, showcase) |
+| Katalog 318 scraper | Seed dari struktur publik (E32) digabung dengan **92 scraper / 333 endpoint live** milik sendiri |
+| Pembayaran (tidak teramati, U4) | Invoice transfer bank manual dengan kode unik, disetujui admin |
+| Storage server-side (tidak teramati) | Lapisan KV: Memory/File (lokal) atau Upstash Redis REST (Vercel) |
+
+## C. Batasan yang disengaja
+
+- **Kategori Bypass Tools (27 endpoint) dan scraper `ai:bypass-ai` serta `dev-tools:cf-sitekey` tidak dibuat.** Ketiganya berfungsi untuk mengakali proteksi atau deteksi.
+- **Endpoint yang butuh scraping privat atau anti-bot** (Instagram, TikTok, marketplace dan sejenisnya) hanya muncul di katalog dengan status *planned*. Status berubah menjadi *upstream* bila `ZIE_UPSTREAM_URL` diisi; pastikan dulu ketentuan penyedia upstream tersebut.
+- **Tidak ada teks marketing, ikon, contoh respons, atau deskripsi zapi yang disalin.**
+
+## D. Verifikasi
+
+- 138 tes otomatis lulus (`npm test`): alur website, auth, API key, kuota, refund 5xx, plan gate, invoice→admin approve, bulk + idempotensi, webhook bertanda tangan, MCP, adapter upstream, format Upstash, dan uji tiap modul scraper dengan fetch tiruan.
+- Uji upstream nyata dari browser pengguna (E34): **30 sumber membalas 200 dengan bentuk data yang sesuai**, 11 lainnya terjangkau tetapi tidak bisa dibaca karena CORS, dan sisanya **belum terverifikasi**.
+
+## E. Unknowns tambahan
+
+| ID | Pertanyaan | Penghalang |
+|---|---|---|
+| U10 | Isi dashboard dan admin zapi (tata letak, metrik) | Butuh login |
+| U11 | Gateway pembayaran zapi | Butuh akun + transaksi |
+| U12 | Sekitar 38 upstream live zieapi yang belum terverifikasi | CORS / izin situs di browser; uji dari server setelah deploy |

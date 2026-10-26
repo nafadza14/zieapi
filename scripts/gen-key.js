@@ -2,7 +2,7 @@
 // Print a new key line for the ZIE_KEYS env var (Vercel / serverless).
 // Usage: node scripts/gen-key.js ultra   →   ultra:zie_xxxxxxxx
 import { randomBytes } from "node:crypto";
-import { PLANS } from "../src/plans.js";
+import { PLANS } from "../src/core/plans.js";
 const plan = process.argv[2] ?? "free";
 if (!PLANS[plan]) {
   console.error(`Unknown plan "${plan}". Use: ${Object.keys(PLANS).join(", ")}`);

@@ -1,0 +1,187 @@
+import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
+
+// ---------- MCP ----------------------------------------------------------------
+export function mcpPage({ user, apiUrl }) {
+  const url = `${apiUrl}/mcp`;
+  const clients = [
+    ["Claude Code", `claude mcp add --transport http zieapi ${url} \\\n  --header "x-api-key: zie_xxx"`],
+    ["Claude Desktop", JSON.stringify({ mcpServers: { zieapi: { command: "npx", args: ["-y", "mcp-remote", url, "--header", "x-api-key:zie_xxx"] } } }, null, 2)],
+    ["Cursor", JSON.stringify({ mcpServers: { zieapi: { url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
+    ["VS Code", JSON.stringify({ servers: { zieapi: { type: "http", url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
+    ["Gemini CLI", JSON.stringify({ mcpServers: { zieapi: { httpUrl: url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
+    ["Windsurf", JSON.stringify({ mcpServers: { zieapi: { serverUrl: url, headers: { "x-api-key": "zie_xxx" } } } }, null, 2)],
+  ];
+  const tools = [
+    ["search_scrapers", "Find scrapers by name, source or the data they return."],
+    ["get_scraper_schema", "Return an endpoint's parameters, verb, path and status."],
+    ["list_categories", "List every category with scraper and endpoint counts."],
+    ["run_scraper", "Call any endpoint and return clean JSON."],
+    ["get_account", "Show your plan, key and limits."],
+    ["get_usage", "Requests used this month and this minute."],
+    ["bulk_submit", "Submit many inputs as one bulk job (Ultra/Max)."],
+    ["bulk_status", "Fetch a bulk job and its results."],
+  ];
+  const body = `<main>
+${pageHead("MCP server", "Let your AI agent do the scraping.", "A remote, stateless MCP server that turns the whole catalog into tools. Same key, same quota, same errors as REST.")}
+<section class="wrap section-tight">
+  <div class="grid-3 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Transport</span><b>Streamable HTTP · stateless</b></div><div class="card"><span class="muted">Auth</span><b>x-api-key · Bearer · api-key</b></div></div>
+  <div class="code-card tabs-card" data-tabs>
+    <div class="code-tabs" role="tablist">${clients.map(([n], i) => `<button role="tab" class="${i ? "" : "on"}" data-tab="${i}">${n}</button>`).join("")}<button class="copy" data-copy-code>Copy</button></div>
+    ${clients.map(([, code], i) => `<pre class="code" data-panel="${i}"${i ? " hidden" : ""}><code>${esc(code)}</code></pre>`).join("")}
+  </div>
+  <h2 class="display-2 mt">Tools</h2>
+  <div class="table-wrap"><table class="doc-table">${tools.map(([n, d]) => `<tr><td><code>${n}</code></td><td>${d}</td></tr>`).join("")}</table></div>
+  <div class="grid-2 mt"><div class="card"><h3>Limits</h3><p>Tool calls that run scrapers count against the same per-minute and monthly limits as REST. Bulk tools need Ultra or Max.</p></div><div class="card"><h3>Errors</h3><p>Failures come back as tool errors with the REST status and code, e.g. <code>{"status":403,"code":"plan_upgrade_required"}</code>.</p></div></div>
+</section></main>`;
+  return layout({ title: "MCP server", active: "mcp", user, body });
+}
+
+// ---------- Showcase -----------------------------------------------------------
+export function showcasePage({ user, items }) {
+  const body = `<main>
+${pageHead("Showcase", "Built with zieapi.", "Bots, research pipelines and tools people have shipped on zieapi.")}
+<section class="wrap section-tight">
+  ${items.length ? `<div class="grid-3">${items.map((p) => `<a class="card show-card" href="${esc(p.url)}" rel="noopener nofollow" target="_blank"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><span class="muted small">${esc(new URL(p.url).hostname)}</span></a>`).join("")}</div>` : `<div class="empty card"><h3>No projects here yet.</h3><p>Shipped something on zieapi? Yours could be the first one.</p></div>`}
+  <div class="card mt submit-card">
+    <h2>Submit your project</h2>
+    ${user ? `<form class="form" data-form="/api/showcase" data-success="Thanks! We'll review it shortly."><label>Project name<input name="name" required maxlength="80"></label><label>URL<input name="url" type="url" required placeholder="https://"></label><label class="full">What does it do?<textarea name="description" required maxlength="280" rows="3"></textarea></label><button class="pill pill-white">Submit</button><p class="form-msg" role="status"></p></form>` : `<p><a href="/login?next=/showcase">Sign in</a> to submit your project. Ultra and Max plans get their logo on the “Built with zieapi” strip.</p>`}
+  </div>
+</section></main>`;
+  return layout({ title: "Showcase", active: "showcase", user, body });
+}
+
+// ---------- Report -------------------------------------------------------------
+export function reportPage({ user, type = "issue", scraper = "" }) {
+  const body = `<main>
+${pageHead("Support", type === "request" ? "Request a scraper" : "Report an issue", "Tell us what broke or what source you need. Include the x-request-id if you have one.")}
+<section class="wrap narrow section-tight"><form class="card form" data-form="/api/report" data-success="Received — thank you. We'll follow up by email if needed.">
+  <label>Type<select name="type"><option value="issue"${type === "issue" ? " selected" : ""}>Something is broken</option><option value="request"${type === "request" ? " selected" : ""}>Request a new source</option><option value="other">Other</option></select></label>
+  <label>Email<input name="email" type="email" value="${esc(user?.email ?? "")}" required></label>
+  <label>Scraper (optional)<input name="scraper" value="${esc(scraper)}" placeholder="e.g. finance:idx"></label>
+  <label>Request ID (optional)<input name="requestId" placeholder="01H…"></label>
+  <label class="full">Details<textarea name="message" required rows="6" maxlength="4000"></textarea></label>
+  <button class="pill pill-white">Send</button><p class="form-msg" role="status"></p>
+</form></section></main>`;
+  return layout({ title: "Report an issue", user, body });
+}
+
+// ---------- Status -------------------------------------------------------------
+export function statusPage({ user, categories, totals, uptimeSec, requests }) {
+  const body = `<main>
+${pageHead("Status", "All systems operational.", `Gateway up for ${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m on this instance · ${fmt(requests)} requests served.`)}
+<section class="wrap section-tight"><div class="table-wrap"><table class="doc-table status-table"><thead><tr><th>Category</th><th>Scrapers</th><th>Live</th><th>Endpoints</th><th>Status</th></tr></thead><tbody>
+${categories.map((c) => `<tr><td><a href="/category/${esc(c.slug)}">${esc(c.displayName)}</a></td><td>${c.scrapers}</td><td>${c.live}</td><td>${c.endpoints}</td><td>${c.live ? '<span class="badge badge-live">Operational</span>' : '<span class="badge badge-planned">Planned</span>'}</td></tr>`).join("")}
+</tbody></table></div><p class="muted small">${totals.liveEndpoints} of ${totals.endpoints} endpoints are live on this deployment.</p></section></main>`;
+  return layout({ title: "Status", user, body });
+}
+
+// ---------- Legal ----------------------------------------------------------------
+const LEGAL = {
+  terms: ["Terms of Service", [
+    ["Agreement", "By creating an account or calling the zieapi API you agree to these terms. If you use zieapi for an organisation, you accept them on its behalf."],
+    ["The service", "zieapi provides programmatic access to publicly available data through a unified API, a web dashboard and an MCP server. Sources may change or become unavailable; we work to keep endpoints running but do not guarantee any particular source."],
+    ["Accounts and keys", "Keep your API keys secret. You are responsible for all activity on your keys. We may suspend keys that are leaked or abused."],
+    ["Plans and payment", "Paid plans are billed in Indonesian Rupiah for 30-day periods and activated once payment is verified. Quotas reset on the 1st of each month (UTC)."],
+    ["Acceptable use", "Your use must comply with the Acceptable Use Policy and applicable law, including Indonesia's Personal Data Protection Law (UU PDP No. 27/2022)."],
+    ["Liability", "The service is provided “as is”. To the maximum extent permitted by law, zieapi is not liable for indirect or consequential losses. Our total liability is limited to the fees you paid in the previous three months."],
+    ["Changes", "We may update these terms; material changes will be announced on the website at least 14 days in advance."],
+    ["Governing law", "These terms are governed by the laws of the Republic of Indonesia."],
+  ]],
+  privacy: ["Privacy Policy", [
+    ["What we collect", "Account data (name, email, avatar from your sign-in provider), API key hashes, request metadata (time, endpoint, status, latency, IP address) and billing records."],
+    ["Why", "To operate the service, enforce limits, show you usage and logs, prevent abuse and handle billing."],
+    ["Retention", "Request logs are kept according to your plan (7–90 days). Account data is kept while your account is active and deleted on request."],
+    ["Sharing", "We do not sell personal data. Infrastructure providers (hosting, database) process data on our behalf."],
+    ["Your rights", "Under UU PDP you may access, correct or delete your personal data. Email hello@zieads.com."],
+  ]],
+  cookies: ["Cookie Policy", [
+    ["Essential cookies", "zie_session keeps you signed in. zie_oauth protects the sign-in flow. They are strictly necessary and set only when you sign in."],
+    ["Preferences", "The website may store small preferences (like the API key you paste into the playground) in your browser's localStorage. It never leaves your device unless you send a request."],
+    ["Analytics", "zieapi does not set advertising or third-party analytics cookies."],
+  ]],
+  aup: ["Acceptable Use Policy", [
+    ["Allowed", "Building products, research and automation on the data zieapi returns, in line with each source's terms and the law."],
+    ["Not allowed", "Collecting personal data for harassment, stalking, doxxing or discrimination; spam; credential stuffing; attacking or overloading third-party systems; bypassing paywalls or access controls; reselling raw API access without permission."],
+    ["Personal data", "If you process personal data obtained through zieapi you are the data controller and must comply with UU PDP and other applicable laws."],
+    ["Enforcement", "We may throttle, suspend or terminate accounts that violate this policy."],
+  ]],
+  refund: ["Refund Policy", [
+    ["Failed requests", "Server-side failures (5xx) are never counted against your quota."],
+    ["Plan payments", "If you were charged and the plan was not activated, or you cancel within 3 days without significant usage (under 10% of the quota), contact us for a full refund."],
+    ["How", "Email hello@zieads.com with your invoice ID. Refunds are processed to the original bank account within 14 business days."],
+  ]],
+};
+
+export function legalPage({ user, slug }) {
+  const doc = LEGAL[slug];
+  if (!doc) return null;
+  const [title, sections] = doc;
+  const body = `<main>${pageHead("Legal", title, "Last updated 26 October 2026. This template is a starting point — have it reviewed by a lawyer before launch.")}
+<article class="wrap narrow prose section-tight">${sections.map(([h, p]) => `<h2>${esc(h)}</h2><p>${esc(p)}</p>`).join("")}</article></main>`;
+  return layout({ title, user, body });
+}
+
+// ---------- Auth -----------------------------------------------------------------
+export function authPage({ mode, providers, next = "/dashboard", error = "", plan = "" }) {
+  const isReg = mode === "register";
+  const icons = {
+    github: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.2.8-.6v-2.2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .5Z"/></svg>',
+    google: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8a6 6 0 0 1 0-12c1.9 0 3.1.8 3.8 1.5l2.6-2.5A9.6 9.6 0 0 0 12 2.4a9.6 9.6 0 1 0 0 19.2c5.5 0 9.2-3.9 9.2-9.4 0-.6-.1-1.1-.2-1.6H12Z"/></svg>',
+    discord: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#8b9cff" d="M20 4.6A18 18 0 0 0 15.6 3l-.6 1.1a16 16 0 0 0-6 0L8.4 3A18 18 0 0 0 4 4.6C1.2 8.8.4 12.8.8 16.8A18 18 0 0 0 6.3 19.6l1.2-1.9a11 11 0 0 1-1.8-.9l.4-.3a12.8 12.8 0 0 0 11.8 0l.4.3c-.6.4-1.2.7-1.8.9l1.2 1.9a18 18 0 0 0 5.5-2.8c.5-4.6-.8-8.6-3.2-12.2ZM8.5 14.4c-1 0-1.9-1-1.9-2.2s.8-2.2 1.9-2.2 1.9 1 1.9 2.2-.8 2.2-1.9 2.2Zm7 0c-1 0-1.9-1-1.9-2.2s.8-2.2 1.9-2.2 1.9 1 1.9 2.2-.8 2.2-1.9 2.2Z"/></svg>',
+  };
+  const body = `<main class="auth">
+<div class="auth-glow" aria-hidden="true"></div>
+<section class="auth-card card">
+  <a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a>
+  <h1>${isReg ? "Create your account" : "Welcome back"}</h1>
+  <p class="muted">${isReg ? "600 free requests every month. No credit card." : "Sign in to continue."}</p>
+  ${error ? `<p class="form-error" role="alert">${esc(error)}</p>` : ""}
+  ${providers.length ? `<div class="oauth">${providers.map((p) => `<a class="pill pill-outline pill-block" href="/auth/${p.id}?next=${encodeURIComponent(next)}">${icons[p.id] ?? ""} Continue with ${p.label}</a>`).join("")}</div><div class="or"><span>or</span></div>` : ""}
+  <form class="form stack" data-auth="${isReg ? "register" : "login"}" data-next="${esc(next)}" data-plan="${esc(plan)}">
+    ${isReg ? '<label>Name<input name="name" autocomplete="name" required maxlength="60"></label>' : ""}
+    <label>Email<input name="email" type="email" autocomplete="email" required></label>
+    <label>Password<input name="password" type="password" autocomplete="${isReg ? "new-password" : "current-password"}" required minlength="8"></label>
+    <button class="pill pill-white pill-block">${isReg ? "Create account" : "Sign in"}</button>
+    <p class="form-msg" role="status"></p>
+  </form>
+  <p class="muted small">${isReg ? `Already have an account? <a href="/login?next=${encodeURIComponent(next)}">Sign in</a>` : `New to zieapi? <a href="/register?next=${encodeURIComponent(next)}">Create an account</a>`}</p>
+  <p class="muted tiny">By continuing you agree to the <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+  <a href="/" class="muted small">← Back to site</a>
+</section></main>`;
+  return layout({ title: isReg ? "Sign up" : "Sign in", body, bare: true, bodyClass: "auth-body", noindex: true });
+}
+
+// ---------- 404 ----------------------------------------------------------------
+export function notFoundPage({ user }) {
+  return layout({ title: "Not found", user, body: `<main>${pageHead("404", "This page wandered off.", "Try the catalog, or head back home.")}<div class="center section-tight"><a class="pill pill-white" href="/scrapers">Browse scrapers</a> <a class="pill pill-outline" href="/">Home</a></div></main>` });
+}
+
+// ---------- Dashboard & admin shells (client-rendered by /assets/dash.js) ----------
+const DASH_NAV = [
+  ["", "Overview"],
+  ["keys", "API keys"],
+  ["usage", "Usage"],
+  ["logs", "Request logs"],
+  ["bulk", "Bulk jobs"],
+  ["webhooks", "Webhooks"],
+  ["billing", "Billing"],
+  ["settings", "Settings"],
+];
+
+export function dashboardPage({ user, section, plan, apiUrl, bank }) {
+  const side = DASH_NAV.map(([s, label]) => `<a href="/dashboard${s ? "/" + s : ""}" class="${s === section ? "on" : ""}">${label}</a>`).join("") + (user.role === "admin" ? `<a href="/admin" class="admin-link">Admin</a>` : "");
+  const body = `<main class="dash wrap-wide">
+<aside class="dash-side" aria-label="Dashboard"><div class="dash-user">${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar">${esc(user.name[0]?.toUpperCase() ?? "?")}</span>`}<div><b>${esc(user.name)}</b><span class="badge badge-plan">${esc(plan)}</span></div></div><nav>${side}</nav><button class="pill pill-outline pill-sm pill-block" data-logout>Sign out</button></aside>
+<section class="dash-main" data-dash="${esc(section || "overview")}"><div class="loading">Loading…</div></section>
+<script type="application/json" id="dash-data">${json({ section: section || "overview", apiUrl, user: { id: user.id, name: user.name, email: user.email, role: user.role }, bank })}</script>
+</main>`;
+  return layout({ title: "Dashboard", user, body, scripts: ["/assets/site.js", "/assets/dash.js"], noindex: true, bodyClass: "dash-body" });
+}
+
+const ADMIN_NAV = [["", "Overview"], ["users", "Users"], ["invoices", "Invoices"], ["scrapers", "Scrapers"], ["reports", "Reports"], ["showcase", "Showcase"]];
+export function adminPage({ user, section }) {
+  const side = ADMIN_NAV.map(([s, label]) => `<a href="/admin${s ? "/" + s : ""}" class="${s === section ? "on" : ""}">${label}</a>`).join("") + `<a href="/dashboard" class="admin-link">← Dashboard</a>`;
+  const body = `<main class="dash wrap-wide"><aside class="dash-side"><div class="dash-user"><span class="avatar">A</span><div><b>Admin</b><span class="badge">${esc(user.email ?? "")}</span></div></div><nav>${side}</nav></aside>
+<section class="dash-main" data-admin="${esc(section || "overview")}"><div class="loading">Loading…</div></section></main>`;
+  return layout({ title: "Admin", user, body, scripts: ["/assets/site.js", "/assets/dash.js"], noindex: true, bodyClass: "dash-body" });
+}

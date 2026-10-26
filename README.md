@@ -1,163 +1,104 @@
 # zieapi
 
-**One API key, one JSON envelope, many public data sources.**
-A clean-room, zero-dependency scraper API gateway for Node.js ≥ 20 — catalog, API keys, plans, rate limits, caching, bulk jobs, signed webhooks, OpenAPI, `llms.txt`, and a built-in MCP server for AI agents.
+**One API key for hundreds of public data sources — Indonesia first.**
 
-zieapi was designed from an evidence-backed reverse-engineering study of the **public** surface of zapi.ink, done with the [REA](https://github.com/morluto/rea) methodology. See [`docs/REA-REPORT.md`](docs/REA-REPORT.md) (Bahasa Indonesia) and the evidence index in [`docs/evidence/index.json`](docs/evidence/index.json). None of zapi's code, scrapers or brand assets are copied. Only the public contract shapes are reproduced, and the public MIT `zpi-sdk` works against zieapi unchanged ([`examples/zpi-sdk-parity.mjs`](examples/zpi-sdk-parity.mjs)).
+zieapi is a complete, self-hostable public-data API platform with zero runtime dependencies (Node.js ≥ 20). It includes:
 
----
+- **Website:** a landing page with the animated globe hero, a searchable catalog, a page per scraper with a "Try it" console and code samples, pricing, docs, the MCP page, a showcase, a status page, issue reporting and legal pages.
+- **Accounts:** email/password sign-in plus GitHub, Google and Discord OAuth.
+- **Dashboard:** overview, API keys (with IP allowlists), usage charts, request logs, bulk jobs, signed webhooks, billing with manual bank-transfer invoices, and settings.
+- **Admin panel:** users and plans, invoice approval, scraper on/off switches, reports and showcase moderation.
+- **API:** `GET|POST /v1/{category}:{scraper}/{endpoint}` with one envelope, plans and quotas, per-minute rate limits, caching, bulk jobs with idempotency, OpenAPI files and `llms.txt`.
+- **MCP server** at `/mcp` with 8 tools for AI agents.
+- **Catalog:** 296 scrapers and 1,271 endpoints across 24 categories, of which **92 scrapers / 333 endpoints are live**, all built on official public APIs, open data or publisher RSS feeds. The rest are listed as *planned*, or served by an optional upstream adapter.
 
-## Quick start
+The architecture and API contract come from an evidence-backed reverse-engineering study of zapi.ink, done with the [REA](https://github.com/morluto/rea) methodology. See [`docs/REA-REPORT.md`](docs/REA-REPORT.md) (Bahasa Indonesia) and [`docs/evidence/`](docs/evidence). No zapi code, scraper internals, branding or copy is reused. The catalog *structure* (sources, endpoint names, parameter schemas) was imported from their public OpenAPI index, with the circumvention category (Bypass Tools) removed.
+
+## Run locally
 
 ```bash
 git clone https://github.com/nafadza14/zieapi.git
 cd zieapi
-npm start            # no npm install needed — zero dependencies
+npm start              # → http://localhost:8787
 ```
 
-On the first run in development, a dev API key (Ultra plan) is printed once. Try it:
+1. Open http://localhost:8787 and click **Sign up**. Locally, the first account you create becomes **admin**.
+2. Go to **Dashboard → API keys → Create key**.
+3. Call an endpoint:
 
 ```bash
-KEY=zie_xxx   # paste the key printed by `npm start`
-
-curl "http://localhost:8787/v1/indonesia:terbilang/convert?number=1250000&currency=true" -H "x-api-key: $KEY"
-# {"project":"indonesia:terbilang","data":{"number":1250000,"text":"satu juta dua ratus lima puluh ribu rupiah","formatted":"Rp1.250.000"},"timestamp":"…"}
+curl "http://localhost:8787/v1/indonesia:bmkg/gempa-terkini" -H "x-api-key: zie_xxx"
 ```
 
-Open **http://localhost:8787** in your browser for the **playground**: paste the key, pick a scraper, fill the form, and press Run.
-
-Run the tests: `npm test`
+To run the tests: `npm test` (138 tests).
 
 ## Deploy to Vercel
 
-The repo is ready for Vercel: `api/zieapi.js` is the serverless entry, and `vercel.json` rewrites every path to it.
+1. Push this repo to GitHub and import it in Vercel (Framework preset: **Other**). `vercel.json` already sets the build (`npm test`), the output (`public`) and the rewrites to the `api/zieapi.js` function.
+2. **Add storage:** Vercel → Storage → **Upstash for Redis** → connect it to the project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Without it, accounts and usage live in memory and reset on every cold start.
+3. Set these environment variables:
 
-1. Generate one or more keys:
-   ```bash
-   npm run key:generate -- ultra     # → ultra:zie_xxxxxxxx
-   ```
-2. In Vercel, go to **Add New → Project**, import `nafadza14/zieapi`, and keep the defaults (Framework: *Other*). The build command (`npm test`) and output (`public`) come from `vercel.json`.
-3. Under **Settings → Environment Variables**, add:
    | Name | Value |
    |---|---|
-   | `ZIE_KEYS` | `ultra:zie_xxx` (comma-separate several, e.g. `ultra:zie_a,free:zie_b`) |
-   | `ZIE_ADMIN_TOKEN` | optional |
-4. Deploy, then open `https://<project>.vercel.app/` and paste your key into the playground.
+   | `ZIE_PUBLIC_URL` | `https://your-project.vercel.app` (or your domain) |
+   | `ZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
+   | `ZIE_SESSION_SECRET` | any long random string |
+   | `ZIE_BANK_INFO` | bank account text shown on invoices |
+   | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{ZIE_PUBLIC_URL}/auth/{provider}/callback` |
 
-Or use the CLI: `npm i -g vercel`, then `vercel`, then `vercel env add ZIE_KEYS`, then `vercel --prod`.
+4. Deploy, open the site, and sign up with the admin email.
 
-**Serverless limitations.** Every function instance keeps its own memory. On Vercel:
-- usage counters, the cache and rate limits are per instance, which is fine for previews;
-- bulk jobs finish inside the submit request, so the response already contains the results;
-- keys minted with `/admin/keys` vanish on cold start, so use `ZIE_KEYS`.
+All options are listed in [`.env.example`](.env.example).
 
-For real production, back `src/store.js` with a database such as Upstash Redis or Postgres.
-
-## The contract
+## API in one table
 
 | | |
 |---|---|
 | Call | `GET` or `POST /v1/{category}:{scraper}/{endpoint}[/{path-params}]` |
 | Auth | `x-api-key: zie_…` (or `Authorization: Bearer …`, or `api-key: …`) |
 | Success | `{ "project", "data", "timestamp" }` |
-| Error | `{ "content", "message", "errors" }`. Plan, bulk and quota errors use `{ "error": { "code", "message" }, … }` |
-| Limits | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Remaining-Month`, `Retry-After` on 429 |
-| Tracing | `x-request-id`, `X-Response-Time`, `X-Cache: HIT / MISS / BYPASS` |
+| Errors | `{ "content", "message", "errors" }`; plan, bulk and quota errors use `{ "error": { "code", "message" } }` |
+| Limits | `X-RateLimit-Remaining`, `X-RateLimit-Remaining-Month`, `Retry-After`. A 5xx is refunded. |
+| Bulk | `POST …/{endpoint}/bulk` `{items:[…]}` + `Idempotency-Key`; `GET /v1/bulk/{id}` |
+| Catalog | `/api/public/categories`, `/api/scrapers/list`, `/api/scrapers/{key}`, `…/schema`, `…/stats` |
+| Machine docs | `/openapi.json`, `/category/{slug}/openapi.json`, `/llms.txt`, `/llms-full.txt` |
+| MCP | `POST /mcp` with tools `search_scrapers`, `get_scraper_schema`, `list_categories`, `run_scraper`, `get_account`, `get_usage`, `bulk_submit`, `bulk_status` |
 
-| Status | Meaning |
-|---|---|
-| 400 | `Invalid params` (with `errors[{path,message}]`), or a scraper exec error `{project,error,timestamp}` |
-| 401 | Missing, invalid or disabled key |
-| 403 | `plan_upgrade_required` (`required_plan`, `upgrade_url`) or `bulk_not_enabled` |
-| 404 / 405 | Unknown scraper or endpoint / wrong verb (`content.expected` + `Allow`) |
-| 422 | `idempotency_key_reuse` |
-| 429 | Per-minute or monthly limit (`content.{limit,used,window,retryAfterSec}`) |
-| 5xx | Never billed against your quota |
+Plans, in Rupiah, are defined in `src/core/plans.js`:
 
-### Routes
+| Plan | Price | Req/month | Req/min |
+|---|---|---|---|
+| Free | Rp0 | 600 | 100 |
+| Pro | Rp49.000 | 25,000 | 2,000 |
+| Ultra | Rp129.000 | 200,000 | 5,000 |
+| Max | Rp399.000 | 1,000,000 | 15,000 |
 
-| Route | Auth | Purpose |
-|---|---|---|
-| `GET /api/public/categories` | – | Categories |
-| `GET /api/scrapers/list?q=&cat=&cursor=&limit=&sort=popular\|name\|endpoints&bulk=true&indonesian=true` | – | Catalog search |
-| `GET /api/scrapers/{slug}` | – | Scraper detail and endpoints |
-| `GET /api/public/scrapers/{slug}/endpoints/{ep}/schema` | – | Parameter schema |
-| `GET /api/public/scrapers/{slug}/stats` | – | Requests and success rate |
-| `GET /openapi.json`, `GET /llms.txt` | – | Generated from the catalog |
-| `GET\|POST /v1/{cat}:{scraper}/{ep}` | key | Run an endpoint |
-| `POST /v1/{cat}:{scraper}/{ep}/bulk` `{items:[…]}` + `Idempotency-Key` | key (Ultra/Max) | Bulk job |
-| `GET\|DELETE /v1/bulk/{jobId}` | key | Poll or cancel a bulk job |
-| `GET /v1/me`, `GET /v1/usage` | key | Account and usage |
-| `GET\|PUT /v1/webhooks`, `POST /v1/webhooks/test` | key (Pro+) | Signed webhooks |
-| `POST /mcp` | key | MCP (Streamable HTTP, stateless) |
-| `GET\|POST /admin/keys`, `PATCH /admin/keys/{id}` | `Bearer $ZIE_ADMIN_TOKEN` | Key management |
+## Billing flow (manual)
 
-### Plans (edit `src/plans.js`)
+1. The user goes to Billing, picks a plan, and creates an invoice. The amount includes a unique 3-digit code.
+2. They transfer the money and click **I've paid**, entering their reference.
+3. An admin approves the invoice in Admin → Invoices. The plan becomes active for 30 days per month paid, and a `plan.changed` webhook fires.
 
-| Plan | Req/month | Req/min | Cache control | Bulk | Webhooks |
-|---|---|---|---|---|---|
-| free | 600 | 100 | – | – | – |
-| pro | 25,000 | 2,000 | down to 30s | – | ✓ |
-| ultra | 200,000 | 5,000 | `ttl=0` bypass | ✓ (500 items) | ✓ |
-| max | 1,000,000 | 15,000 | `ttl=0` bypass | ✓ (2,000 items) | ✓ |
+## Adding scrapers
 
-Quotas reset on the 1st of each month (UTC).
-
-## MCP (AI agents)
-
-Tools: `search_scrapers`, `get_scraper_schema`, `list_categories`, `run_scraper`, `get_account`, `get_usage`, `bulk_submit`, `bulk_status`.
-
-```bash
-claude mcp add --transport http zieapi http://localhost:8787/mcp --header "x-api-key: zie_xxx"
-```
-
-## Included scrapers
-
-| Project key | Endpoints | Notes |
-|---|---|---|
-| `dev-tools:hash` | `digest` | md5, sha1, sha256, sha512 |
-| `dev-tools:uuid` | `v4` | |
-| `dev-tools:text` | `stats` (POST), `slugify/:text` | path-template example |
-| `indonesia:terbilang` | `convert`, `format-rupiah` | Angka → kata, Rupiah formatting |
-| `finance:fx` | `latest`, `convert` | ECB rates via the Frankfurter public API |
-| `web-tools:page` | `meta` | Pro plan; SSRF-guarded page metadata |
-
-### Add your own
-
-Copy [`src/scrapers/_template.js`](src/scrapers/_template.js), then register it in `src/scrapers/index.js`. Each endpoint declares `fields` (validated and coerced), `cacheTtl`, `minPlan`, `bulkEnabled`, an optional `pathTemplate`, and an async `handler(params, ctx)`. Throw `ScraperError` for known upstream failures. Only scrape sources whose terms allow it, and prefer official APIs.
-
-## Configuration
-
-| Env | Default | |
-|---|---|---|
-| `PORT` / `HOST` | `8787` / `0.0.0.0` | |
-| `ZIE_API_URL` | `http://localhost:8787` | Used in `pollUrl` and OpenAPI |
-| `ZIE_PUBLIC_URL` | = API URL | Used in `upgrade_url` |
-| `ZIE_ADMIN_TOKEN` | – | Enables `/admin/*` |
-| `ZIE_DATA_FILE` | `./data/zieapi.json` | JSON snapshot of keys, usage and webhooks |
-| `ZIE_DEV_KEY_PLAN` | `ultra` | Plan for the first-run dev key |
-| `ZIE_KEYS` | – | Fixed keys `plan:zie_…,plan:zie_…` (required on Vercel) |
-| `NODE_ENV=production` | | Disables the dev key |
-
-Create keys from the CLI: `npm run key:create -- --plan pro --name "my app"`
-
-## Production notes
-
-The `Store` (`src/store.js`), `TtlCache` and in-process bulk queue are deliberately simple. Before scaling past a single instance, replace them with Postgres, Redis and a job queue — the interfaces are small. Put the server behind a reverse proxy or CDN that sets `X-Forwarded-For`.
+Copy `src/scrapers/_template.js` into `src/scrapers/live/` and register it in `src/scrapers/index.js`. A live module with the same `category:slug` as a catalog entry replaces its planned endpoints. Helpers in `src/scrapers/kit.js` (`getJson`, `feed`, `url`, `ScraperError`, `requireEnv`, …) keep handlers small. Use official APIs or open data only.
 
 ## Project layout
 
 ```
-src/app.js         HTTP gateway and routes      src/executor.js   run pipeline
-src/catalog.js     scraper registry + read model src/validate.js  param validation
-src/auth.js        API keys                      src/ratelimit.js minute + month limits
-src/cache.js       TTL cache + plan rules        src/bulk.js      bulk jobs + idempotency
-src/webhooks.js    HMAC-signed delivery          src/mcp.js       MCP server
-src/openapi.js     OpenAPI + llms.txt            src/scrapers/    scraper modules
-src/playground.js  browser playground (GET /)    api/zieapi.js    Vercel function entry
-docs/REA-REPORT.md reverse-engineering report    test/            node:test suites
+api/zieapi.js            Vercel function entry
+public/assets/           site.css · site.js · dash.js · favicon
+src/app.js               router: pages, auth, /api/me, /api/admin, /v1, /mcp
+src/core/                catalog · executor · limits · bulk · webhooks · mcp · openapi · plans · validate
+src/db/                  kv.js (Memory / Upstash) · repo.js (users, keys, usage, logs, invoices…)
+src/auth/                passwords · sessions · API keys · OAuth
+src/web/                 html layout + pages (home, catalog, pricing, docs, misc)
+src/catalog/seed.js      catalog structure (generated by scripts/import-catalog.js)
+src/scrapers/live/       live scraper modules (finance, indonesia, news, research-dev, media-apps, devtools)
+docs/                    REA report + evidence
+test/                    node:test suites
 ```
 
 ## License
 
-MIT © Zieads. Not affiliated with Zapi or Zeative Labs.
+MIT © Zieads. Not affiliated with Zapi / Zeative Labs. You are responsible for complying with each data source's terms and with UU PDP.

@@ -1,7 +1,7 @@
 // Copy this file, rename it, then add it to ./index.js.
 // Only scrape sources whose terms allow it; prefer official/public APIs.
 
-import { ScraperError } from "../executor.js";
+import { ScraperError } from "./kit.js";
 
 export default [
   {

@@ -170,6 +170,42 @@
       "source": "examples/zpi-sdk-parity.mjs (this repo)",
       "kind": "verification",
       "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local zieapi via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError — i.e. zieapi is wire-compatible with the observed contract."
+    },
+    {
+      "id": "E29",
+      "source": "https://zapi.ink/sitemap.xml (+ child sitemaps)",
+      "kind": "page",
+      "summary": "84 non-scraper routes: /, /scrapers, /pricing, /mcp, /showcase, 16 /docs/* pages (installation, quickstart, authentication, configuration, run, streaming, bulk, catalog, errors, retries, typed-results, codegen, webhooks, mcp-client, rest-api, next-steps), legal (/terms, /privacy, /cookies, /aup, /refund), /llms.txt, /llms-full.txt, /openapi.json and /category/{slug}/{openapi.json,llms.txt} for 27 categories (incl. design, uploader); 636 /api/{category}/{scraper} pages."
+    },
+    {
+      "id": "E30",
+      "source": "fetch(redirect:'manual') from zapi.ink origin",
+      "kind": "network",
+      "summary": "Session-gated routes redirect (opaque redirect): /dashboard, /dashboard/keys, /dashboard/usage, /dashboard/logs, /dashboard/billing, /dashboard/webhooks, /dashboard/settings, /dashboard/bulk, /admin, /status. 404: /dashboard/api-keys, /dashboard/invoices, /dashboard/topup, /forgot-password, /changelog, /blog. 200: /report, /showcase, /verify-email."
+    },
+    {
+      "id": "E31",
+      "source": "https://zapi.ink/login and /register (HTML text)",
+      "kind": "page",
+      "summary": "Both render the same OAuth-only card: 'Sign in — Welcome back' with GitHub, Google and Discord buttons; no email/password form."
+    },
+    {
+      "id": "E32",
+      "source": "Per-category OpenAPI specs (25) + /api/scrapers/list (4 pages, 318 items)",
+      "kind": "network",
+      "summary": "Captured catalog structure: 291 scrapers / 1,243 endpoints after excluding bypass-tools (27 endpoints); 1,223 GET + 20 POST; path params expressed as {name}. Stored as docs/evidence/zapi-catalog-capture.json (no descriptions/examples)."
+    },
+    {
+      "id": "E33",
+      "source": "Page headings of /, /pricing, /api/indonesia/cek-kode-pos, /docs/quickstart",
+      "kind": "page",
+      "summary": "Home sections: hero, 'Three steps', catalog search, 'Change one word', 'Built to stay working' (5 features), pricing, MCP agent, CTA. Pricing: quota toggle (600/25K/200K/1M), 4 plan cards, comparison table, 'How the quota actually works' (3 rules), FAQ (8). Scraper page: endpoint dropdown, Parameters (Name/Type/In/Description), Example response, Errors, Code tabs (SDK, cURL, Python, Go), 'Use from MCP', key-aware try-it."
+    },
+    {
+      "id": "E34",
+      "source": "Browser pane fetch of zieapi live-scraper upstream URLs (user machine, 26 Oct 2026)",
+      "kind": "verification",
+      "summary": "Of 79 upstream URLs (one per live scraper), 30 returned HTTP 200 with the expected shape (e.g. BMKG autogempa, equran.id, myquran, Nager.Date, CoinGecko, Frankfurter, World Bank, GLEIF, Treasury XML, NCBI, DOAJ, Wikipedia, npm, Openverse, Bluesky, RDAP, Jina, Cloudflare DoH, ipwho.is, TVmaze, iTunes, MusicBrainz, PokeAPI, CheapShark, TheMealDB, ClinicalTables, Flathub, AMO), 11 more were reachable without CORS; the rest could not be checked from the browser (site permission / CORS) and remain unverified."
     }
   ]
 }

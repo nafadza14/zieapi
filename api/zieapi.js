@@ -1,6 +1,4 @@
-// Vercel Serverless Function entry. vercel.json rewrites every path here.
-// One app instance per warm function; state (usage, cache, bulk jobs) is
-// per-instance — set ZIE_KEYS so API keys exist on every instance.
+// Vercel Serverless Function entry — vercel.json rewrites every non-static path here.
 import { createApp } from "../src/app.js";
 
 const app = createApp({ serverless: true });

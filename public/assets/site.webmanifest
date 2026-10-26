@@ -1,6 +1,6 @@
 {
-  "name": "zieapi",
-  "short_name": "zieapi",
+  "name": "apizie",
+  "short_name": "Apizie",
   "description": "One API key for hundreds of public data sources, Indonesia first.",
   "start_url": "/",
   "display": "standalone",

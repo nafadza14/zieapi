@@ -1,5 +1,5 @@
 // Brand marks for the hero strip, from simple-icons (CC0, https://simpleicons.org).
-// Trademarks belong to their owners; each mark links to the zieapi catalog entry for that API.
+// Trademarks belong to their owners; each mark links to the Apizie catalog entry for that API.
 export const HERO_BRANDS = [
  {
   "name": "GitHub",

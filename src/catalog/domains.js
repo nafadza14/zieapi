@@ -1,6 +1,6 @@
 // Source website for each scraper. Used to fetch the source's own favicon
 // (scripts/fetch-icons) and to link the scraper page to its source.
-// null = zieapi utility with no single upstream site (gets a generated monogram).
+// null = Apizie utility with no single upstream site (gets a generated monogram).
 export const SOURCE_DOMAINS = {
   "finance:pluang": "pluang.com", "finance:idx": "idx.co.id", "social-media:instagram-scraper": "instagram.com",
   "finance:tradingview": "tradingview.com", "finance:stockbit": "stockbit.com", "social-media:tiktok-scraper": "tiktok.com",

@@ -1,4 +1,4 @@
-/* zieapi dashboard + admin (client-rendered) */
+/* Apizie dashboard + admin (client-rendered) */
 (() => {
   const { $, $$, esc, toast, api } = window.zie;
   const fmt = (n) => Number(n ?? 0).toLocaleString("en-US");
@@ -45,7 +45,7 @@
           <div class="card"><h3>Top scrapers this month</h3>${o.top.length ? `<ul class="checks">${o.top.map((t) => `<li><a href="/api/${esc(t.project.replace(":", "/"))}">${esc(t.project)}</a>: ${fmt(t.requests)}</li>`).join("")}</ul>` : '<p class="muted">No calls yet.</p>'}</div>
           <div class="card"><h3>Recent requests</h3>${o.recent.length ? `<ul class="checks">${o.recent.map((l) => `<li>${badge(l.status)} ${esc(l.project)}/${esc(l.endpoint)} <span class="muted small">${ago(l.at)}</span></li>`).join("")}</ul>` : '<p class="muted">No calls yet.</p>'}<a class="small" href="/dashboard/logs">All logs →</a></div>
         </div>
-        <div class="card"><h3>Quick start</h3><pre class="out">curl "${esc(D.apiUrl)}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: ${o.keys[0] ? esc(o.keys[0].preview) : "zie_…"}"</pre></div>`);
+        <div class="card"><h3>Quick start</h3><pre class="out">curl "${esc(D.apiUrl)}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: ${o.keys[0] ? esc(o.keys[0].preview) : "apz_…"}"</pre></div>`);
     },
 
     async keys() {
@@ -59,7 +59,7 @@
         ${table(["Name", "Key", "Status", "Last used", "Created", ""], keys.map((k) => `<tr><td>${esc(k.name)}</td><td><code>${esc(k.preview)}</code>${k.ipAllowlist?.length ? `<div class="small muted">IPs: ${esc(k.ipAllowlist.join(", "))}</div>` : ""}</td><td>${badge(k.status)}</td><td>${ago(k.lastUsedAt)}</td><td>${date(k.createdAt)}</td><td><div class="row-actions"><button class="pill pill-outline pill-sm" data-act="rename" data-id="${k.id}">Rename</button><button class="pill pill-outline pill-sm" data-act="${k.status === "active" ? "disable" : "enable"}" data-id="${k.id}">${k.status === "active" ? "Disable" : "Enable"}</button>${canIp ? `<button class="pill pill-outline pill-sm" data-act="ip" data-id="${k.id}">IP allowlist</button>` : ""}<button class="pill pill-danger pill-sm" data-act="delete" data-id="${k.id}">Delete</button></div></td></tr>`), "No keys yet. Create one above.")}
         <p class="small muted">Send the key as <code>x-api-key</code>, <code>Authorization: Bearer</code> or <code>api-key</code>. ${canIp ? "" : "IP allowlists are available on Pro and above."}</p>
         <h2 class="dash-sub">Connected MCP apps</h2>
-        ${table(["App", "Returns to", "Active tokens", ""], apps.map((a) => `<tr><td>${esc(a.name)}</td><td class="small muted">${esc(a.redirect ? a.redirect.replace(/^(https?:\/\/[^/]+).*$/, "$1") : "")}</td><td>${a.tokens}</td><td><button class="pill pill-danger pill-sm" data-act="disconnect" data-id="${esc(a.clientId)}">Disconnect</button></td></tr>`), "No apps connected yet. Add zieapi in Claude, ChatGPT or another MCP app to see it here.")}
+        ${table(["App", "Returns to", "Active tokens", ""], apps.map((a) => `<tr><td>${esc(a.name)}</td><td class="small muted">${esc(a.redirect ? a.redirect.replace(/^(https?:\/\/[^/]+).*$/, "$1") : "")}</td><td>${a.tokens}</td><td><button class="pill pill-danger pill-sm" data-act="disconnect" data-id="${esc(a.clientId)}">Disconnect</button></td></tr>`), "No apps connected yet. Add Apizie in Claude, ChatGPT or another MCP app to see it here.")}
         <p class="small muted">Apps connected with OAuth (see <a href="/mcp">MCP setup</a>) do not need an API key.</p>`);
       $("[data-new-key]").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -122,10 +122,10 @@
       const evOpts = (sel = ["*"]) => ["*", ...w.events].map((e) => `<label style="display:inline-flex;gap:6px;align-items:center;margin-right:12px"><input type="checkbox" value="${e}" ${sel.includes(e) ? "checked" : ""} style="width:auto"> ${e === "*" ? "all events" : e}</label>`).join("");
       set(`<div class="dash-head"><h1>Webhooks</h1><button class="pill pill-outline pill-sm" data-test>Send test event</button></div>
         <form data-hooks class="grid-1" style="display:grid;gap:14px">
-          ${[...rows, { url: "", events: ["*"] }].map((h, i) => `<div class="card" data-hook><label class="small muted">Endpoint URL<input name="url" value="${esc(h.url)}" placeholder="https://example.com/zieapi-webhook"></label><div class="small" style="margin-top:10px">${evOpts(h.events)}</div>${h.secretPreview ? `<p class="small muted">Secret: <code>${esc(h.secretPreview)}</code></p>` : ""}</div>`).join("")}
+          ${[...rows, { url: "", events: ["*"] }].map((h, i) => `<div class="card" data-hook><label class="small muted">Endpoint URL<input name="url" value="${esc(h.url)}" placeholder="https://example.com/apizie-webhook"></label><div class="small" style="margin-top:10px">${evOpts(h.events)}</div>${h.secretPreview ? `<p class="small muted">Secret: <code>${esc(h.secretPreview)}</code></p>` : ""}</div>`).join("")}
           <button class="pill pill-white">Save webhooks</button>
         </form><div data-secrets></div>
-        <p class="small muted">Deliveries are signed with <code>X-Zie-Signature: sha256=…</code> (HMAC of the raw body). <a href="/docs/webhooks">Verify signatures</a>.</p>`);
+        <p class="small muted">Deliveries are signed with <code>X-Apizie-Signature: sha256=…</code> (HMAC of the raw body). <a href="/docs/webhooks">Verify signatures</a>.</p>`);
       $("[data-hooks]").addEventListener("submit", async (e) => {
         e.preventDefault();
         const hooks = $$("[data-hook]").map((c) => ({ url: $("input[name=url]", c).value.trim(), events: $$("input[type=checkbox]:checked", c).map((x) => x.value) })).filter((h) => h.url);

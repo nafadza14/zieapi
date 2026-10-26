@@ -9,7 +9,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { supabaseUrl } from "../db/kv.js";
 
-// Defaults for the zieapi Supabase project (public values). Override with env.
+// Defaults for the Apizie Supabase project (public values). Override with env.
 export const SUPABASE_DEFAULTS = {
   projectId: "hfscpcwrntvdslxwddjy",
   publishableKey: "sb_publishable_uHZn89sA8wCHmyIh5vYqZA_SYXo1BZ8",
@@ -50,7 +50,7 @@ export async function supabaseExchange(cfg, { code, verifier, fetchImpl = global
   if (!res.ok || !j.user) throw new Error(`Supabase token exchange failed: ${j.error_description ?? j.msg ?? j.message ?? res.status}`);
   const u = j.user;
   const meta = u.user_metadata ?? {};
-  // Revoke the Supabase session right away: zieapi keeps its own session cookie.
+  // Revoke the Supabase session right away: Apizie keeps its own session cookie.
   if (j.access_token) fetchImpl(cfg.url + "/auth/v1/logout", { method: "POST", headers: { apikey: cfg.key, authorization: `Bearer ${j.access_token}` } }).catch(() => {});
   return {
     id: String(u.id),

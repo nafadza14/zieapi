@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Print a new key line for the ZIE_KEYS env var (Vercel / serverless).
-// Usage: node scripts/gen-key.js ultra   →   ultra:zie_xxxxxxxx
+// Print a new key line for the APIZIE_KEYS env var (Vercel / serverless).
+// Usage: node scripts/gen-key.js ultra   →   ultra:apz_xxxxxxxx
 import { randomBytes } from "node:crypto";
 import { PLANS } from "../src/core/plans.js";
 const plan = process.argv[2] ?? "free";

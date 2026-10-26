@@ -1,4 +1,4 @@
-# zieapi logo guidelines
+# Apizie logo guidelines
 
 ## 1. The logo
 - **Idea:** a URL path, `//`, that ends in a data point. Every request lands on clean data. The magenta dot returns as the dot on the final "i" of the wordmark.
@@ -8,7 +8,7 @@
 ## 2. Construction
 - Two capsules 40 units wide with a 75° slant (exactly 15° from vertical), on a 256 unit canvas.
 - A dot with a radius of 24 units sits on the baseline and dips 2 units below it as an optical overshoot.
-- The small-size cut (`zieapi-symbol-small.svg`, used for favicons) is heavier: 52 unit strokes and a 30 unit dot.
+- The small-size cut (`apizie-symbol-small.svg`, used for favicons) is heavier: 52 unit strokes and a 30 unit dot.
 
 ## 3. Clear space
 Keep a clear zone equal to **the diameter of the dot** around the logo on every side. It scales with the logo.

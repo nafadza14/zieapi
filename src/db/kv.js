@@ -1,5 +1,5 @@
 // Tiny Redis-like key/value layer with three backends:
-//   SupabaseKV – Supabase Postgres via PostgREST RPC (supabase/migrations/0001_zieapi.sql);
+//   SupabaseKV – Supabase Postgres via PostgREST RPC (supabase/migrations/0001_apizie.sql);
 //                set SUPABASE_URL (or SUPABASE_PROJECT_ID) + SUPABASE_SECRET_KEY
 //   UpstashKV  – Upstash Redis REST (set UPSTASH_REDIS_REST_URL/TOKEN or KV_REST_API_URL/TOKEN)
 //   MemoryKV   – in-process (optionally snapshotted to a JSON file) for local dev / single server
@@ -197,7 +197,7 @@ export class UpstashKV {
 
 export class SupabaseKV {
   constructor({ url, key, fetchImpl = globalThis.fetch }) {
-    this.url = url.replace(/\/+$/, "") + "/rest/v1/rpc/zie_kv";
+    this.url = url.replace(/\/+$/, "") + "/rest/v1/rpc/apizie_kv";
     this.key = key;
     this.fetch = fetchImpl;
     // New-style keys (sb_secret_...) go in the apikey header only; legacy JWT keys also as Bearer.

@@ -4,7 +4,7 @@
 import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { E } from "../core/envelope.js";
 
-export const SESSION_COOKIE = "zie_session";
+export const SESSION_COOKIE = "apz_session";
 
 // ---------- passwords --------------------------------------------------------
 const scryptAsync = (pw, salt, len) => new Promise((res, rej) => scrypt(pw, salt, len, { N: 16384, r: 8, p: 1 }, (e, k) => (e ? rej(e) : res(k))));
@@ -87,7 +87,7 @@ export const PROVIDERS = {
     token: "https://github.com/login/oauth/access_token",
     scope: "read:user user:email",
     async profile(fetchImpl, token) {
-      const h = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "zieapi" };
+      const h = { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "apizie" };
       const u = await (await fetchImpl("https://api.github.com/user", { headers: h })).json();
       let email = u.email;
       if (!email) {

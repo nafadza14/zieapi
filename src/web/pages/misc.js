@@ -3,19 +3,19 @@ import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
 // ---------- MCP ----------------------------------------------------------------
 export function mcpPage({ user, apiUrl, totals }) {
   const url = `${apiUrl}/mcp`;
-  const key = "zie_xxxxxxxx";
+  const key = "apz_xxxxxxxx";
   const oauthClients = [
-    ["Claude.ai / Claude Desktop", `Settings → Connectors → Add custom connector\n\nName: zieapi\nURL:  ${url}\n\nClick Connect, sign in to zieapi, press Allow. No API key needed.`],
-    ["ChatGPT", `Settings → Apps & Connectors → Advanced → Developer mode\nCreate → MCP server URL: ${url}\nAuthentication: OAuth\n\nSign in to zieapi and press Allow.`],
-    ["Claude Code (OAuth)", `claude mcp add --transport http zieapi ${url}\n# then run /mcp inside Claude Code and choose "Authenticate"`],
+    ["Claude.ai / Claude Desktop", `Settings → Connectors → Add custom connector\n\nName: Apizie\nURL:  ${url}\n\nClick Connect, sign in to Apizie, press Allow. No API key needed.`],
+    ["ChatGPT", `Settings → Apps & Connectors → Advanced → Developer mode\nCreate → MCP server URL: ${url}\nAuthentication: OAuth\n\nSign in to Apizie and press Allow.`],
+    ["Claude Code (OAuth)", `claude mcp add --transport http apizie ${url}\n# then run /mcp inside Claude Code and choose "Authenticate"`],
   ];
   const keyClients = [
-    ["Claude Code", `claude mcp add --transport http zieapi \\\n  ${url} \\\n  --header "x-api-key: ${key}"`],
-    ["Cursor", `// .cursor/mcp.json\n` + JSON.stringify({ mcpServers: { zieapi: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
-    ["VS Code", `// .vscode/mcp.json\n` + JSON.stringify({ servers: { zieapi: { type: "http", url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
-    ["Gemini CLI", `// ~/.gemini/settings.json\n` + JSON.stringify({ mcpServers: { zieapi: { httpUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
-    ["Windsurf", `// ~/.codeium/windsurf/mcp_config.json\n` + JSON.stringify({ mcpServers: { zieapi: { serverUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
-    ["Claude Desktop (key)", `// claude_desktop_config.json\n` + JSON.stringify({ mcpServers: { zieapi: { command: "npx", args: ["-y", "mcp-remote", url, "--header", `Authorization:Bearer ${key}`] } } }, null, 2)],
+    ["Claude Code", `claude mcp add --transport http apizie \\\n  ${url} \\\n  --header "x-api-key: ${key}"`],
+    ["Cursor", `// .cursor/mcp.json\n` + JSON.stringify({ mcpServers: { apizie: { url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["VS Code", `// .vscode/mcp.json\n` + JSON.stringify({ servers: { apizie: { type: "http", url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Gemini CLI", `// ~/.gemini/settings.json\n` + JSON.stringify({ mcpServers: { apizie: { httpUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Windsurf", `// ~/.codeium/windsurf/mcp_config.json\n` + JSON.stringify({ mcpServers: { apizie: { serverUrl: url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2)],
+    ["Claude Desktop (key)", `// claude_desktop_config.json\n` + JSON.stringify({ mcpServers: { apizie: { command: "npx", args: ["-y", "mcp-remote", url, "--header", `Authorization:Bearer ${key}`] } } }, null, 2)],
     ["curl", `curl ${url} \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "content-type: application/json" \\\n  -H "accept: application/json, text/event-stream" \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`],
   ];
   const tools = [
@@ -35,9 +35,9 @@ export function mcpPage({ user, apiUrl, totals }) {
   const body = `<main>
 ${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.`, "Claude, ChatGPT, Cursor, VS Code or Gemini CLI can search the catalog and call any API as a tool, with your account and your quota.")}
 <section class="wrap section-tight">
-  <div class="grid-4 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Server</span><b>zieapi · Streamable HTTP</b></div><div class="card"><span class="muted">Sign-in</span><b>OAuth 2.1 (no key needed)</b></div><div class="card"><span class="muted">Or use a key</span><b>Bearer · x-api-key · api-key</b></div></div>
+  <div class="grid-4 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Server</span><b>Apizie · Streamable HTTP</b></div><div class="card"><span class="muted">Sign-in</span><b>OAuth 2.1 (no key needed)</b></div><div class="card"><span class="muted">Or use a key</span><b>Bearer · x-api-key · api-key</b></div></div>
   <div class="steps-row mt">
-    <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open a zieapi sign-in window. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
+    <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open a Apizie sign-in window. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
     <div class="card"><span class="step-n">02</span><h3>Ask in plain language</h3><p>“Latest BMKG earthquakes”, “Bitcoin price in rupiah”, “Search GitHub repos about MCP”. The agent picks the tools.</p></div>
     <div class="card"><span class="step-n">03</span><h3>Watch usage</h3><p>Every tool call shows up in your request logs and counts against your plan, exactly like REST.</p></div>
   </div>
@@ -57,9 +57,9 @@ export function consentPage({ user, client, scope, tx, redirectHost }) {
   const body = `<main class="auth">
 <div class="auth-glow" aria-hidden="true"></div>
 <section class="auth-card card consent">
-  <a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a>
+  <a href="/" class="auth-logo" aria-label="Apizie home">${logo()}</a>
   <h1>Connect ${esc(client.client_name)}?</h1>
-  <p class="muted"><b>${esc(client.client_name)}</b> wants to use zieapi as <b>${esc(user.email ?? user.name)}</b>.</p>
+  <p class="muted"><b>${esc(client.client_name)}</b> wants to use Apizie as <b>${esc(user.email ?? user.name)}</b>.</p>
   <ul class="consent-list">
     <li>Search the catalog and run APIs through MCP</li>
     <li>Use your plan's quota (calls appear in your logs)</li>
@@ -77,19 +77,19 @@ export function consentPage({ user, client, scope, tx, redirectHost }) {
 }
 
 export function oauthErrorPage({ user, message }) {
-  const body = `<main class="auth"><section class="auth-card card"><a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a><h1>Can't connect this app</h1><p class="form-error" role="alert">${esc(message)}</p><a class="pill pill-outline" href="/mcp">How to connect</a></section></main>`;
+  const body = `<main class="auth"><section class="auth-card card"><a href="/" class="auth-logo" aria-label="Apizie home">${logo()}</a><h1>Can't connect this app</h1><p class="form-error" role="alert">${esc(message)}</p><a class="pill pill-outline" href="/mcp">How to connect</a></section></main>`;
   return layout({ title: "Authorization error", user, body, bare: true, bodyClass: "auth-body", noindex: true });
 }
 
 // ---------- Showcase -----------------------------------------------------------
 export function showcasePage({ user, items }) {
   const body = `<main>
-${pageHead("Showcase", "Built with zieapi.", "Bots, research pipelines and tools people have shipped on zieapi.")}
+${pageHead("Showcase", "Built with Apizie.", "Bots, research pipelines and tools people have shipped on Apizie.")}
 <section class="wrap section-tight">
-  ${items.length ? `<div class="grid-3">${items.map((p) => `<a class="card show-card" href="${esc(p.url)}" rel="noopener nofollow" target="_blank"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><span class="muted small">${esc(new URL(p.url).hostname)}</span></a>`).join("")}</div>` : `<div class="empty card"><h3>No projects here yet.</h3><p>Shipped something on zieapi? Yours could be the first one.</p></div>`}
+  ${items.length ? `<div class="grid-3">${items.map((p) => `<a class="card show-card" href="${esc(p.url)}" rel="noopener nofollow" target="_blank"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><span class="muted small">${esc(new URL(p.url).hostname)}</span></a>`).join("")}</div>` : `<div class="empty card"><h3>No projects here yet.</h3><p>Shipped something on Apizie? Yours could be the first one.</p></div>`}
   <div class="card mt submit-card">
     <h2>Submit your project</h2>
-    ${user ? `<form class="form" data-form="/api/showcase" data-success="Thanks! We'll review it shortly."><label>Project name<input name="name" required maxlength="80"></label><label>URL<input name="url" type="url" required placeholder="https://"></label><label class="full">What does it do?<textarea name="description" required maxlength="280" rows="3"></textarea></label><button class="pill pill-white">Submit</button><p class="form-msg" role="status"></p></form>` : `<p><a href="/login?next=/showcase">Sign in</a> to submit your project. Ultra and Max plans get their logo on the “Built with zieapi” strip.</p>`}
+    ${user ? `<form class="form" data-form="/api/showcase" data-success="Thanks! We'll review it shortly."><label>Project name<input name="name" required maxlength="80"></label><label>URL<input name="url" type="url" required placeholder="https://"></label><label class="full">What does it do?<textarea name="description" required maxlength="280" rows="3"></textarea></label><button class="pill pill-white">Submit</button><p class="form-msg" role="status"></p></form>` : `<p><a href="/login?next=/showcase">Sign in</a> to submit your project. Ultra and Max plans get their logo on the “Built with Apizie” strip.</p>`}
   </div>
 </section></main>`;
   return layout({ title: "Showcase", active: "showcase", user, body });
@@ -123,12 +123,12 @@ ${categories.map((c) => `<tr><td><a href="/category/${esc(c.slug)}">${esc(c.disp
 // ---------- Legal ----------------------------------------------------------------
 const LEGAL = {
   terms: ["Terms of Service", [
-    ["Agreement", "By creating an account or calling the zieapi API you agree to these terms. If you use zieapi for an organisation, you accept them on its behalf."],
-    ["The service", "zieapi provides programmatic access to publicly available data through a unified API, a web dashboard and an MCP server. Sources may change or become unavailable; we work to keep endpoints running but do not guarantee any particular source."],
+    ["Agreement", "By creating an account or calling the Apizie API you agree to these terms. If you use Apizie for an organisation, you accept them on its behalf."],
+    ["The service", "Apizie provides programmatic access to publicly available data through a unified API, a web dashboard and an MCP server. Sources may change or become unavailable; we work to keep endpoints running but do not guarantee any particular source."],
     ["Accounts and keys", "Keep your API keys secret. You are responsible for all activity on your keys. We may suspend keys that are leaked or abused."],
     ["Plans and payment", "Paid plans are billed in Indonesian Rupiah for 30-day periods and activated once payment is verified. Quotas reset on the 1st of each month (UTC)."],
     ["Acceptable use", "Your use must comply with the Acceptable Use Policy and applicable law, including Indonesia's Personal Data Protection Law (UU PDP No. 27/2022)."],
-    ["Liability", "The service is provided “as is”. To the maximum extent permitted by law, zieapi is not liable for indirect or consequential losses. Our total liability is limited to the fees you paid in the previous three months."],
+    ["Liability", "The service is provided “as is”. To the maximum extent permitted by law, Apizie is not liable for indirect or consequential losses. Our total liability is limited to the fees you paid in the previous three months."],
     ["Changes", "We may update these terms; material changes will be announced on the website at least 14 days in advance."],
     ["Governing law", "These terms are governed by the laws of the Republic of Indonesia."],
   ]],
@@ -140,14 +140,14 @@ const LEGAL = {
     ["Your rights", "Under UU PDP you may access, correct or delete your personal data. Email hello@zieads.com."],
   ]],
   cookies: ["Cookie Policy", [
-    ["Essential cookies", "zie_session keeps you signed in. zie_oauth protects the sign-in flow. They are strictly necessary and set only when you sign in."],
+    ["Essential cookies", "apz_session keeps you signed in. apz_oauth protects the sign-in flow. They are strictly necessary and set only when you sign in."],
     ["Preferences", "The website may store small preferences (like the API key you paste into the playground) in your browser's localStorage. It never leaves your device unless you send a request."],
-    ["Analytics", "zieapi does not set advertising or third-party analytics cookies."],
+    ["Analytics", "Apizie does not set advertising or third-party analytics cookies."],
   ]],
   aup: ["Acceptable Use Policy", [
-    ["Allowed", "Building products, research and automation on the data zieapi returns, in line with each source's terms and the law."],
+    ["Allowed", "Building products, research and automation on the data Apizie returns, in line with each source's terms and the law."],
     ["Not allowed", "Collecting personal data for harassment, stalking, doxxing or discrimination; spam; credential stuffing; attacking or overloading third-party systems; bypassing paywalls or access controls; reselling raw API access without permission."],
-    ["Personal data", "If you process personal data obtained through zieapi you are the data controller and must comply with UU PDP and other applicable laws."],
+    ["Personal data", "If you process personal data obtained through Apizie you are the data controller and must comply with UU PDP and other applicable laws."],
     ["Enforcement", "We may throttle, suspend or terminate accounts that violate this policy."],
   ]],
   refund: ["Refund Policy", [
@@ -177,7 +177,7 @@ export function authPage({ mode, providers, next = "/dashboard", error = "", pla
   const body = `<main class="auth">
 <div class="auth-glow" aria-hidden="true"></div>
 <section class="auth-card card">
-  <a href="/" class="auth-logo" aria-label="zieapi home">${logo()}</a>
+  <a href="/" class="auth-logo" aria-label="Apizie home">${logo()}</a>
   <h1>${isReg ? "Create your account" : "Welcome back"}</h1>
   <p class="muted">${isReg ? "600 free requests every month. No credit card." : "Sign in to continue."}</p>
   ${error ? `<p class="form-error" role="alert">${esc(error)}</p>` : ""}
@@ -189,7 +189,7 @@ export function authPage({ mode, providers, next = "/dashboard", error = "", pla
     <button class="pill pill-white pill-block">${isReg ? "Create account" : "Sign in"}</button>
     <p class="form-msg" role="status"></p>
   </form>
-  <p class="muted small">${isReg ? `Already have an account? <a href="/login?next=${encodeURIComponent(next)}">Sign in</a>` : `New to zieapi? <a href="/register?next=${encodeURIComponent(next)}">Create an account</a>`}</p>
+  <p class="muted small">${isReg ? `Already have an account? <a href="/login?next=${encodeURIComponent(next)}">Sign in</a>` : `New to Apizie? <a href="/register?next=${encodeURIComponent(next)}">Create an account</a>`}</p>
   <p class="muted tiny">By continuing you agree to the <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
   <a href="/" class="muted small">← Back to site</a>
 </section></main>`;

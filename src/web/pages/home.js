@@ -68,7 +68,7 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
     ? `
 <section class="section wrap">
   <div class="section-head"><span class="eyebrow">Global APIs</span><h2 class="display-2">${fmt(totals.directoryApis ?? 0)} global APIs. One gateway.</h2>
-  <p class="lead">Payments, messaging, developer tools, media, open data and more, imported from public OpenAPI specs. ${fmt(totals.liveEndpoints)} endpoints work with no extra setup. The rest run with your own provider key: send it in <code>x-upstream-key</code> and zieapi never stores it.</p></div>
+  <p class="lead">Payments, messaging, developer tools, media, open data and more, imported from public OpenAPI specs. ${fmt(totals.liveEndpoints)} endpoints work with no extra setup. The rest run with your own provider key: send it in <code>x-upstream-key</code> and Apizie never stores it.</p></div>
   <div class="grid-4 top-grid">${global.map(scraperCard).join("")}</div>
   <div class="center"><a href="/scrapers?filter=global" class="pill pill-outline">Explore global APIs →</a> <a href="/docs/byok" class="pill pill-ghost">How your own key works</a></div>
 </section>`
@@ -113,7 +113,7 @@ export function homePage({ user, totals, categories, top, global = [], apiUrl, p
   const agent = `
 <section class="section wrap">
   <div class="split reverse">
-    <div class="code-card"><div class="code-tabs"><button class="on">Claude Code</button></div><pre class="code"><code>claude mcp add --transport http zieapi \\
+    <div class="code-card"><div class="code-tabs"><button class="on">Claude Code</button></div><pre class="code"><code>claude mcp add --transport http apizie \\
   ${esc(apiUrl)}/mcp \\
   --header "x-api-key: zie_••••••••"</code></pre>
       <ul class="tool-list">${["search_scrapers", "get_scraper_schema", "list_categories", "run_scraper", "get_account", "get_usage", "bulk_submit", "bulk_status"].map((t) => `<li><code>${t}</code></li>`).join("")}</ul></div>

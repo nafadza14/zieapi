@@ -98,7 +98,7 @@ export const MCP_TOOLS = [
   },
 ];
 
-export function createMcpHandler({ catalog, repo, executor, limiter, bulk, version, authenticate, wwwAuthenticate = () => 'Bearer realm="zieapi"' }) {
+export function createMcpHandler({ catalog, repo, executor, limiter, bulk, version, authenticate, wwwAuthenticate = () => 'Bearer realm="apizie"' }) {
   const toolResult = (data) => {
     const text = JSON.stringify(data, null, 2) ?? "null";
     if (text.length > MAX_TEXT) {
@@ -185,9 +185,9 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
         return reply({
           protocolVersion: MCP_PROTOCOL_VERSIONS.includes(asked) ? asked : MCP_PROTOCOL_VERSIONS[0],
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "zieapi", version },
+          serverInfo: { name: "apizie", title: "Apizie", version },
           instructions:
-            "zieapi is one gateway to Indonesian data sources and 1,300+ global APIs. Workflow: search_scrapers to find a source, get_scraper_schema to read its parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's zieapi quota (see get_usage).",
+            "Apizie is one gateway to Indonesian data sources and 1,300+ global APIs. Workflow: search_scrapers to find a source, get_scraper_schema to read its parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's Apizie quota (see get_usage).",
         });
       }
       case "notifications/initialized":

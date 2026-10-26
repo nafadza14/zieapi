@@ -8,7 +8,7 @@ Each scraper card shows the logo of the website it reads from.
 3. A few icons that were too small were replaced with vector icons from [simple-icons](https://simpleicons.org) (CC0).
 4. Every icon was resized to 128 × 128 PNG (or kept as SVG) in `public/assets/sources/`, and the mapping is in `src/catalog/icons.js`.
 
-Result: 268 of 296 scrapers have a logo. The rest get a two-letter monogram. That covers 21 sources whose sites block automated access or had no usable favicon, plus 7 zieapi utilities with no external source.
+Result: 268 of 296 scrapers have a logo. The rest get a two-letter monogram. That covers 21 sources whose sites block automated access or had no usable favicon, plus 7 Apizie utilities with no external source.
 
 ## Changing a logo
 Admin → Scrapers → **Set logo**. Paste an `https://` image URL, or leave it empty to upload a file (resized to 128 px in the browser). Type `reset` to go back to the default. Overrides are stored in the database and win over the bundled file.

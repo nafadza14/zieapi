@@ -104,7 +104,7 @@ export class Executor {
     const rest = names.length ? "/" + pathVals.join("/") : "";
     const query = Object.fromEntries(Object.entries(value).filter(([k]) => !names.includes(k)));
     let target = `${up.url}/v1/${scraper.key}/${endpoint.slug}${rest}`;
-    const init = { method: endpoint.method, headers: { [up.header]: up.key, "user-agent": "zieapi-upstream/2" } };
+    const init = { method: endpoint.method, headers: { [up.header]: up.key, "user-agent": "apizie-upstream/2" } };
     if (endpoint.method === "GET") {
       const qs = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])).toString();
       if (qs) target += "?" + qs;

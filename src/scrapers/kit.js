@@ -5,7 +5,7 @@ import { ScraperError, NotConfiguredError } from "../core/errors.js";
 
 export { ScraperError, NotConfiguredError };
 
-export const UA = "zieapi/2 (+https://github.com/nafadza14/zieapi)";
+export const UA = "apizie/2 (+https://github.com/nafadza14/zieapi)";
 
 /** Build a URL, dropping undefined / null / "" params. Arrays become repeated keys. */
 export function url(base, params = {}) {

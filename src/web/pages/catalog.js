@@ -71,7 +71,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
   </aside>
   <section class="ep-main" data-ep-main></section>
 </div>
-<dialog class="modal" data-mcp-modal><form method="dialog"><h2>Use ${esc(s.displayName)} from MCP</h2><p>Add zieapi to your agent once, then ask for “${esc(s.displayName)}”: the agent calls <code>run_scraper</code> with <code>${esc(s.key)}</code>.</p><pre class="code"><code>claude mcp add --transport http zieapi ${esc(apiUrl)}/mcp \\
+<dialog class="modal" data-mcp-modal><form method="dialog"><h2>Use ${esc(s.displayName)} from MCP</h2><p>Add Apizie to your agent once, then ask for “${esc(s.displayName)}”: the agent calls <code>run_scraper</code> with <code>${esc(s.key)}</code>.</p><pre class="code"><code>claude mcp add --transport http apizie ${esc(apiUrl)}/mcp \\
   --header "x-api-key: zie_••••••••"</code></pre><div class="center"><a href="/mcp" class="pill pill-outline pill-sm">Other clients</a> <button class="pill pill-white pill-sm">Close</button></div></form></dialog>
 <script type="application/json" id="detail-data">${json({ scraper: { key: s.key, displayName: s.displayName, category: s.category, slug: s.slug, auth: s.auth ?? null, provider: s.provider ?? null, origin: s.origin }, endpoints: s.endpoints, current: ep.slug, apiUrl, errors, langs: CODE_LANGS, loggedIn: !!user })}</script>
 </main>`;

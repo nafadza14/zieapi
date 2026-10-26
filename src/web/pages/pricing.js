@@ -2,13 +2,13 @@ import { layout, esc, fmt, idr } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
 
 const FAQ = [
-  ["Is zieapi really free?", "Yes. The Free plan gives every account 600 requests a month at up to 100 requests a minute, on every live endpoint, with no credit card. It does not expire."],
+  ["Is Apizie really free?", "Yes. The Free plan gives every account 600 requests a month at up to 100 requests a minute, on every live endpoint, with no credit card. It does not expire."],
   ["What happens when I hit the quota?", "Requests return HTTP 429 with a clear message, the limit you hit and a Retry-After header. Nothing is charged automatically. Upgrade from the dashboard or wait for the reset on the 1st (UTC)."],
   ["Do failed requests use up my quota?", "Server-side failures (5xx) are refunded automatically. Client errors (4xx such as invalid parameters) are counted, because the work was done."],
   ["Which tier do I need?", "Start on Free while you build. Move to Pro when real users arrive, Ultra when you need bulk jobs or always-fresh data, and Max for heavy pipelines."],
   ["How do I pay?", "Upgrades are invoiced in Rupiah. Create an invoice from Billing, pay by bank transfer and submit the reference. Your plan is activated as soon as the payment is verified."],
-  ["How is zieapi different from a scraping framework?", "You don't run browsers, proxies or parsers. You call an endpoint and get stable JSON. We maintain the integrations; you maintain your product."],
-  ["What about the legality of accessing public data?", "zieapi focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data. See the Acceptable Use Policy."],
+  ["How is Apizie different from a scraping framework?", "You don't run browsers, proxies or parsers. You call an endpoint and get stable JSON. We maintain the integrations; you maintain your product."],
+  ["What about the legality of accessing public data?", "Apizie focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data. See the Acceptable Use Policy."],
   ["Can I request a source that isn't in the catalog?", "Yes. Use Report an issue → Request a scraper. Popular requests are prioritised."],
 ];
 

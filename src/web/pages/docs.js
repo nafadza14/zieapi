@@ -9,7 +9,7 @@ export const DOCS = [
       {
         slug: "",
         title: "Overview",
-        body: (api) => `<p class="lead">zieapi is a managed scraper gateway: one API key, one URL pattern and one JSON envelope for hundreds of public data sources, Indonesian sources first.</p>
+        body: (api) => `<p class="lead">Apizie is a managed scraper gateway: one API key, one URL pattern and one JSON envelope for hundreds of public data sources, Indonesian sources first.</p>
 <div class="grid-2 doc-cards">
 <a class="card" href="/docs/quickstart"><h3>Quickstart</h3><p>Make your first call in under a minute.</p></a>
 <a class="card" href="/docs/authentication"><h3>Authentication</h3><p>API keys, headers and IP allowlists.</p></a>
@@ -23,19 +23,19 @@ export const DOCS = [
         slug: "quickstart",
         title: "Quickstart",
         body: (api) => `<ol class="steps-list"><li><a href="/register">Create an account</a> and copy your first key from <a href="/dashboard/keys">Dashboard → API keys</a>.</li><li>Pick a scraper from the <a href="/scrapers">catalog</a>.</li><li>Call it:</li></ol>
-${c(`curl "${api}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: zie_xxx"`)}
+${c(`curl "${api}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: apz_xxx"`)}
 <p>Response:</p>${c(`{\n  "project": "indonesia:bmkg",\n  "data": { "magnitude": 5.1, "wilayah": "…", "source": "BMKG" },\n  "timestamp": "2026-10-26T03:00:00.000Z"\n}`, "json")}
-<h2>From JavaScript</h2>${c(`const res = await fetch("${api}/v1/finance:coingecko/simple-price?ids=bitcoin&vs_currencies=idr", {\n  headers: { "x-api-key": process.env.ZIE_KEY },\n});\nconst { data } = await res.json();`, "javascript")}
-<h2>From Python</h2>${c(`import requests\nr = requests.get("${api}/v1/news:antara/latest", params={"limit": 5},\n                 headers={"x-api-key": "zie_xxx"})\nprint(r.json()["data"]["items"][0]["title"])`, "python")}`,
+<h2>From JavaScript</h2>${c(`const res = await fetch("${api}/v1/finance:coingecko/simple-price?ids=bitcoin&vs_currencies=idr", {\n  headers: { "x-api-key": process.env.APIZIE_KEY },\n});\nconst { data } = await res.json();`, "javascript")}
+<h2>From Python</h2>${c(`import requests\nr = requests.get("${api}/v1/news:antara/latest", params={"limit": 5},\n                 headers={"x-api-key": "apz_xxx"})\nprint(r.json()["data"]["items"][0]["title"])`, "python")}`,
       },
       {
         slug: "authentication",
         title: "Authentication",
         body: () => `<p>Every <code>/v1</code> and <code>/mcp</code> request needs an API key. Send it in any of these headers:</p>
-<table class="doc-table"><tr><th>Header</th><th>Example</th></tr><tr><td><code>x-api-key</code></td><td><code>x-api-key: zie_xxx</code> (recommended)</td></tr><tr><td><code>Authorization</code></td><td><code>Authorization: Bearer zie_xxx</code></td></tr><tr><td><code>api-key</code></td><td><code>api-key: zie_xxx</code></td></tr></table>
+<table class="doc-table"><tr><th>Header</th><th>Example</th></tr><tr><td><code>x-api-key</code></td><td><code>x-api-key: apz_xxx</code> (recommended)</td></tr><tr><td><code>Authorization</code></td><td><code>Authorization: Bearer apz_xxx</code></td></tr><tr><td><code>api-key</code></td><td><code>api-key: apz_xxx</code></td></tr></table>
 <h2>Managing keys</h2><p>Create, rename, disable and delete keys in <a href="/dashboard/keys">Dashboard → API keys</a>. The full key is shown only once; we store a SHA-256 hash.</p>
 <h2>IP allowlist</h2><p>On Pro and above, restrict a key to specific client IPs. Requests from other IPs get <code>403</code>.</p>
-<h2>Keep keys server-side</h2><p>Never ship a key in a browser or mobile app. Call zieapi from your backend and forward the result.</p>`,
+<h2>Keep keys server-side</h2><p>Never ship a key in a browser or mobile app. Call Apizie from your backend and forward the result.</p>`,
       },
     ],
   },
@@ -80,7 +80,7 @@ ${c(`curl "${api}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: zie_xxx"
         slug: "bulk",
         title: "Bulk jobs",
         body: (api) => `<p>Ultra and Max can submit many inputs for one endpoint in a single request (if the endpoint supports bulk).</p>
-${c(`curl -X POST "${api}/v1/finance:coingecko/simple-price/bulk" \\\n  -H "x-api-key: zie_xxx" -H "content-type: application/json" \\\n  -H "Idempotency-Key: 7f0c…" \\\n  -d '{"items":[{"ids":"bitcoin"},{"ids":"ethereum"}]}'`)}
+${c(`curl -X POST "${api}/v1/finance:coingecko/simple-price/bulk" \\\n  -H "x-api-key: apz_xxx" -H "content-type: application/json" \\\n  -H "Idempotency-Key: 7f0c…" \\\n  -d '{"items":[{"ids":"bitcoin"},{"ids":"ethereum"}]}'`)}
 <p>The response contains <code>jobId</code>, <code>status</code> (<code>COMPLETED</code> / <code>FAILED</code>), per-item <code>items[]</code> and a <code>pollUrl</code>. Fetch it again later with <code>GET /v1/bulk/{jobId}</code> (kept for 7 days). Each item costs one request; failed 5xx items are refunded. Re-sending the same <code>Idempotency-Key</code> returns the same job.</p>`,
       },
       {
@@ -88,7 +88,7 @@ ${c(`curl -X POST "${api}/v1/finance:coingecko/simple-price/bulk" \\\n  -H "x-ap
         title: "Webhooks",
         body: () => `<p>Pro and above can register up to 5 HTTPS endpoints in <a href="/dashboard/webhooks">Dashboard → Webhooks</a>.</p>
 <p>Events: <code>quota.warning</code> (80%), <code>quota.exceeded</code>, <code>request.error</code>, <code>bulk.completed</code>, <code>bulk.failed</code>, <code>key.created</code>, <code>key.disabled</code>, <code>plan.changed</code>, <code>webhook.test</code>.</p>
-<p>Each delivery is a <code>POST</code> with body <code>{ id, event, data, deliveredAt }</code> and header <code>X-Zie-Signature: sha256=&lt;hex&gt;</code>, an HMAC-SHA256 of the raw body using your webhook secret.</p>
+<p>Each delivery is a <code>POST</code> with body <code>{ id, event, data, deliveredAt }</code> and header <code>X-Apizie-Signature: sha256=&lt;hex&gt;</code>, an HMAC-SHA256 of the raw body using your webhook secret.</p>
 ${c(`import { createHmac, timingSafeEqual } from "node:crypto";\n\nfunction verify(rawBody, header, secret) {\n  const want = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");\n  return header && want.length === header.length &&\n    timingSafeEqual(Buffer.from(want), Buffer.from(header));\n}`, "javascript")}`,
       },
       {
@@ -106,17 +106,17 @@ ${c(`import { createHmac, timingSafeEqual } from "node:crypto";\n\nfunction veri
       {
         slug: "byok",
         title: "Global APIs & your own key",
-        body: (api) => `<p>Besides the native scrapers, zieapi includes more than a thousand global APIs (payments, messaging, developer tools, media, open data and more). They are imported from public OpenAPI specs in the <a href="https://github.com/APIs-guru/openapi-directory" rel="noopener">APIs.guru OpenAPI Directory</a> and called through the same <code>/v1</code> pattern, envelope, quotas and MCP tools.</p>
+        body: (api) => `<p>Besides the native scrapers, Apizie includes more than a thousand global APIs (payments, messaging, developer tools, media, open data and more). They are imported from public OpenAPI specs in the <a href="https://github.com/APIs-guru/openapi-directory" rel="noopener">APIs.guru OpenAPI Directory</a> and called through the same <code>/v1</code> pattern, envelope, quotas and MCP tools.</p>
 <h2>Two kinds of global API</h2>
-<table class="doc-table"><tr><th>Badge</th><th>Meaning</th></tr><tr><td><span class="badge badge-live">Live</span></td><td>The provider needs no key. Call it with just your zieapi key.</td></tr><tr><td><span class="badge badge-byok">Your key</span></td><td>The provider needs credentials. Bring your own key (BYOK).</td></tr></table>
+<table class="doc-table"><tr><th>Badge</th><th>Meaning</th></tr><tr><td><span class="badge badge-live">Live</span></td><td>The provider needs no key. Call it with just your Apizie key.</td></tr><tr><td><span class="badge badge-byok">Your key</span></td><td>The provider needs credentials. Bring your own key (BYOK).</td></tr></table>
 <h2>Sending your provider key</h2>
-<p>Add one of these headers next to your zieapi key. zieapi places it where the provider expects (header, query or basic auth) and forwards the call.</p>
+<p>Add one of these headers next to your Apizie key. Apizie places it where the provider expects (header, query or basic auth) and forwards the call.</p>
 <table class="doc-table"><tr><td><code>x-upstream-key</code></td><td>The raw key or token. For basic auth send <code>username:password</code>.</td></tr><tr><td><code>x-upstream-authorization</code></td><td>A full <code>Authorization</code> header value, sent as is.</td></tr></table>
-${c(`curl "${api}/v1/finance:stripe/get-balance" \\\n  -H "x-api-key: $ZIE_KEY" \\\n  -H "x-upstream-key: $STRIPE_SECRET_KEY"`)}
+${c(`curl "${api}/v1/finance:stripe/get-balance" \\\n  -H "x-api-key: $APIZIE_KEY" \\\n  -H "x-upstream-key: $STRIPE_SECRET_KEY"`)}
 <p>Your provider key is used for that request only. It is never stored, logged or shown in the dashboard, and responses fetched with it are cached per account and per key so they are never served to anyone else.</p>
 <p>Without a key, a BYOK endpoint answers <code>401</code> with <code>error.code = "upstream_key_required"</code> and tells you where the key goes. That request is not billed as a success.</p>
 <h2>Server-side keys (self-hosting)</h2>
-<p>Operators can set a shared key per API with an env var named <code>ZIE_UPSTREAM_KEY_</code> plus the API key in upper case, for example <code>ZIE_UPSTREAM_KEY_FINANCE_STRIPE</code>. A caller's own header always wins. Check each provider's terms before sharing a key with your users.</p>
+<p>Operators can set a shared key per API with an env var named <code>APIZIE_UPSTREAM_KEY_</code> plus the API key in upper case, for example <code>APIZIE_UPSTREAM_KEY_FINANCE_STRIPE</code>. A caller's own header always wins. Check each provider's terms before sharing a key with your users.</p>
 <h2>Via MCP</h2><p><code>run_scraper</code> accepts an optional <code>upstream_key</code> argument. <code>get_scraper_schema</code> returns the auth type.</p>
 <h2>Refreshing the directory</h2>${c(`npm i --no-save openapi-directory\nnode scripts/import-openapi.js node_modules/openapi-directory/api`)}`,
       },
@@ -128,16 +128,16 @@ ${c(`curl "${api}/v1/finance:stripe/get-balance" \\\n  -H "x-api-key: $ZIE_KEY" 
       {
         slug: "mcp",
         title: "MCP server",
-        body: (api) => `<p>zieapi runs a stateless MCP server (Streamable HTTP) at <code>${esc(api)}/mcp</code>. Authenticate with the same API key. See <a href="/mcp">the MCP page</a> for client-specific setup.</p>
+        body: (api) => `<p>Apizie runs a stateless MCP server (Streamable HTTP) at <code>${esc(api)}/mcp</code>. Authenticate with the same API key. See <a href="/mcp">the MCP page</a> for client-specific setup.</p>
 <table class="doc-table"><tr><th>Tool</th><th>What it does</th></tr><tr><td>search_scrapers</td><td>Search the catalog</td></tr><tr><td>get_scraper_schema</td><td>Parameters, verb and path of an endpoint</td></tr><tr><td>list_categories</td><td>Categories with counts</td></tr><tr><td>run_scraper</td><td>Run any endpoint (billed like REST)</td></tr><tr><td>get_account</td><td>Plan and key info</td></tr><tr><td>get_usage</td><td>Minute and month usage</td></tr><tr><td>bulk_submit</td><td>Bulk job (Ultra/Max)</td></tr><tr><td>bulk_status</td><td>Fetch a bulk job</td></tr></table>`,
       },
       {
         slug: "self-hosting",
         title: "Self-hosting",
-        body: () => `<p>zieapi is open source and has zero runtime dependencies.</p>${c(`git clone https://github.com/nafadza14/zieapi\ncd zieapi\nnpm start`)}
-<h2>Deploy to Vercel with Supabase</h2><ol><li>In Supabase, open the SQL editor and run <code>supabase/migrations/0001_zieapi.sql</code> once. It creates one locked table (<code>zie_kv</code>) and two functions only the server can call.</li><li>Supabase → Authentication → Sign In / Providers → enable <b>Google</b> with your Google OAuth client. In Google Cloud the authorized redirect URI is <code>https://&lt;project&gt;.supabase.co/auth/v1/callback</code>.</li><li>Supabase → Authentication → URL Configuration: add <code>https://&lt;your-domain&gt;/auth/supabase/callback</code> to Redirect URLs.</li><li>Vercel → Settings → Environment Variables: <code>SUPABASE_PROJECT_ID</code>, <code>SUPABASE_PUBLISHABLE_KEY</code>, <code>SUPABASE_SECRET_KEY</code> (Supabase → Project Settings → API Keys → secret key), <code>ZIE_SESSION_SECRET</code>, <code>ZIE_ADMIN_EMAILS</code>, <code>ZIE_PUBLIC_URL</code>.</li><li>Deploy. <code>/healthz</code> shows <code>"storage":"SupabaseKV"</code> when the database is connected.</li></ol>
+        body: () => `<p>Apizie is open source and has zero runtime dependencies.</p>${c(`git clone https://github.com/nafadza14/zieapi\ncd zieapi\nnpm start`)}
+<h2>Deploy to Vercel with Supabase</h2><ol><li>In Supabase, open the SQL editor and run <code>supabase/migrations/0001_apizie.sql</code> once. It creates one locked table (<code>apizie_kv</code>) and two functions only the server can call.</li><li>Supabase → Authentication → Sign In / Providers → enable <b>Google</b> with your Google OAuth client. In Google Cloud the authorized redirect URI is <code>https://&lt;project&gt;.supabase.co/auth/v1/callback</code>.</li><li>Supabase → Authentication → URL Configuration: add <code>https://&lt;your-domain&gt;/auth/supabase/callback</code> to Redirect URLs.</li><li>Vercel → Settings → Environment Variables: <code>SUPABASE_PROJECT_ID</code>, <code>SUPABASE_PUBLISHABLE_KEY</code>, <code>SUPABASE_SECRET_KEY</code> (Supabase → Project Settings → API Keys → secret key), <code>APIZIE_SESSION_SECRET</code>, <code>APIZIE_ADMIN_EMAILS</code>, <code>APIZIE_PUBLIC_URL</code>.</li><li>Deploy. <code>/healthz</code> shows <code>"storage":"SupabaseKV"</code> when the database is connected.</li></ol>
 <p>Upstash Redis (<code>KV_REST_API_URL</code>/<code>KV_REST_API_TOKEN</code>) also works instead of Supabase. Without either, data lives in memory and is lost on restart.</p>
-<h2>Upstream adapter</h2><p>Endpoints that are in the catalog but not implemented locally can be forwarded to a compatible gateway with <code>ZIE_UPSTREAM_URL</code>, <code>ZIE_UPSTREAM_KEY</code> and <code>ZIE_UPSTREAM_HEADER</code>. Check that provider's terms before reselling access.</p>`,
+<h2>Upstream adapter</h2><p>Endpoints that are in the catalog but not implemented locally can be forwarded to a compatible gateway with <code>APIZIE_UPSTREAM_URL</code>, <code>APIZIE_UPSTREAM_KEY</code> and <code>APIZIE_UPSTREAM_HEADER</code>. Check that provider's terms before reselling access.</p>`,
       },
     ],
   },

@@ -98,7 +98,7 @@ test("register → session → key → call API → logs/usage", async () => {
   const k = await c("/api/me/keys", { method: "POST", body: { name: "prod" } });
   assert.equal(k.status, 201);
   const secret = k.body.content.key;
-  assert.match(secret, /^zie_/);
+  assert.match(secret, /^apz_/);
 
   const run = await fetch(`${base}/v1/dev-tools:hash/digest?text=halo`, { headers: key(secret) });
   const body = await run.json();
@@ -196,13 +196,13 @@ test("plan gate, admin upgrade, invoices, bulk, webhooks", async () => {
   await app.webhooks.drain();
   const d = deliveries.find((x) => JSON.parse(x.init.body).event === "bulk.completed");
   assert.ok(d, "bulk.completed webhook delivered");
-  assert.ok(verifySignature(secret, d.init.body, d.init.headers["x-zie-signature"]));
+  assert.ok(verifySignature(secret, d.init.body, d.init.headers["x-apizie-signature"]));
 });
 
 test("MCP: initialize, tools/list, run_scraper", async () => {
   const k = "zie_env_ultra_key_000000";
   const rpc = (method, params) => fetch(`${base}/mcp`, { method: "POST", headers: { authorization: `Bearer ${k}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }).then((r) => r.json());
-  assert.equal((await rpc("initialize", { protocolVersion: "2025-06-18" })).result.serverInfo.name, "zieapi");
+  assert.equal((await rpc("initialize", { protocolVersion: "2025-06-18" })).result.serverInfo.name, "apizie");
   assert.equal((await rpc("tools/list")).result.tools.length, 8);
   const run = await rpc("tools/call", { name: "run_scraper", arguments: { scraper: "dev-tools:uuid", endpoint: "v4", params: { count: 1 } } });
   assert.equal(run.result.isError, false);
@@ -225,7 +225,7 @@ test("rate limit per minute → 429", async () => {
 });
 
 test("helpers: normalizeUrl + UpstashKV wire format", async () => {
-  assert.equal(normalizeUrl("/api/zieapi?__path=v1/a:b/c&x=1").pathname, "/v1/a:b/c");
+  assert.equal(normalizeUrl("/api/apizie?__path=v1/a:b/c&x=1").pathname, "/v1/a:b/c");
   const sent = [];
   const kv = new UpstashKV({ url: "https://kv.test", token: "t", fetchImpl: async (u, init) => { sent.push({ u, body: JSON.parse(init.body) }); return Response.json(u.endsWith("/pipeline") ? [{ result: 5 }, { result: 1 }] : { result: "v" }); } });
   assert.equal(await kv.get("k"), "v");

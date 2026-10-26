@@ -1,15 +1,15 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/zieapi-horizontal-white.svg">
-    <img src="brand/logo/zieapi-horizontal.svg" alt="zieapi" width="320">
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/apizie-horizontal-white.svg">
+    <img src="brand/logo/apizie-horizontal.svg" alt="Apizie" width="320">
   </picture>
 </p>
 
-# zieapi
+# Apizie
 
 **One API key for hundreds of public data sources, Indonesia first.**
 
-zieapi is a complete, self-hostable public-data API platform with zero runtime dependencies (Node.js ≥ 20). It includes:
+Apizie is a complete, self-hostable public-data API platform with zero runtime dependencies (Node.js ≥ 20). It includes:
 
 - **Website:** a landing page with the animated globe hero, a searchable catalog, a page per scraper with a "Try it" console and code samples, pricing, docs, the MCP page, a showcase, a status page, issue reporting and legal pages.
 - **Accounts:** email/password sign-in plus GitHub, Google and Discord OAuth.
@@ -24,15 +24,15 @@ The architecture and API contract come from an evidence-backed reverse-engineeri
 
 ## Supabase backend + Google sign-in
 
-1. Supabase SQL editor: run `supabase/migrations/0001_zieapi.sql` once.
+1. Supabase SQL editor: run `supabase/migrations/0001_apizie.sql` once.
 2. Supabase → Authentication → Providers: enable **Google** (Google Cloud redirect URI: `https://hfscpcwrntvdslxwddjy.supabase.co/auth/v1/callback`).
 3. Supabase → Authentication → URL Configuration → Redirect URLs: add `https://<your-domain>/auth/supabase/callback` (and `http://localhost:8787/auth/supabase/callback` for local).
-4. Vercel env vars: `SUPABASE_PROJECT_ID`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ZIE_SESSION_SECRET`, `ZIE_ADMIN_EMAILS`, `ZIE_PUBLIC_URL`.
+4. Vercel env vars: `SUPABASE_PROJECT_ID`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `APIZIE_SESSION_SECRET`, `APIZIE_ADMIN_EMAILS`, `APIZIE_PUBLIC_URL`.
 5. `/healthz` reports `"storage":"SupabaseKV"` when connected.
 
 ## MCP for end users
 
-`https://<your-domain>/mcp` (Streamable HTTP). Apps that support OAuth (Claude.ai and Claude Desktop custom connectors, ChatGPT, Claude Code `/mcp`) only need the URL: they discover `/.well-known/oauth-protected-resource`, register themselves, and the user signs in and presses Allow. Other apps send an API key (`Authorization: Bearer zie_…` or `x-api-key`). Setup snippets are on `/mcp`.
+`https://<your-domain>/mcp` (Streamable HTTP). Apps that support OAuth (Claude.ai and Claude Desktop custom connectors, ChatGPT, Claude Code `/mcp`) only need the URL: they discover `/.well-known/oauth-protected-resource`, register themselves, and the user signs in and presses Allow. Other apps send an API key (`Authorization: Bearer apz_…` or `x-api-key`). Setup snippets are on `/mcp`.
 
 ## Run locally
 
@@ -47,24 +47,24 @@ npm start              # → http://localhost:8787
 3. Call an endpoint:
 
 ```bash
-curl "http://localhost:8787/v1/indonesia:bmkg/gempa-terkini" -H "x-api-key: zie_xxx"
+curl "http://localhost:8787/v1/indonesia:bmkg/gempa-terkini" -H "x-api-key: apz_xxx"
 ```
 
 To run the tests: `npm test` (138 tests).
 
 ## Deploy to Vercel
 
-1. Push this repo to GitHub and import it in Vercel (Framework preset: **Other**). `vercel.json` already sets the build (`npm test`), the output (`public`) and the rewrites to the `api/zieapi.js` function.
+1. Push this repo to GitHub and import it in Vercel (Framework preset: **Other**). `vercel.json` already sets the build (`npm test`), the output (`public`) and the rewrites to the `api/apizie.js` function.
 2. **Add storage:** Vercel → Storage → **Upstash for Redis** → connect it to the project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Without it, accounts and usage live in memory and reset on every cold start.
 3. Set these environment variables:
 
    | Name | Value |
    |---|---|
-   | `ZIE_PUBLIC_URL` | `https://your-project.vercel.app` (or your domain) |
-   | `ZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
-   | `ZIE_SESSION_SECRET` | any long random string |
-   | `ZIE_BANK_INFO` | bank account text shown on invoices |
-   | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{ZIE_PUBLIC_URL}/auth/{provider}/callback` |
+   | `APIZIE_PUBLIC_URL` | `https://your-project.vercel.app` (or your domain) |
+   | `APIZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
+   | `APIZIE_SESSION_SECRET` | any long random string |
+   | `APIZIE_BANK_INFO` | bank account text shown on invoices |
+   | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{APIZIE_PUBLIC_URL}/auth/{provider}/callback` |
 
 4. Deploy, open the site, and sign up with the admin email.
 
@@ -75,7 +75,7 @@ All options are listed in [`.env.example`](.env.example).
 | | |
 |---|---|
 | Call | `GET` or `POST /v1/{category}:{scraper}/{endpoint}[/{path-params}]` |
-| Auth | `x-api-key: zie_…` (or `Authorization: Bearer …`, or `api-key: …`) |
+| Auth | `x-api-key: apz_…` (or `Authorization: Bearer …`, or `api-key: …`) |
 | Success | `{ "project", "data", "timestamp" }` |
 | Errors | `{ "content", "message", "errors" }`; plan, bulk and quota errors use `{ "error": { "code", "message" } }` |
 | Limits | `X-RateLimit-Remaining`, `X-RateLimit-Remaining-Month`, `Retry-After`. A 5xx is refunded. |
@@ -110,12 +110,12 @@ npm i --no-save openapi-directory
 node scripts/import-openapi.js node_modules/openapi-directory/api
 ```
 
-Operators may set shared provider keys with `ZIE_UPSTREAM_KEY_<CATEGORY>_<SLUG>` (for example `ZIE_UPSTREAM_KEY_FINANCE_STRIPE`). A caller's own `x-upstream-key` always wins.
+Operators may set shared provider keys with `APIZIE_UPSTREAM_KEY_<CATEGORY>_<SLUG>` (for example `APIZIE_UPSTREAM_KEY_FINANCE_STRIPE`). A caller's own `x-upstream-key` always wins.
 
 ## Project layout
 
 ```
-api/zieapi.js            Vercel function entry
+api/apizie.js            Vercel function entry
 public/assets/           site.css · site.js · dash.js · favicon
 src/app.js               router: pages, auth, /api/me, /api/admin, /v1, /mcp
 src/core/                catalog · executor · limits · bulk · webhooks · mcp · openapi · plans · validate

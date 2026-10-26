@@ -1,4 +1,4 @@
-// zieapi HTTP application (zero dependencies). One handler serves the website,
+// Apizie HTTP application (zero dependencies). One handler serves the website,
 // dashboard, admin, public catalog API, /v1 scraper API and /mcp.
 
 import { createServer } from "node:http";
@@ -8,6 +8,7 @@ import { join, normalize, extname } from "node:path";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { kvFromEnv } from "./db/kv.js";
+import { withEnvAliases, applyEnvAliases } from "./env.js";
 import { Repo } from "./db/repo.js";
 import { Catalog } from "./core/catalog.js";
 import { Limiter } from "./core/limits.js";
@@ -36,7 +37,8 @@ const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 const MIME = { ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".webp": "image/webp", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json" };
 
 export function createApp(opts = {}) {
-  const env = opts.env ?? process.env;
+  if (!opts.env) applyEnvAliases();
+  const env = withEnvAliases(opts.env ?? process.env);
   const vercelHost = env.VERCEL_PROJECT_PRODUCTION_URL ?? env.VERCEL_URL;
   const apiUrl = (opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`)).replace(/\/+$/, "");
   const publicUrl = (opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl).replace(/\/+$/, "");
@@ -46,8 +48,8 @@ export function createApp(opts = {}) {
   const adminEmails = new Set(String(env.ZIE_ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
   // Must be identical on every serverless instance; falls back to a value derived from the Supabase secret.
   const sbSecret = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
-  const stateSecret = env.ZIE_SESSION_SECRET ?? (sbSecret ? createHmac("sha256", "zieapi-state").update(sbSecret).digest("hex") : randomBytes(32).toString("hex"));
-  const bank = env.ZIE_BANK_INFO ?? "Bank transfer details are not configured yet. Set ZIE_BANK_INFO on the server.";
+  const stateSecret = env.ZIE_SESSION_SECRET ?? (sbSecret ? createHmac("sha256", "apizie-state").update(sbSecret).digest("hex") : randomBytes(32).toString("hex"));
+  const bank = env.ZIE_BANK_INFO ?? "Bank transfer details are not configured yet. Set APIZIE_BANK_INFO on the server.";
   const upstream = env.ZIE_UPSTREAM_URL ? { url: env.ZIE_UPSTREAM_URL.replace(/\/+$/, ""), key: env.ZIE_UPSTREAM_KEY ?? "", header: (env.ZIE_UPSTREAM_HEADER ?? "x-api-key").toLowerCase() } : null;
 
   const kv = opts.kv ?? kvFromEnv(env, { file: opts.dataFile ?? env.ZIE_DATA_FILE ?? null });
@@ -155,7 +157,7 @@ export function createApp(opts = {}) {
 
     // ----- machine-readable ----------------------------------------------------
     if (p === "/healthz") return json(200, { ok: true, version: VERSION, uptimeSec: Math.round(process.uptime()), storage: kv.constructor.name });
-    if (p === "/api/info") return json(200, okContent({ name: "zieapi", version: VERSION, ...catalog.totals(), docs: `${publicUrl}/docs`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp` }));
+    if (p === "/api/info") return json(200, okContent({ name: "apizie", version: VERSION, ...catalog.totals(), docs: `${publicUrl}/docs`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp` }));
     if (p === "/openapi.json") return json(200, memo("oa", () => buildOpenApi(catalog, { apiUrl, version: VERSION })), { "Cache-Control": "public, max-age=600" });
     if (p === "/llms.txt") return text(memo("llms", () => buildLlmsTxt(catalog, { apiUrl, publicUrl, full: false })));
     if (p === "/llms-full.txt") return text(memo("llmsf", () => buildLlmsTxt(catalog, { apiUrl, publicUrl, full: true })));
@@ -195,10 +197,10 @@ export function createApp(opts = {}) {
     if ((mm = /^\/auth\/(github|google|discord)$/.exec(p)) && m === "GET" && sbAuth?.providers.includes(mm[1]) && !enabledProviders(env).some((x) => x.id === mm[1])) {
       const { verifier, challenge } = pkcePair();
       const st = signState(`${verifier}|${safeNext(q.next)}`);
-      return redirect(supabaseAuthorizeUrl(sbAuth, { provider: mm[1], redirectTo: `${publicUrl}/auth/supabase/callback`, challenge }), { "Set-Cookie": cookie("zie_sb", st, { maxAge: 600, secure: isHttps(req) }) });
+      return redirect(supabaseAuthorizeUrl(sbAuth, { provider: mm[1], redirectTo: `${publicUrl}/auth/supabase/callback`, challenge }), { "Set-Cookie": cookie("apz_sb", st, { maxAge: 600, secure: isHttps(req) }) });
     }
     if (p === "/auth/supabase/callback" && m === "GET") {
-      const raw = checkState(parseCookies(req.headers.cookie).zie_sb);
+      const raw = checkState(parseCookies(req.headers.cookie).apz_sb);
       const [verifier, next] = raw ? raw.split("|") : [];
       if (q.error) return redirect("/login?error=" + encodeURIComponent(String(q.error_description ?? q.error).slice(0, 200)));
       if (!verifier || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
@@ -206,7 +208,7 @@ export function createApp(opts = {}) {
         const prof = await supabaseExchange(sbAuth, { code: q.code, verifier, fetchImpl: opts.oauthFetch ?? globalThis.fetch });
         const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: "supabase", pid: prof.id });
         if (u.status !== "active") return redirect("/login?error=" + encodeURIComponent("Account suspended"));
-        return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("zie_sb", "", { maxAge: 0 })] });
+        return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_sb", "", { maxAge: 0 })] });
       } catch (e) {
         logger?.warn?.(e.message);
         return redirect("/login?error=" + encodeURIComponent("Google sign-in failed, please try again"));
@@ -216,17 +218,17 @@ export function createApp(opts = {}) {
       if (!enabledProviders(env).some((x) => x.id === mm[1])) return redirect(`/login?error=${encodeURIComponent(PROVIDERS[mm[1]].label + " sign-in is not configured")}`);
       const nonce = randomBytes(16).toString("base64url");
       const state = signState(`${nonce}|${safeNext(q.next)}`);
-      return redirect(authorizeUrl(mm[1], { redirectUri: `${publicUrl}/auth/${mm[1]}/callback`, state: nonce, env }), { "Set-Cookie": cookie("zie_oauth", state, { maxAge: 600, secure: isHttps(req) }) });
+      return redirect(authorizeUrl(mm[1], { redirectUri: `${publicUrl}/auth/${mm[1]}/callback`, state: nonce, env }), { "Set-Cookie": cookie("apz_oauth", state, { maxAge: 600, secure: isHttps(req) }) });
     }
     if ((mm = /^\/auth\/(github|google|discord)\/callback$/.exec(p)) && m === "GET") {
-      const raw = checkState(parseCookies(req.headers.cookie).zie_oauth);
+      const raw = checkState(parseCookies(req.headers.cookie).apz_oauth);
       const [nonce, next] = raw ? raw.split("|") : [];
       if (!nonce || nonce !== q.state || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
       try {
         const prof = await exchangeCode(mm[1], { code: q.code, redirectUri: `${publicUrl}/auth/${mm[1]}/callback`, fetchImpl: opts.oauthFetch ?? globalThis.fetch, env });
         const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: mm[1], pid: prof.id });
         if (u.status !== "active") return redirect("/login?error=" + encodeURIComponent("Account suspended"));
-        return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("zie_oauth", "", { maxAge: 0 })] });
+        return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_oauth", "", { maxAge: 0 })] });
       } catch (e) {
         logger?.warn?.(e.message);
         return redirect("/login?error=" + encodeURIComponent("Sign-in failed, please try again"));
@@ -451,7 +453,7 @@ export function createApp(opts = {}) {
     }
     if (p === "/api/me/webhooks/test" && m === "POST") {
       const hooks = await repo.getWebhooks(user.id);
-      const res = await Promise.all(hooks.map((h) => webhooks.deliver(h, "webhook.test", { message: "Hello from zieapi" })));
+      const res = await Promise.all(hooks.map((h) => webhooks.deliver(h, "webhook.test", { message: "Hello from Apizie" })));
       return json(200, okContent(res.map((r, i) => ({ url: hooks[i].url, ok: r.ok, status: r.status }))));
     }
     if (p === "/api/me/billing" && m === "GET") {
@@ -676,7 +678,7 @@ export function createApp(opts = {}) {
 // ---------- helpers -------------------------------------------------------------
 export function normalizeUrl(raw) {
   const url = new URL(raw ?? "/", "http://local");
-  if (url.searchParams.has("__path") && /^\/api\/zieapi\/?$/.test(url.pathname)) {
+  if (url.searchParams.has("__path") && /^\/api\/(apizie|zieapi)\/?$/.test(url.pathname)) {
     url.pathname = "/" + url.searchParams.get("__path").replace(/^\/+/, "");
     url.searchParams.delete("__path");
   }

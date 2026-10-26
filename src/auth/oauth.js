@@ -85,7 +85,7 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
       authorization_servers: [issuer],
       scopes_supported: ["mcp", "offline_access"],
       bearer_methods_supported: ["header"],
-      resource_name: "zieapi MCP",
+      resource_name: "Apizie MCP",
       resource_documentation: `${publicUrl}/mcp`,
     }),
     authorizationServer: () => ({
@@ -289,7 +289,7 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
     await kv.srem(`oagrants:${userId}`, clientId);
   }
 
-  const wwwAuthenticate = (extra = "") => `Bearer realm="zieapi", resource_metadata="${apiUrl}/.well-known/oauth-protected-resource/mcp", scope="mcp"${extra}`;
+  const wwwAuthenticate = (extra = "") => `Bearer realm="apizie", resource_metadata="${apiUrl}/.well-known/oauth-protected-resource/mcp", scope="mcp"${extra}`;
 
   return { metadata, register, getClient, validateAuthorize, approve, deny, token, revoke, resolveAccessToken, listGrants, revokeGrant, wwwAuthenticate, issuer, resource };
 }

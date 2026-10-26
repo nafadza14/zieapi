@@ -129,19 +129,19 @@ AI agent  ──► mcp.zapi.ink/mcp (JSON-RPC, stateless) ──► katalog + /
 
 ---
 
-## 6. Spesifikasi rekonstruksi clean-room (A5): **zieapi**
+## 6. Spesifikasi rekonstruksi clean-room (A5): **Apizie**
 
 Implementasi ada di repo ini. Prinsip: meniru **kontrak publik** dan arsitektur, **bukan** kode atau scraper proprietary.
 
 ### 6.1 Komponen
 1. **Gateway** (`src/server.js`): routing `/v1`, `/api`, `/mcp`, CORS, `x-request-id`, `X-Response-Time`.
-2. **Auth & keys** (`src/auth.js`): key `zie_…`, disimpan sebagai SHA-256, diterima di `x-api-key` / `Authorization: Bearer` / `api-key`.
+2. **Auth & keys** (`src/auth.js`): key `apz_…`, disimpan sebagai SHA-256, diterima di `x-api-key` / `Authorization: Bearer` / `api-key`.
 3. **Plans & metering** (`src/plans.js`, `src/ratelimit.js`): kuota bulanan (reset tgl 1 UTC), window per menit, 5xx tidak dihitung.
 4. **Katalog** (`src/catalog.js`): registry scraper → endpoint dengan `paramsSchema`, `cacheTtl`, `pathTemplate`, `minPlan`, `bulkEnabled`.
 5. **Validator** (`src/validate.js`): dari schema → `400 Invalid params`.
 6. **Cache** (`src/cache.js`): TTL per endpoint, `ttl` override dibatasi per plan.
 7. **Bulk** (`src/bulk.js`): job queue in-process + `Idempotency-Key`.
-8. **Webhook** (`src/webhooks.js`): HMAC-SHA256 `X-Zie-Signature`.
+8. **Webhook** (`src/webhooks.js`): HMAC-SHA256 `X-Apizie-Signature`.
 9. **MCP** (`src/mcp.js`): 8 tool setara, JSON-RPC stateless.
 10. **OpenAPI & llms.txt** dibangkitkan dari katalog.
 11. **Store** (`src/store.js`): in-memory + persistensi JSON opsional (ganti Postgres untuk produksi).
@@ -163,7 +163,7 @@ Implementasi ada di repo ini. Prinsip: meniru **kontrak publik** dan arsitektur,
 - [x] 8 tool dengan nama sama; error tool memakai kode REST
 
 ### 6.5 Rencana uji
-**Bukti paritas (E28):** `zpi-sdk@0.6.0` resmi dari npm, tanpa modifikasi, berjalan terhadap zieapi lokal (`examples/zpi-sdk-parity.mjs`): `run()`, auto-verb POST, path template, katalog, bulk, dan pemetaan error ke kelas yang benar.
+**Bukti paritas (E28):** `zpi-sdk@0.6.0` resmi dari npm, tanpa modifikasi, berjalan terhadap Apizie lokal (`examples/zpi-sdk-parity.mjs`): `run()`, auto-verb POST, path template, katalog, bulk, dan pemetaan error ke kelas yang benar.
 
 Lihat juga `test/*.test.js` (35 tes): envelope, tiga header auth, plan gate, 405, invalid params, rate limit menit & bulan, 5xx tidak dihitung, cache hit, bulk & idempotency, webhook signature, MCP.
 
@@ -186,7 +186,7 @@ Indeks bukti: [`docs/evidence/index.json`](evidence/index.json) (E01–E28).
 
 # Iterasi 2: Reverse engineering seluruh website & sistem (26 Okt 2026)
 
-Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh website dan sistem** zapi.ink lalu membangun ulang semuanya sebagai **zieapi v2**, dengan desain sendiri (hero globe partikel).
+Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh website dan sistem** zapi.ink lalu membangun ulang semuanya sebagai **Apizie v2**, dengan desain sendiri (hero globe partikel).
 
 ## A. Observations baru
 
@@ -196,9 +196,9 @@ Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh 
 - **Katalog (E32):** 25 spesifikasi OpenAPI per kategori. Setelah kategori Bypass Tools dikeluarkan, ada 291 scraper dan 1.243 endpoint (1.223 GET, 20 POST).
 - **Struktur halaman (E33):** susunan section pada homepage, pricing, detail scraper dan docs.
 
-## B. Pemetaan zapi.ink → zieapi v2
+## B. Pemetaan zapi.ink → Apizie v2
 
-| zapi.ink (teramati) | zieapi v2 |
+| zapi.ink (teramati) | Apizie v2 |
 |---|---|
 | Next.js App Router + Cloudflare | Node `http` tanpa dependency, SSR template + vanilla JS; deploy ke Vercel/Docker |
 | `api.zapi.ink` + `mcp.zapi.ink` (host terpisah) | Satu host: `/v1`, `/api/*`, `/mcp` |
@@ -212,7 +212,7 @@ Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh 
 ## C. Batasan yang disengaja
 
 - **Kategori Bypass Tools (27 endpoint) dan scraper `ai:bypass-ai` serta `dev-tools:cf-sitekey` tidak dibuat.** Ketiganya berfungsi untuk mengakali proteksi atau deteksi.
-- **Endpoint yang butuh scraping privat atau anti-bot** (Instagram, TikTok, marketplace dan sejenisnya) hanya muncul di katalog dengan status *planned*. Status berubah menjadi *upstream* bila `ZIE_UPSTREAM_URL` diisi; pastikan dulu ketentuan penyedia upstream tersebut.
+- **Endpoint yang butuh scraping privat atau anti-bot** (Instagram, TikTok, marketplace dan sejenisnya) hanya muncul di katalog dengan status *planned*. Status berubah menjadi *upstream* bila `APIZIE_UPSTREAM_URL` diisi; pastikan dulu ketentuan penyedia upstream tersebut.
 - **Tidak ada teks marketing, ikon, contoh respons, atau deskripsi zapi yang disalin.**
 
 ## D. Verifikasi
@@ -226,14 +226,14 @@ Iterasi pertama hanya menghasilkan gateway API. Iterasi ini memetakan **seluruh 
 |---|---|---|
 | U10 | Isi dashboard dan admin zapi (tata letak, metrik) | Butuh login |
 | U11 | Gateway pembayaran zapi | Butuh akun + transaksi |
-| U12 | Sekitar 38 upstream live zieapi yang belum terverifikasi | CORS / izin situs di browser; uji dari server setelah deploy |
+| U12 | Sekitar 38 upstream live Apizie yang belum terverifikasi | CORS / izin situs di browser; uji dari server setelah deploy |
 
 # Iterasi 3: Perluasan ke ribuan API global (26 Okt 2026)
 
 Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 
 ## A. Observations
-- Kompetitor besar (RapidAPI, ApyHub, API Ninjas, Apify) menjual "satu kunci, banyak API". Pembeda zieapi adalah satu format respons dan satu kuota untuk semua sumber.
+- Kompetitor besar (RapidAPI, ApyHub, API Ninjas, Apify) menjual "satu kunci, banyak API". Pembeda Apizie adalah satu format respons dan satu kuota untuk semua sumber.
 - APIs.guru OpenAPI Directory (CC0) menyediakan spesifikasi mesin untuk ribuan API publik, sehingga integrasi bisa dibuat otomatis dan diulang.
 
 ## B. Rekonstruksi
@@ -259,7 +259,7 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 ## B. Inferensi
 - Konektor Claude.ai/ChatGPT hanya menerima URL + OAuth, jadi OAuth adalah syarat agar MCP "bisa dipakai user" di aplikasi chat, bukan hanya di editor. (Keyakinan: tinggi, dari E40 dan perilaku klien MCP resmi.)
 
-## C. Rekonstruksi di zieapi
+## C. Rekonstruksi di Apizie
 | Komponen | Berkas |
 |---|---|
 | Authorization server OAuth 2.1 (metadata, DCR, consent, PKCE, refresh rotation, revoke, Client ID Metadata Document) | `src/auth/oauth.js`, rute `/oauth/*` dan `/.well-known/*` di `src/app.js` |
@@ -267,7 +267,7 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 | Token OAuth (`zoa_`) diterima di `/mcp` dan `/v1`, tercatat di log sebagai `MCP · <nama app>` | `src/auth/index.js` |
 | Halaman persetujuan + daftar "Connected MCP apps" (bisa diputus) | `src/web/pages/misc.js`, `public/assets/dash.js` |
 | Tool annotations, versi protokol 2025-11-25, pemotongan hasil besar | `src/core/mcp.js` |
-| Backend Supabase (tabel `zie_kv` + RPC, RLS tanpa policy) | `supabase/migrations/0001_zieapi.sql`, `SupabaseKV` di `src/db/kv.js` |
+| Backend Supabase (tabel `apizie_kv` + RPC, RLS tanpa policy) | `supabase/migrations/0001_apizie.sql`, `SupabaseKV` di `src/db/kv.js` |
 | Login Google lewat Supabase Auth (PKCE) | `src/auth/supabase.js` |
 | Logo brand API besar di hero (simple-icons, CC0) | `src/web/brands.js`, `src/web/pages/home.js` |
 
@@ -276,3 +276,9 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 - Klien resmi `@modelcontextprotocol/sdk@1.32.2`: (1) API key: initialize, tools/list (8 tool beranotasi), search, run_scraper, error BYOK, get_usage; (2) OAuth persis seperti Claude/ChatGPT: 401 → discovery → DCR → PKCE → consent → token → panggilan tool sebagai user → refresh rotation → disconnect mencabut token. Semua lulus.
 - Seluruh suite `test/app.test.js` dan skenario MCP di atas juga dijalankan terhadap Postgres 16 lokal dengan migration Supabase yang sama (lewat shim PostgREST): lulus.
 - Belum terverifikasi: koneksi ke project Supabase asli (butuh migration dijalankan, provider Google aktif, dan `SUPABASE_SECRET_KEY` di Vercel).
+
+# Iterasi 5: Rebrand zieapi → Apizie (26 Okt 2026)
+- Nama produk di semua UI, dokumentasi, OpenAPI, llms.txt, MCP (`serverInfo.name: "apizie"`, `title: "Apizie"`), OAuth (`resource_name: "Apizie MCP"`) dan aset brand.
+- Logo: simbol `//.` tetap; wordmark kini **Apizie** (Inter Display SemiBold, titik aksen di huruf "i" terakhir). Generator: `brand/logo/*.svg`, PNG di `brand/png/`.
+- Teknis: fungsi Vercel `api/apizie.js`, tabel Supabase `apizie_kv`, prefix API key baru `apz_` (kunci `zie_` lama tetap valid), env `APIZIE_*` (nama lama `ZIE_*` tetap dibaca), header webhook `X-Apizie-Signature`.
+- Repo GitHub tetap `nafadza14/zieapi` sampai di-rename; domain default `apizie.vercel.app`.

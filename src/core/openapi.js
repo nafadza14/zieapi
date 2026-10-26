@@ -54,17 +54,17 @@ export function buildOpenApi(catalog, { apiUrl, version, category = null, only =
             "4XX": { $ref: "#/components/responses/Error" },
             "5XX": { $ref: "#/components/responses/Error" },
           },
-          "x-zie-cache-ttl": e.cacheTtl,
-          "x-zie-min-plan": maxPlan(s.minPlan, e.minPlan),
-          "x-zie-bulk": e.bulkEnabled,
-          "x-zie-status": e.status,
+          "x-apizie-cache-ttl": e.cacheTtl,
+          "x-apizie-min-plan": maxPlan(s.minPlan, e.minPlan),
+          "x-apizie-bulk": e.bulkEnabled,
+          "x-apizie-status": e.status,
         },
       };
     }
   }
   return {
     openapi: "3.1.0",
-    info: { title: category ? `zieapi: ${category}` : "zieapi", version, description: "One API key, one envelope, many public data sources." },
+    info: { title: category ? `Apizie: ${category}` : "Apizie", version, description: "One API key, one envelope, many public data sources." },
     servers: [{ url: apiUrl }],
     security: [{ ApiKeyAuth: [] }],
     paths,
@@ -99,7 +99,7 @@ function fieldSchema(f) {
 export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full = true }) {
   const t = catalog.totals();
   const lines = [
-    category ? `# zieapi: ${category}` : "# zieapi",
+    category ? `# Apizie: ${category}` : "# Apizie",
     "",
     `> ${t.scrapers} scrapers, ${t.endpoints} endpoints, ${t.categories} categories behind one API key.`,
     "",

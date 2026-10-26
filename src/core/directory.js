@@ -33,7 +33,7 @@ export function loadDirectoryIndex() {
 }
 
 const T = { s: "string" };
-/** Build zieapi endpoints for one directory API (called lazily). */
+/** Build Apizie endpoints for one directory API (called lazily). */
 export function loadEndpoints(entry, buildEndpoint) {
   const raw = JSON.parse(readFileSync(`${DIR}apis/${entry.f}.json`, "utf8"));
   const api = { key: entry.k, name: entry.n, base: raw.base, auth: raw.auth };

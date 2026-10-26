@@ -129,7 +129,7 @@ test("OAuth: register, consent, code + PKCE, token, MCP call, refresh, revoke", 
 
   const mcp = (token, body) => fetch(base + "/mcp", { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify(body) });
   const init = await (await mcp(t.access_token, { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } })).json();
-  assert.equal(init.result.serverInfo.name, "zieapi");
+  assert.equal(init.result.serverInfo.name, "apizie");
   const call = await (await mcp(t.access_token, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "run_scraper", arguments: { scraper: "dev-tools:uuid", endpoint: "v4" } } })).json();
   assert.equal(call.result.isError, false);
   const logs = await (await get("/api/me/logs", { cookie: session })).json();
@@ -160,7 +160,7 @@ test("SupabaseKV wire format and env selection", async () => {
   const sent = [];
   const kv = new SupabaseKV({ url: "https://p.supabase.co/", key: "sb_secret_abc", fetchImpl: async (u, init) => { sent.push({ u, init }); return Response.json(JSON.parse(init.body).cmds.map(() => 7)); } });
   assert.equal(await kv.incrby("c", 2, 60), 7);
-  assert.equal(sent[0].u, "https://p.supabase.co/rest/v1/rpc/zie_kv");
+  assert.equal(sent[0].u, "https://p.supabase.co/rest/v1/rpc/apizie_kv");
   assert.equal(sent[0].init.headers.apikey, "sb_secret_abc");
   assert.equal(sent[0].init.headers.authorization, undefined);
   assert.deepEqual(JSON.parse(sent[0].init.body), { cmds: [["INCRBY", "c", 2, 60]] });

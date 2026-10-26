@@ -51,7 +51,7 @@ function cleanDomain(raw) {
 
 const NCBI_DBS = ["pubmed", "protein", "nuccore", "ipg", "nucleotide", "structure", "genome", "grasp", "annotinfo", "assembly", "bioproject", "biosample", "blastdbinfo", "books", "cdd", "clinvar", "dbvar", "gene", "gds", "geoprofiles", "medgen", "mesh", "nlmcatalog", "omim", "orgtrack", "pmc", "proteinclusters", "pcassay", "protfam", "pccompound", "pcsubstance", "seqannot", "snp", "sra", "taxonomy", "biocollections", "gtr"];
 const EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
-const eutils = (path, params) => url(EUTILS + path, { ...params, tool: "zieapi", email: env("NCBI_EMAIL"), api_key: env("NCBI_API_KEY") });
+const eutils = (path, params) => url(EUTILS + path, { ...params, tool: "apizie", email: env("NCBI_EMAIL"), api_key: env("NCBI_API_KEY") });
 const dbField = (def = "pubmed") => f.enm("db", NCBI_DBS, { default: def, description: "Entrez database" });
 const PUBTATOR = "https://www.ncbi.nlm.nih.gov/research/pubtator3-api/";
 
@@ -383,7 +383,7 @@ const pubmed = {
       "Convert between PMID, PMCID, DOI and manuscript IDs (PMC ID Converter API).",
       [f.req("ids", { example: "PMC3531190,23193287" }), f.enm("idtype", ["pmid", "pmcid", "doi", "mid"]), f.bool("versions", { default: false })],
       async (p, ctx) => {
-        const j = await getJson(ctx, url("https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/", { ids: csv(p.ids).join(","), idtype: p.idtype, versions: p.versions ? "yes" : "no", format: "json", tool: "zieapi", email: env("NCBI_EMAIL") }));
+        const j = await getJson(ctx, url("https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/", { ids: csv(p.ids).join(","), idtype: p.idtype, versions: p.versions ? "yes" : "no", format: "json", tool: "apizie", email: env("NCBI_EMAIL") }));
         if (j?.status && j.status !== "ok") throw new ScraperError(j.message ?? "ID conversion failed");
         return {
           count: arr(j?.records).length,

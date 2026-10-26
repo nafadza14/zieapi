@@ -7,7 +7,8 @@ import { PLANS } from "../core/plans.js";
 
 const J = (s) => (s ? JSON.parse(s) : null);
 const S = (o) => JSON.stringify(o);
-export const KEY_PREFIX = "zie_";
+export const KEY_PREFIX = "apz_";
+export const LEGACY_KEY_PREFIXES = ["zie_"]; // keys issued before the Apizie rebrand keep working
 const SESSION_DAYS = 30;
 
 export class Repo {
@@ -89,8 +90,8 @@ export class Repo {
     for (const part of String(spec).split(",").map((s) => s.trim()).filter(Boolean)) {
       const i = part.indexOf(":");
       const [plan, secret] = i > 0 ? [part.slice(0, i), part.slice(i + 1)] : ["free", part];
-      if (!PLANS[plan]) throw new Error(`ZIE_KEYS: unknown plan "${plan}"`);
-      if (!secret.startsWith(KEY_PREFIX) || secret.length < 16) throw new Error(`ZIE_KEYS: keys must start with ${KEY_PREFIX} and be ≥16 chars`);
+      if (!PLANS[plan]) throw new Error(`APIZIE_KEYS: unknown plan "${plan}"`);
+      if (![KEY_PREFIX, ...LEGACY_KEY_PREFIXES].some((x) => secret.startsWith(x)) || secret.length < 16) throw new Error(`APIZIE_KEYS: keys must start with ${KEY_PREFIX} and be ≥16 chars`);
       const hash = sha256(secret);
       this.envKeys.set(hash, { id: stableId(hash), userId: null, plan, name: `env-${plan}`, hash, preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, status: "active", ipAllowlist: [], createdAt: null });
     }

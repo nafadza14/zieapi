@@ -1,11 +1,11 @@
 {
-  "name": "zieapi",
+  "name": "apizie",
   "version": "2.0.0",
-  "description": "zieapi \u2014 full public-data API platform: website, dashboard, admin, 290+ scrapers catalog, API keys, plans, billing, webhooks, bulk and MCP. Zero dependencies.",
+  "description": "Apizie \u2014 full public-data API platform: website, dashboard, admin, 290+ scrapers catalog, API keys, plans, billing, webhooks, bulk and MCP. Zero dependencies.",
   "type": "module",
   "main": "src/app.js",
   "bin": {
-    "zieapi": "src/index.js"
+    "Apizie": "src/index.js"
   },
   "scripts": {
     "start": "node src/index.js",

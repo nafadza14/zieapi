@@ -169,7 +169,7 @@
       "id": "E28",
       "source": "examples/zpi-sdk-parity.mjs (this repo)",
       "kind": "verification",
-      "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local zieapi via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError, which shows zieapi is wire-compatible with the observed contract."
+      "summary": "Unmodified zpi-sdk@0.6.0 from npm, pointed at a local Apizie via baseURL, successfully ran run() (GET, POST auto-verb, path template), catalog.list/schema/stats, bulk.submit+wait, and mapped errors to ZpiPlanGateError, ZpiInvalidParamsError, ZpiAuthError, which shows Apizie is wire-compatible with the observed contract."
     },
     {
       "id": "E29",
@@ -203,7 +203,7 @@
     },
     {
       "id": "E34",
-      "source": "Browser pane fetch of zieapi live-scraper upstream URLs (user machine, 26 Oct 2026)",
+      "source": "Browser pane fetch of Apizie live-scraper upstream URLs (user machine, 26 Oct 2026)",
       "kind": "verification",
       "summary": "Of 79 upstream URLs (one per live scraper), 30 returned HTTP 200 with the expected shape (e.g. BMKG autogempa, equran.id, myquran, Nager.Date, CoinGecko, Frankfurter, World Bank, GLEIF, Treasury XML, NCBI, DOAJ, Wikipedia, npm, Openverse, Bluesky, RDAP, Jina, Cloudflare DoH, ipwho.is, TVmaze, iTunes, MusicBrainz, PokeAPI, CheapShark, TheMealDB, ClinicalTables, Flathub, AMO), 11 more were reachable without CORS; the rest could not be checked from the browser (site permission / CORS) and remain unverified."
     },
@@ -245,7 +245,7 @@
     },
     {
       "id": "E41",
-      "source": "scratchpad e2e with @modelcontextprotocol/sdk@1.32.2 against local zieapi (memory and Postgres backends)",
+      "source": "scratchpad e2e with @modelcontextprotocol/sdk@1.32.2 against local Apizie (memory and Postgres backends)",
       "kind": "verification",
       "summary": "API-key and OAuth (DCR + PKCE + consent + refresh + revoke) flows pass end to end with the official MCP client."
     }

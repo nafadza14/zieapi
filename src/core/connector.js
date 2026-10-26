@@ -1,15 +1,15 @@
 // Generic OpenAPI connector: turns one operation from the API directory into a
-// zieapi endpoint handler. The upstream server is fixed by the spec; callers can
+// Apizie endpoint handler. The upstream server is fixed by the spec; callers can
 // only fill parameters. Credentials for keyed APIs come from the caller
 // (x-upstream-key / x-upstream-authorization, "bring your own key") or from a
-// server env var ZIE_UPSTREAM_KEY_<API_SLUG>.
+// server env var APIZIE_UPSTREAM_KEY_<API_SLUG> (legacy ZIE_UPSTREAM_KEY_<API_SLUG> also works).
 
 import { HttpError } from "./envelope.js";
 import { ScraperError } from "./errors.js";
 import { assertPublicUrl } from "../scrapers/ssrf.js";
 
 const MAX_BYTES = 1_500_000;
-const UA = "zieapi-connector/1 (+https://github.com/nafadza14/zieapi)";
+const UA = "apizie-connector/1 (+https://github.com/nafadza14/zieapi)";
 const hostOk = new Map(); // host -> expiry (SSRF check cache)
 
 export class UpstreamAuthRequired extends HttpError {
@@ -20,12 +20,13 @@ export class UpstreamAuthRequired extends HttpError {
 }
 
 export function envKeyName(apiKey) {
-  return "ZIE_UPSTREAM_KEY_" + apiKey.replace(/[^a-z0-9]+/gi, "_").toUpperCase();
+  return "APIZIE_UPSTREAM_KEY_" + apiKey.replace(/[^a-z0-9]+/gi, "_").toUpperCase();
 }
 
 function credentialFor(api, ctx) {
   const env = typeof process !== "undefined" ? process.env : {};
-  const fromEnv = env[envKeyName(api.key)];
+  const name = envKeyName(api.key);
+  const fromEnv = env[name] ?? env[name.replace(/^APIZIE_/, "ZIE_")];
   const u = ctx.upstreamAuth ?? {};
   if (u.authorization) return { raw: u.authorization };
   if (u.key) return { value: u.key };

@@ -54,14 +54,14 @@ test("connector: keyed API asks for upstream key, then sends it where the spec s
 
 test("connector: server env key is used when caller sends none", async () => {
   const api = { key: "finance:env-demo", name: "EnvDemo", base: "https://api.demo-f.test", auth: { t: "key", in: "header", name: "X-Key" } };
-  assert.equal(envKeyName(api.key), "ZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO");
-  process.env.ZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO = "from-env";
+  assert.equal(envKeyName(api.key), "APIZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO");
+  process.env.APIZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO = "from-env";
   try {
     const { calls, fetch } = recorder();
     await makeHandler(api, op)({ id: "1" }, { fetch, lookup: publicLookup });
     assert.equal(calls[0].init.headers["x-key"], "from-env");
   } finally {
-    delete process.env.ZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO;
+    delete process.env.APIZIE_UPSTREAM_KEY_FINANCE_ENV_DEMO;
   }
 });
 

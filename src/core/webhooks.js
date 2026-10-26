@@ -1,5 +1,5 @@
 // Signed webhook delivery: POST {id,event,data,deliveredAt}, header
-// X-Zie-Signature: sha256=<hex HMAC-SHA256(secret, rawBody)>.
+// X-Apizie-Signature: sha256=<hex HMAC-SHA256(secret, rawBody)>.
 
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import { ulid, sleep } from "./util.js";
@@ -42,7 +42,7 @@ export class WebhookDispatcher {
       try {
         const res = await this.fetchImpl(hook.url, {
           method: "POST",
-          headers: { "content-type": "application/json", "user-agent": "zieapi-webhooks/2", "x-zie-event": event, "x-zie-delivery": payload.id, "x-zie-signature": signPayload(hook.secret, raw) },
+          headers: { "content-type": "application/json", "user-agent": "apizie-webhooks/2", "x-apizie-event": event, "x-apizie-delivery": payload.id, "x-apizie-signature": signPayload(hook.secret, raw) },
           body: raw,
           signal: AbortSignal.timeout?.(8000),
         });

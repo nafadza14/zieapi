@@ -680,7 +680,10 @@ export function createApp(opts = {}) {
         }
       }
     } catch (err) {
-      if (err instanceof HttpError) {
+      if (err instanceof HttpError && url.pathname === "/mcp" && (err.status === 400 || err.status === 413)) {
+        // Body could not be read as JSON: answer in JSON-RPC terms so MCP clients can surface it.
+        out = json(err.status, { jsonrpc: "2.0", id: null, error: { code: err.status === 400 ? -32700 : -32600, message: err.status === 400 ? "Parse error" : "Request too large", data: { status: err.status } } });
+      } else if (err instanceof HttpError) {
         out = isApi || err.status !== 404 ? json(err.status, err.body, err.headers) : { status: 404, body: notFoundPage({ user: null }), headers: { "content-type": "text/html; charset=utf-8" } };
         if (!isApi && err.status === 404) out.status = 404;
       } else {
@@ -754,11 +757,19 @@ async function readBody(req) {
   if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(req.method)) return undefined;
   const chunks = [];
   let size = 0;
+  let tooLarge = false;
   for await (const c of req) {
     size += c.length;
-    if (size > MAX_BODY) throw new HttpError(413, errBody("Payload too large"));
+    // Keep draining (without buffering) so the client receives the 413 instead of a reset connection;
+    // give up and drop the connection only for absurd sizes.
+    if (size > MAX_BODY) {
+      tooLarge = true;
+      if (size > MAX_BODY * 16) break;
+      continue;
+    }
     chunks.push(c);
   }
+  if (tooLarge) throw new HttpError(413, errBody("Payload too large"));
   let raw = size ? Buffer.concat(chunks).toString("utf8") : null;
   if (!raw) {
     try {

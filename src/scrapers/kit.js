@@ -1,9 +1,9 @@
 // Helpers shared by every scraper module. Browser-compatible on purpose (no node:* imports)
 // so handlers can be smoke-tested inside a real browser as well as in Node.
 
-import { ScraperError, NotConfiguredError } from "../core/errors.js";
+import { ScraperError, NotConfiguredError, UpstreamError } from "../core/errors.js";
 
-export { ScraperError, NotConfiguredError };
+export { ScraperError, NotConfiguredError, UpstreamError };
 
 export const UA = "apizie/2 (+https://github.com/nafadza14/zieapi)";
 
@@ -18,6 +18,12 @@ export function url(base, params = {}) {
   return u.toString();
 }
 
+/** 5xx and 429 are the provider's problem, not the caller's: surface them as UpstreamError (502 / 429). */
+function throwIfUpstreamDown(res, target) {
+  if (res.status >= 500) throw new UpstreamError(`Upstream returned ${res.status}`, { upstreamStatus: res.status, context: { url: redactUrl(target) } });
+  if (res.status === 429) throw new UpstreamError("Upstream rate-limited this request. Try again later.", { httpStatus: 429, upstreamStatus: 429, retryAfter: res.headers.get("retry-after") ?? "60", context: { url: redactUrl(target) } });
+}
+
 async function doFetch(ctx, target, init = {}) {
   let res;
   try {
@@ -27,7 +33,8 @@ async function doFetch(ctx, target, init = {}) {
       headers: { "user-agent": UA, accept: "application/json, text/plain, */*", ...(init.headers ?? {}) },
     });
   } catch (e) {
-    throw new ScraperError("Upstream unreachable", { context: { url: redactUrl(target), reason: e?.message } });
+    if (e?.name === "AbortError" || e?.name === "ZieTimeout") throw e;
+    throw new UpstreamError("Upstream unreachable", { context: { url: redactUrl(target), reason: e?.message } });
   }
   return res;
 }
@@ -37,6 +44,7 @@ export async function getJson(ctx, target, init = {}) {
   const res = await doFetch(ctx, target, init);
   const text = await res.text();
   if (!res.ok) {
+    throwIfUpstreamDown(res, target);
     throw new ScraperError(`Upstream returned ${res.status}`, { status: res.status, context: { url: redactUrl(target), body: text.slice(0, 300) } });
   }
   try {
@@ -55,7 +63,10 @@ export function postJson(ctx, target, body, init = {}) {
 export async function getText(ctx, target, init = {}) {
   const res = await doFetch(ctx, target, { ...init, headers: { accept: "*/*", ...(init.headers ?? {}) } });
   const text = await res.text();
-  if (!res.ok) throw new ScraperError(`Upstream returned ${res.status}`, { status: res.status, context: { url: redactUrl(target) } });
+  if (!res.ok) {
+    throwIfUpstreamDown(res, target);
+    throw new ScraperError(`Upstream returned ${res.status}`, { status: res.status, context: { url: redactUrl(target) } });
+  }
   return text;
 }
 

@@ -22,8 +22,8 @@ export function mcpPage({ user, apiUrl, totals }) {
     ["curl", `curl ${url} \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "content-type: application/json" \\\n  -H "accept: application/json, text/event-stream" \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`],
   ];
   const tools = [
-    ["search_scrapers", "Find APIs and scrapers by name, source or the data they return."],
-    ["get_scraper_schema", "Read an endpoint's parameters, verb, path and status."],
+    ["search_scrapers", "Find APIs by name, source or the data they return. Pages through the whole catalog with a cursor."],
+    ["get_scraper_schema", "List an API's endpoints, or read one endpoint's parameters, verb, path, auth and status."],
     ["list_categories", "Every category with its counts."],
     ["run_scraper", "Call any endpoint and get clean JSON. BYOK APIs take upstream_key."],
     ["get_account", "Plan, key status and limits."],

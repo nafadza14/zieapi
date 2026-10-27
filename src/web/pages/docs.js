@@ -130,7 +130,7 @@ ${c(`curl "${api}/v1/finance:stripe/get-balance" \\\n  -H "x-api-key: $APIZIE_KE
         slug: "mcp",
         title: "MCP server",
         body: (api) => `<p>Apizie runs a stateless MCP server (Streamable HTTP) at <code>${esc(api)}/mcp</code>. Authenticate with the same API key. See <a href="/mcp">the MCP page</a> for client-specific setup.</p>
-<table class="doc-table"><tr><th>Tool</th><th>What it does</th></tr><tr><td>search_scrapers</td><td>Search the catalog</td></tr><tr><td>get_scraper_schema</td><td>Parameters, verb and path of an endpoint</td></tr><tr><td>list_categories</td><td>Categories with counts</td></tr><tr><td>run_scraper</td><td>Run any endpoint (billed like REST)</td></tr><tr><td>get_account</td><td>Plan and key info</td></tr><tr><td>get_usage</td><td>Minute and month usage</td></tr><tr><td>bulk_submit</td><td>Bulk job (Ultra/Max)</td></tr><tr><td>bulk_status</td><td>Fetch a bulk job</td></tr></table>`,
+<table class="doc-table"><tr><th>Tool</th><th>What it does</th></tr><tr><td>search_scrapers</td><td>Search the catalog</td></tr><tr><td>get_scraper_schema</td><td>Endpoints of an API (omit endpoint), or the parameters, verb and path of one endpoint</td></tr><tr><td>list_categories</td><td>Categories with counts</td></tr><tr><td>run_scraper</td><td>Run any endpoint (billed like REST)</td></tr><tr><td>get_account</td><td>Plan and key info</td></tr><tr><td>get_usage</td><td>Minute and month usage</td></tr><tr><td>bulk_submit</td><td>Bulk job (Ultra/Max)</td></tr><tr><td>bulk_status</td><td>Fetch a bulk job</td></tr></table>`,
       },
       {
         slug: "self-hosting",

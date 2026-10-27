@@ -1,6 +1,7 @@
 // Stateless MCP server over Streamable HTTP (JSON responses).
-// Tool set mirrors the public zapi.ink MCP surface (E03): 8 tools, no
-// resources/prompts. Auth: Authorization: Bearer | x-api-key | api-key.
+// Tool set mirrors the public zapi.ink MCP surface (E03): 8 tools, no resources/prompts.
+// search_scrapers pages through the whole catalog with cursor; get_scraper_schema without an endpoint
+// lists an API's endpoints. Auth: Authorization: Bearer | x-api-key | api-key.
 
 import { HttpError } from "./envelope.js";
 import { getPlan } from "./plans.js";
@@ -15,25 +16,32 @@ export const MCP_TOOLS = [
     name: "search_scrapers",
     title: "Search the catalog",
     annotations: { title: "Search the catalog", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Find APIs and scrapers by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount.",
+    description: "Find APIs by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key, planned = listed but not callable yet) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
     inputSchema: {
       type: "object",
       properties: {
-        query: s("string", "Free-text search, e.g. 'saham', 'instagram', 'rupiah'"),
-        category: s("string", "Category slug filter, e.g. 'finance'"),
-        limit: s("integer", "Max results (1-50)", { minimum: 1, maximum: 50, default: 10 }),
+        query: s("string", "Free-text search, e.g. 'weather', 'github', 'rupiah'. Omit to list everything."),
+        category: s("string", "Category slug filter, e.g. 'finance' (see list_categories)"),
+        status: s("string", "Only items with this status", { enum: ["live", "byok", "planned"] }),
+        limit: s("integer", "Max results per page (1-50)", { minimum: 1, maximum: 50, default: 10 }),
+        cursor: s("string", "nextCursor from the previous page"),
       },
     },
   },
   {
     name: "get_scraper_schema",
-    title: "Endpoint schema",
-    annotations: { title: "Endpoint schema", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Return an endpoint's parameters, HTTP method, path template, cache TTL, plan gate and example response.",
+    title: "Endpoints and schema",
+    annotations: { title: "Endpoints and schema", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    description: "Without endpoint: list the endpoints (operations) of an API with slug, method, status and summary, paged with cursor. With endpoint: return that endpoint's parameters (name, type, required, enum, location), HTTP method, path template, cache TTL, plan gate, auth needs and example response.",
     inputSchema: {
       type: "object",
-      required: ["scraper", "endpoint"],
-      properties: { scraper: s("string", "Project key 'category:slug'"), endpoint: s("string", "Endpoint slug") },
+      required: ["scraper"],
+      properties: {
+        scraper: s("string", "Project key 'category:slug'"),
+        endpoint: s("string", "Endpoint slug. Omit to list the API's endpoints."),
+        limit: s("integer", "When listing: endpoints per page (1-200)", { minimum: 1, maximum: 200, default: 100 }),
+        cursor: s("string", "When listing: nextCursor from the previous page"),
+      },
     },
   },
   {
@@ -100,16 +108,22 @@ export const MCP_TOOLS = [
 
 export function createMcpHandler({ catalog, repo, executor, limiter, bulk, version, authenticate, wwwAuthenticate = () => 'Bearer realm="apizie"' }) {
   const toolResult = (data) => {
-    const text = JSON.stringify(data, null, 2) ?? "null";
+    let text = JSON.stringify(data, null, 2) ?? "null";
     if (text.length > MAX_TEXT) {
-      const note = `\n\n[truncated: result was ${text.length} characters; ask for fewer items or a narrower query]`;
-      return { content: [{ type: "text", text: text.slice(0, MAX_TEXT) + note }], isError: false };
+      // Too big for most MCP clients. Shrink to valid JSON (shorter arrays and strings) and say so, so the agent can
+      // still parse the result and knows to ask for a narrower query or the next page.
+      const { value, note } = shrink(data, text.length);
+      text = JSON.stringify(value, null, 2);
+      return { content: [{ type: "text", text }], structuredContent: value, isError: false, _meta: { truncated: true, note } };
     }
     return { content: [{ type: "text", text }], structuredContent: data && typeof data === "object" && !Array.isArray(data) ? data : { result: data }, isError: false };
   };
   const toolError = (status, body) => {
     const message = body?.message ?? body?.error?.message ?? (typeof body?.error === "string" ? body.error : "Error");
-    const code = body?.error?.code ?? codeFor(status);
+    // A ScraperError body ({ error: "<message>", context: { url | upstreamStatus } }) is the provider answering with an error,
+    // not bad input from the agent.
+    const upstream = typeof body?.error === "string" && (body?.context?.url || body?.context?.upstreamStatus);
+    const code = body?.error?.code ?? (upstream ? "upstream_error" : codeFor(status));
     const payload = { status, code, message, ...(body?.errors?.length ? { errors: body.errors } : {}), ...(body?.content ? { details: body.content } : {}) };
     return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError: true };
   };
@@ -118,26 +132,43 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
     try {
       switch (name) {
         case "search_scrapers": {
-          const r = catalog.list({ q: args.query, cat: args.category, limit: Math.min(50, args.limit ?? 10) });
-          return toolResult(r);
+          const limit = Math.min(50, Math.max(1, Number(args.limit) || 10));
+          const disabled = await repo.disabledScrapers();
+          const r = catalog.list({ q: args.query, cat: args.category, status: args.status, cursor: args.cursor, limit }, {}, disabled);
+          return toolResult({ ...r, items: r.items.map(slimItem) });
         }
         case "get_scraper_schema": {
-          const d = catalog.detail(String(args.scraper ?? ""));
-          const ep = d?.endpoints.find((e) => e.slug === args.endpoint);
-          if (!ep) return toolError(404, { message: `Unknown scraper/endpoint ${args.scraper}/${args.endpoint}` });
-          const schema = catalog.schema(args.scraper, args.endpoint);
+          const key = String(args.scraper ?? "");
+          const sc = catalog.find(key);
+          if (!sc || !key.includes(":")) return toolError(404, { message: `Unknown scraper "${key}". Use search_scrapers to find project keys like 'category:slug'.` });
+          const d = catalog.detail(sc.key, undefined, await repo.disabledScrapers());
+          if (args.endpoint === undefined || args.endpoint === null || args.endpoint === "") {
+            const limit = Math.min(200, Math.max(1, Number(args.limit) || 100));
+            const off = Math.max(0, Number(args.cursor) || 0);
+            const eps = d.endpoints;
+            return toolResult({
+              scraper: d.key, displayName: d.displayName, description: d.description, status: d.status, auth: d.auth, provider: d.provider, sourceUrl: d.sourceUrl,
+              note: d.status === "byok" ? "Needs your own provider key: pass it as upstream_key to run_scraper." : d.status === "planned" ? "Listed in the catalog but not callable on this server yet." : undefined,
+              total: eps.length,
+              endpoints: eps.slice(off, off + limit).map((e) => ({ slug: e.slug, displayName: e.displayName, method: e.method, ...(e.upstreamMethod ? { upstreamMethod: e.upstreamMethod } : {}), status: e.status, minPlan: e.minPlan ?? null, description: e.description ? String(e.description).slice(0, 200) : null })),
+              nextCursor: off + limit < eps.length ? String(off + limit) : null,
+            });
+          }
+          const ep = d.endpoints.find((e) => e.slug === args.endpoint);
+          if (!ep) return toolError(404, { message: `Unknown endpoint "${args.endpoint}" on ${d.key}. Call get_scraper_schema without endpoint to list them.` });
           return toolResult({
-            scraper: `${d.category}:${d.slug}`,
+            scraper: d.key,
             endpoint: ep.slug,
             method: ep.method,
-            path: `/v1/${d.category}:${d.slug}/${ep.slug}${ep.pathTemplate ? "/" + ep.pathTemplate : ""}`,
+            ...(ep.upstreamMethod ? { upstreamMethod: ep.upstreamMethod } : {}),
+            path: `/v1/${d.key}/${ep.slug}${ep.pathTemplate ? "/" + ep.pathTemplate : ""}`,
             cacheTtl: ep.cacheTtl,
             minPlan: ep.minPlan,
             bulkEnabled: ep.bulkEnabled,
             status: ep.status,
             auth: d.auth ?? null,
-            note: d.auth ? "This API needs your own credentials: pass them as upstream_key to run_scraper." : undefined,
-            fields: schema.fields,
+            note: d.auth ? "This API needs your own credentials: pass them as upstream_key to run_scraper." : ep.status === "planned" ? "Listed in the catalog but not callable on this server yet." : undefined,
+            fields: ep.fields,
             exampleResponse: ep.exampleResponse,
           });
         }
@@ -187,7 +218,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "apizie", title: "Apizie", version },
           instructions:
-            "Apizie is one gateway to Indonesian data sources and 1,300+ global APIs. Workflow: search_scrapers to find a source, get_scraper_schema to read its parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's Apizie quota (see get_usage).",
+            "Apizie is one gateway to 1,900+ public data APIs. Workflow: search_scrapers to find a source (page with cursor until nextCursor is null to see everything), get_scraper_schema with only scraper to list its endpoints, get_scraper_schema with scraper and endpoint to read the parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's Apizie quota (see get_usage).",
         });
       }
       case "notifications/initialized":
@@ -213,6 +244,11 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
     if (req.method !== "POST") {
       return { status: 405, body: { jsonrpc: "2.0", id: null, error: { code: -32000, message: "Method not allowed. This server is stateless: POST JSON-RPC to /mcp." } }, headers: { Allow: "POST" } };
     }
+    // Streamable HTTP: a request carrying an MCP-Protocol-Version this server does not support must get 400.
+    const pv = req.headers?.["mcp-protocol-version"];
+    if (pv && !MCP_PROTOCOL_VERSIONS.includes(String(pv))) {
+      return { status: 400, body: { jsonrpc: "2.0", id: body?.id ?? null, error: { code: -32600, message: `Unsupported MCP-Protocol-Version "${String(pv).slice(0, 40)}". Supported: ${MCP_PROTOCOL_VERSIONS.join(", ")}` } } };
+    }
     let caller;
     try {
       caller = await authenticate(req);
@@ -232,9 +268,48 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
   };
 }
 
+/** Shrink a large result to fit MAX_TEXT: cut long strings, then halve the longest arrays, keeping valid JSON. */
+function shrink(data, originalChars) {
+  let v = JSON.parse(JSON.stringify(data ?? null));
+  const cutStrings = (x, max) => {
+    if (typeof x === "string") return x.length > max ? x.slice(0, max) + "…" : x;
+    if (Array.isArray(x)) return x.map((y) => cutStrings(y, max));
+    if (x && typeof x === "object") return Object.fromEntries(Object.entries(x).map(([k, y]) => [k, cutStrings(y, max)]));
+    return x;
+  };
+  // containers that can be shortened: arrays, and objects used as maps (many keys, e.g. versions by number)
+  const containers = (x, out = []) => {
+    if (Array.isArray(x)) { out.push({ ref: x, n: x.length, w: JSON.stringify(x).length }); x.forEach((y) => containers(y, out)); }
+    else if (x && typeof x === "object") {
+      const keys = Object.keys(x);
+      if (keys.length > 20) out.push({ ref: x, n: keys.length, w: JSON.stringify(x).length, map: true });
+      Object.values(x).forEach((y) => containers(y, out));
+    }
+    return out;
+  };
+  const size = () => JSON.stringify(v, null, 2).length;
+  const budget = MAX_TEXT - 600;
+  for (const max of [4000, 1000, 300]) if (size() > budget) v = cutStrings(v, max);
+  let dropped = 0;
+  for (let i = 0; i < 80 && size() > budget; i++) {
+    const big = containers(v).filter((c) => c.n > 1).sort((a, b) => b.w - a.w)[0];
+    if (!big) break;
+    const keep = Math.max(1, Math.floor(big.n / 2));
+    dropped += big.n - keep;
+    if (big.map) Object.keys(big.ref).slice(keep).forEach((k) => delete big.ref[k]);
+    else big.ref.length = keep;
+  }
+  if (size() > budget) v = { preview: JSON.stringify(v).slice(0, budget - 200) };
+  const note = `Result was ${originalChars} characters and was shortened to fit${dropped ? ` (${dropped} list or map entries omitted)` : ""}. Ask for fewer items, a narrower query or the next page.`;
+  const wrapped = v && typeof v === "object" && !Array.isArray(v) ? { ...v, _truncated: { originalChars, note } } : { result: v, _truncated: { originalChars, note } };
+  return { value: wrapped, note };
+}
+
+const slimItem = (i) => ({ key: i.key, displayName: i.displayName, description: i.description ? String(i.description).slice(0, 240) : null, category: i.category, status: i.status, endpointCount: i.endpointCount, liveEndpoints: i.liveEndpoints, auth: i.auth, provider: i.provider, origin: i.origin, minPlan: i.minPlan, tags: (i.tags ?? []).slice(0, 8) });
+
 function codeFor(status) {
   return (
-    { 400: "invalid_params", 401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed", 422: "unprocessable", 429: "rate_limited", 500: "internal", 503: "disabled", 504: "timeout" }[status] ??
+    { 400: "invalid_params", 401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "method_not_allowed", 422: "unprocessable", 429: "rate_limited", 500: "internal", 501: "not_live", 502: "upstream_unavailable", 503: "disabled", 504: "timeout" }[status] ??
     "error"
   );
 }

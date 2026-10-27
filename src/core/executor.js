@@ -7,7 +7,7 @@ import { pathFieldNames } from "./catalog.js";
 import { validateParams } from "./validate.js";
 import { stableStringify, dayKey, monthKey, sha256, ulid } from "./util.js";
 import { recordCommands } from "./analytics.js";
-import { ScraperError, NotConfiguredError } from "./errors.js";
+import { ScraperError, NotConfiguredError, UpstreamError } from "./errors.js";
 
 export { ScraperError, NotConfiguredError };
 
@@ -90,6 +90,20 @@ export class Executor {
   }
 
   async _runHandler(endpoint, value, caller, scraper, outer, upstreamAuth) {
+    try {
+      return await this._callHandler(endpoint, value, caller, scraper, outer, upstreamAuth);
+    } catch (e) {
+      // A handler crashing on data it did not expect (TypeError/SyntaxError) means the upstream answered in an
+      // unexpected shape, and undici reports network failures as TypeError("fetch failed"). Report both as a 502 (not billed) instead of a generic 500.
+      if (e instanceof TypeError || e instanceof SyntaxError) {
+        this.logger?.warn?.(`${scraper.key}/${endpoint.slug}: unexpected upstream response: ${e.message}`);
+        throw new HttpError(502, { content: null, message: /fetch failed|network/i.test(e.message) ? `${scraper.displayName ?? scraper.key} could not be reached` : `${scraper.displayName ?? scraper.key} returned an unexpected response`, errors: [] });
+      }
+      throw e;
+    }
+  }
+
+  _callHandler(endpoint, value, caller, scraper, outer, upstreamAuth) {
     return withTimeout(
       (signal) => endpoint.handler(value, { fetch: this.fetchImpl, lookup: this.lookupImpl, signal, upstreamAuth, key: { id: caller.keyId, plan: caller.plan }, project: scraper.key, endpoint: endpoint.slug }),
       endpoint.timeoutMs,
@@ -186,6 +200,10 @@ export class Executor {
     } else if (err instanceof ScraperError || err?.name === "ScraperError") {
       status = 400;
       body = { project: projectKey, error: err.message, errors: err.errors ?? [], ...(err.context ? { context: err.context } : {}), timestamp: nowIso() };
+    } else if (err instanceof UpstreamError || err?.name === "UpstreamError") {
+      status = err.httpStatus ?? 502;
+      body = { content: { upstreamStatus: err.upstreamStatus ?? null, ...(status === 429 ? { window: "upstream" } : {}) }, message: err.message, errors: [] };
+      if (status === 429) extra = { "Retry-After": String(err.retryAfter ?? "60") };
     } else if (err instanceof NotConfiguredError || err?.name === "NotConfiguredError") {
       status = 503;
       body = { content: { code: "not_configured" }, message: err.message, errors: [] };

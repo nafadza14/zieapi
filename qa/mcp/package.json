@@ -1,0 +1,14 @@
+{
+  "name": "apizie-mcp-qa",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end MCP QA harness for Apizie (official MCP SDK client against the real /mcp endpoint). Not part of the app build.",
+  "scripts": {
+    "discovery": "node discovery.mjs > discovery.out.json",
+    "execute": "node discovery.mjs > discovery.out.json && node execute.mjs",
+    "protocol": "node protocol.mjs",
+    "live": "node live.mjs",
+    "agent": "node agent.mjs"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.32.2", "ajv": "^8.17.1" }
+}

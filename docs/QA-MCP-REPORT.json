@@ -1,0 +1,362 @@
+{
+  "project": "Apizie",
+  "test_timestamp": "2026-10-27T06:54:32.499Z",
+  "environment": "Linux cloud sandbox, Node v22.23.4. Apizie booted from the repository (createApp, MemoryKV storage) on 127.0.0.1 over plain HTTP. Upstream: recording stub for full-catalog execution; real internet only for hosts the sandbox egress allows (registry.npmjs.org, pypi.org, crates.io; api.github.com answers 401/403). Client: official MCP TypeScript SDK 1.32.2 (StreamableHTTPClientTransport) and Claude Code CLI 2.1.311.",
+  "mcp_endpoint": "http://127.0.0.1:<ephemeral-port>/mcp (Streamable HTTP, stateless, JSON responses; auth via x-api-key or Authorization: Bearer; credentials omitted)",
+  "baseline": {
+    "total_catalog_sources": 1901,
+    "total_operations": 47141,
+    "sources_by_status_before_fix": {
+      "live": 629,
+      "byok": 1070,
+      "planned": 202
+    },
+    "existing_test_results": {
+      "command": "npm test",
+      "tests": 172,
+      "pass": 172,
+      "fail": 0
+    },
+    "mcp_discovery_before_fix": {
+      "sources_reachable_via_mcp": 956,
+      "coverage_pct": 50.3,
+      "cursor_honoured": false,
+      "operations_listable_via_mcp": 0,
+      "note": "search_scrapers returned nextCursor but ignored it; no tool listed an API's endpoint slugs, so get_scraper_schema could not be called without guessing"
+    }
+  },
+  "coverage": {
+    "sources_discovered": 1901,
+    "sources_expected": 1901,
+    "sources_by_status_after_fix": {
+      "live": 563,
+      "byok": 1136,
+      "planned": 202
+    },
+    "operations_discovered": 47141,
+    "operations_expected": 47141,
+    "schemas_verified": 47141,
+    "schemas_checked": 47141,
+    "operations_tested": 9664,
+    "operations_passed": 9505,
+    "operations_failed": 0,
+    "operations_blocked": 36,
+    "operations_request_verified_response_unverified": 123,
+    "notes": [
+      "operations_tested = every operation that can run without provider credentials (status live), each invoked once through MCP run_scraper against a recording stub upstream. Passed = MCP success envelope plus exactly the expected upstream request(s) to a valid public URL.",
+      "123 native operations sent a correct upstream request but their handler rejected the stub's empty {} body; response parsing is not verified by this run. Roughly 40% of them (31 sources in total) also have recorded-fixture tests in test/scrapers; the rest need a live run.",
+      "16 operations need one of several optional fields (e.g. id or bundleId); they passed once the documented examples were sent.",
+      "7 operations compute locally (uuid, hash, slugify, terbilang, qibla) and correctly make no upstream call.",
+      "Blocked: finance:fred (10 operations) needs FRED_API_KEY on the server; cloud:climatekuul (26) runs on port 8000, which the SSRF guard refuses by design.",
+      "Credential-gated: 36541 byok operations were invoked without a provider key: 36535 returned a clean upstream_key_required error with zero upstream calls; 6 returned invalid_params first because the provider's spec example values do not satisfy its own schema. Execution with real keys was not possible (no provider credentials).",
+      "Not live: all 936 planned operations returned 501 not_live (936/936) and were not billed.",
+      "Input validation: missing required 7450/7450, bad enum 1062/1062, wrong type 2644/2644 rejected as invalid_params with field errors; upstream called on invalid input: 0.",
+      "Host pinning: 8987 directory upstream requests all stayed on the provider's spec base URL (violations: 0).",
+      "Live upstream (real internet): 24 read-only operations attempted on reachable hosts; 6 returned real non-empty data (npm 2/2, PyPI 2/2, crates.io 2/2); 18 GitHub operations were refused by api.github.com from this sandbox (401/403), an environment limit. A repeated call was served from cache without a second upstream request: true."
+    ]
+  },
+  "client_compatibility": {
+    "generic_mcp_client": "PASS",
+    "claude": "PASS",
+    "codex": "NOT_TESTED",
+    "details": {
+      "generic_mcp_client": "Official MCP TypeScript SDK 1.32.2: initialize (negotiated 2025-11-25), ping, tools/list (8 tools, all inputSchemas compile with Ajv), tools/call for every tool, full catalog and schema enumeration.",
+      "claude": "Claude Code CLI 2.1.311 in print mode with --mcp-config (type http, x-api-key header): the model used search_scrapers -> get_scraper_schema (list) -> get_scraper_schema (endpoint) -> run_scraper and answered 'express 5.3.0' via search-tools:npm (6 turns, success). Server-side get_usage for that key showed exactly 1 billed call. Run happened after the discovery fixes (QA-001/002) and before the later error-classification fixes.",
+      "codex": "Codex CLI is not installed in the test environment and no OpenAI credentials are available. Not claimed."
+    }
+  },
+  "defects": [
+    {
+      "id": "QA-001",
+      "severity": "HIGH",
+      "component": "MCP search_scrapers (src/core/mcp.js)",
+      "root_cause": "Tool returned nextCursor but did not accept or forward a cursor, so every page was page 1; only 956/1,901 sources (50.3%) were reachable even via per-category searches.",
+      "fix_applied": "Added cursor and status inputs, forward cursor to catalog.list, stable ordering, slim items, honour admin-disabled status.",
+      "regression_test": "test/mcp-qa.test.js: search_scrapers pages through the whole catalog with cursor",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-002",
+      "severity": "HIGH",
+      "component": "MCP get_scraper_schema (src/core/mcp.js)",
+      "root_cause": "No MCP tool returned an API's endpoint slugs; get_scraper_schema required an endpoint slug, so operations were not discoverable (0 of 47,141).",
+      "fix_applied": "endpoint is now optional: without it the tool lists the API's endpoints (slug, name, method, upstream method, status, plan) with cursor paging; tool count stays 8.",
+      "regression_test": "test/mcp-qa.test.js: get_scraper_schema without endpoint lists every operation",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-003",
+      "severity": "MEDIUM",
+      "component": "Catalog schema (src/core/catalog.js)",
+      "root_cause": "schemaFields ignored the directory field location (src), reporting every parameter of non-GET operations as body and header parameters as query; the upstream verb (e.g. DELETE) was hidden behind POST.",
+      "fix_applied": "Use src for location; expose upstreamMethod in detail, schema and endpoint list.",
+      "regression_test": "test/mcp-qa.test.js: schema reports the real parameter location and upstream method",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-004",
+      "severity": "MEDIUM",
+      "component": "Directory loader (src/core/directory.js)",
+      "root_cause": "259 operations in 12 imported APIs use {placeholders} the spec never declares, so the schema omitted them and every call failed with 'Missing path parameter'.",
+      "fix_applied": "At load time, undeclared path placeholders become required string path fields.",
+      "regression_test": "test/mcp-qa.test.js: undeclared {path} placeholders become required path fields",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-005",
+      "severity": "MEDIUM",
+      "component": "Connector host check (src/core/connector.js)",
+      "root_cause": "A DNS failure (or SSRF-guard refusal) for the provider's own host was thrown as ScraperError -> HTTP 400 invalid_params and billed.",
+      "fix_applied": "Spec-host DNS failures and guard refusals map to 502 (not billed) with a clear message.",
+      "regression_test": "test/mcp-qa.test.js: upstream DNS failure, 5xx and handler crashes are 502; provider host the SSRF guard refuses is a 502",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-006",
+      "severity": "MEDIUM",
+      "component": "Scraper kit (src/scrapers/kit.js), executor",
+      "root_cause": "Native handlers reported network failures, upstream 5xx and 429 as ScraperError -> billed HTTP 400 invalid_params.",
+      "fix_applied": "New UpstreamError: unreachable/5xx -> 502 (not billed), 429 -> 429 with Retry-After; 4xx stays a ScraperError.",
+      "regression_test": "test/mcp-qa.test.js (native 5xx -> 502), test/scrapers/news.test.js updated",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-007",
+      "severity": "LOW",
+      "component": "Executor (src/core/executor.js)",
+      "root_cause": "A handler crashing on an unexpected upstream payload (TypeError) returned a generic 500 Internal error.",
+      "fix_applied": "TypeError/SyntaxError from handlers become 502 'returned an unexpected response' (or 'could not be reached'), logged as warnings.",
+      "regression_test": "test/mcp-qa.test.js: handler crash -> 502",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-008",
+      "severity": "MEDIUM",
+      "component": "MCP tool results (src/core/mcp.js)",
+      "root_cause": "Results over 120,000 characters were cut mid-JSON with no structuredContent, so agents could not parse them (seen live on PyPI 'requests').",
+      "fix_applied": "Shrink to valid JSON (long strings, then largest arrays/maps halved) with a _truncated note and structuredContent.",
+      "regression_test": "test/mcp-qa.test.js: oversized tool results are shortened to valid JSON",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-009",
+      "severity": "LOW",
+      "component": "MCP transport (src/core/mcp.js)",
+      "root_cause": "Unsupported MCP-Protocol-Version header was accepted (spec requires 400).",
+      "fix_applied": "Reject unsupported header values with 400 and the supported list.",
+      "regression_test": "test/mcp-qa.test.js: Streamable HTTP details",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-010",
+      "severity": "LOW",
+      "component": "HTTP layer (src/app.js)",
+      "root_cause": "Malformed JSON on /mcp produced a REST error envelope instead of JSON-RPC -32700.",
+      "fix_applied": "On /mcp, body parse errors return JSON-RPC Parse error (-32700) and oversized bodies -32600.",
+      "regression_test": "test/mcp-qa.test.js: Streamable HTTP details",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-011",
+      "severity": "LOW",
+      "component": "HTTP body reader (src/app.js)",
+      "root_cause": "Bodies over 1 MB aborted the read loop, resetting the connection before the 413 was sent.",
+      "fix_applied": "Drain (without buffering) up to 16 MB so the client receives 413.",
+      "regression_test": "test/mcp-qa.test.js: big body -> 413",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-012",
+      "severity": "MEDIUM",
+      "component": "Directory auth metadata (src/core/directory.js)",
+      "root_cause": "66 Google (googleapis.com) and Amadeus specs omit their security scheme, so the catalog advertised them as keyless 'live' although both providers require credentials.",
+      "fix_applied": "Known-provider auth override: Google -> API key in ?key=, Amadeus -> bearer token; now listed as byok (live sources 629 -> 563).",
+      "regression_test": "test/mcp-qa.test.js: Google and Amadeus APIs are listed as needing the caller's key",
+      "verification_result": "PASS"
+    },
+    {
+      "id": "QA-013",
+      "severity": "LOW",
+      "component": "MCP error codes (src/core/mcp.js)",
+      "root_cause": "Provider 4xx answers were labelled invalid_params and 501/502 had the generic code 'error', so agents could not tell bad input from provider failures.",
+      "fix_applied": "upstream_error for provider errors, not_live (501), upstream_unavailable (502); existing codes unchanged.",
+      "regression_test": "test/mcp-qa.test.js: provider 4xx is labelled upstream_error",
+      "verification_result": "PASS"
+    }
+  ],
+  "security_results": [
+    "PASS SEC-AUTH: no credentials -> 401 + WWW-Authenticate",
+    "PASS SEC-AUTH: invalid key -> 401",
+    "PASS SEC-AUTH: Authorization: Bearer <key> accepted",
+    "PASS SEC-AUTH: revoked key -> 401",
+    "PASS SEC-AUTH: IP allowlist enforced on MCP",
+    "PASS EXEC-004: byok: provider key forwarded upstream only on that call",
+    "PASS EXEC-004: byok: another user without key is not served the cached result",
+    "PASS EXEC-004: byok: same user without key is not served the keyed cache entry",
+    "PASS SEC-SECRETS: provider key never stored (full KV dump scanned)",
+    "PASS SEC-SECRETS: Apizie API keys stored only hashed/sealed (no plaintext in KV)",
+    "PASS SEC-INJECT: untrusted upstream text is returned as data only; server takes no further action",
+    "PASS SEC-INPUT: path-traversal style project key rejected (404)",
+    "PASS SEC-INPUT: prototype-pollution params harmless",
+    "PASS SEC-INPUT: oversized request body -> 413",
+    "PASS SEC-SSRF: path parameter cannot redirect request to another host",
+    "PASS SEC-SECRETS: logs never contain provider key",
+    "PASS SEC-AUTHZ: admin-disabled source shown as disabled and cannot be run",
+    "Open (LOW): Origin header is not validated on /mcp (CORS *). Risk is limited because every call needs an API key or OAuth bearer token that a third-party page cannot read, but the MCP spec asks servers to validate Origin; see remaining_blockers."
+  ],
+  "performance_results": {
+    "conditions": "Single Node process hosting both server and client on the sandbox, MemoryKV, stub upstream unless stated. Latencies are client-observed wall time in ms.",
+    "initialize": {
+      "n": 20,
+      "p50": 5.12,
+      "p95": 42.89
+    },
+    "full_source_discovery_ms": "192 (39 pages of 50)",
+    "endpoint_listing": {
+      "n": 1963,
+      "p50": 14.06,
+      "p95": 27.51,
+      "p99": 38.22
+    },
+    "schema_retrieval": {
+      "n": 47141,
+      "p50": 27.43,
+      "p95": 52.29,
+      "p99": 72.44,
+      "totalSec": 90.2
+    },
+    "run_scraper_stub_upstream": {
+      "p50": 1.19,
+      "p95": 2.23,
+      "p99": 5.67
+    },
+    "run_scraper_real_upstream": {
+      "p50": 32.9,
+      "p95": 216.95,
+      "max": 314.62,
+      "n": 24
+    },
+    "concurrency": "50 concurrent run_scraper calls from 2 users: usage counted exactly (+30/+20), logs isolated; 3 concurrent real calls (npm, PyPI, crates.io) finished in 271 ms.",
+    "memory": "755 MB RSS for server + client after loading all 1,454 directory APIs' operations (production loads them lazily per instance).",
+    "retries": "No automatic upstream retries (one attempt per call, verified for 5xx, network error and 429); timeouts enforced per endpoint (default 25 s, verified with a 1.5 s override -> 504).",
+    "targets": "No documented service objectives exist, so no pass/fail thresholds were applied."
+  },
+  "agent_acceptance": {
+    "dental_clinics_jakarta": {
+      "status": "BLOCKED",
+      "collected": 0,
+      "reasons": [
+        "Ratings and review counts need research:google-maps-reviews, which the catalog marks 'planned' (not callable).",
+        "Place search places:nominatim/search failed: 502 Upstream unreachable"
+      ],
+      "fabricated": false,
+      "workflow": [
+        "discover",
+        "filter",
+        "inspect",
+        "capability",
+        "schema",
+        "execute"
+      ]
+    },
+    "multi_source_concurrent": {
+      "status": "PASS",
+      "results": [
+        {
+          "n": "npm zod",
+          "ok": true,
+          "version": "4.6.7"
+        },
+        {
+          "n": "pypi pydantic",
+          "ok": true,
+          "version": "2.14.1"
+        },
+        {
+          "n": "crates serde",
+          "ok": true,
+          "version": "1.0.229"
+        }
+      ]
+    },
+    "next_page_without_repeats": {
+      "status": "PASS",
+      "detail": {
+        "fields": [
+          "query",
+          "count",
+          "page"
+        ],
+        "p1err": null,
+        "pagingField": "page",
+        "page1": 20,
+        "page2": 20,
+        "overlap": 0,
+        "ok": true
+      }
+    },
+    "explain_missing_capability": {
+      "status": "PASS",
+      "detail": {
+        "query": "dental appointment booking",
+        "total": 0,
+        "explanation": "No catalog source matches; the agent reports the gap instead of guessing."
+      }
+    },
+    "recover_from_timeout": "PASS (protocol suite EXEC-006: 504 returned in 1.5 s, not billed, agent can retry)"
+  },
+  "remaining_blockers": [
+    {
+      "description": "Live upstream data for most of the catalog is unverified.",
+      "reason": "The sandbox egress allowlist only reaches npm, PyPI and crates.io; other providers (and DNS for many) are refused, and api.github.com returns 401/403 here.",
+      "required_action": "Run `cd qa/mcp && npm install && node live.mjs` (extend REACHABLE to all hosts) against a staging deploy or a machine with open internet."
+    },
+    {
+      "description": "36541 credential-gated (byok) operations not executed with real keys.",
+      "reason": "No provider sandbox credentials are available; only the missing-key path was verified.",
+      "required_action": "Provide sandbox keys for the providers that matter and run run_scraper with upstream_key."
+    },
+    {
+      "description": "Codex client compatibility not tested.",
+      "reason": "Codex CLI not installed and no OpenAI credentials.",
+      "required_action": "Install @openai/codex, sign in, add the server (`codex mcp add apizie --url https://<host>/mcp` with the x-api-key header) and repeat the Claude scenario."
+    },
+    {
+      "description": "finance:fred operations return 503 not_configured.",
+      "reason": "Server env FRED_API_KEY is not set (operator configuration).",
+      "required_action": "Set FRED_API_KEY in Vercel, or hide FRED until it is configured."
+    },
+    {
+      "description": "Dental-clinic scenario cannot be fully satisfied.",
+      "reason": "The only source with ratings/review counts (research:google-maps-reviews) is 'planned'; OSM Nominatim has no ratings and was unreachable from the sandbox.",
+      "required_action": "Product decision: implement a ratings-capable places source; re-run qa/mcp/agent.mjs with internet access for the Nominatim part."
+    },
+    {
+      "description": "Production stack not exercised.",
+      "reason": "Tests ran against a local instance with MemoryKV, not Vercel + Supabase.",
+      "required_action": "Deploy, then point qa/mcp at the deployed /mcp with a test key."
+    },
+    {
+      "description": "Origin header validation (MCP spec) not implemented.",
+      "reason": "Adding it changes behaviour for browser-based MCP clients; needs a product decision on allowed origins.",
+      "required_action": "Decide an allowlist (or reject browser Origins on /mcp) and add it in createMcpHandler."
+    },
+    {
+      "description": "14 imported operations ship provider examples that violate their own schema (type/enum), and validation errors (400) are billed by policy.",
+      "reason": "Upstream spec data quality; billing of 4xx is the documented refund policy.",
+      "required_action": "Optional: drop invalid examples at import; review whether invalid-input calls should be free."
+    }
+  ],
+  "final_status": "PARTIAL",
+  "final_status_reason": "MCP initialization, tool discovery, 100% catalog discovery (1,901 sources), 100% operation discovery and schema access (47,141), validation, quota, isolation and security checks pass, and a real Claude client works end to end. Live upstream execution is verified only for reachable hosts, BYOK and Codex are untested, and the dental-clinic scenario is blocked by catalog scope.",
+  "evidence": [
+    "npm test -> 182 tests, 182 pass, 0 fail (172 before; +10 in test/mcp-qa.test.js)",
+    "qa/mcp/baseline.mjs (before fixes) -> discoverableViaListAndCategories 956 of 1901 (50.3%), secondPageSameAsFirst true, schemaWithoutEndpoint 404",
+    "qa/mcp/discovery.mjs -> sources 1901/1901 (0 duplicates, 39 pages), operations 47141/47141, schemas valid 47141/47141, identity mismatches 0",
+    "qa/mcp/execute.mjs -> live 9664: {\"upstream_called_stub_payload_rejected\":123,\"ok\":9482,\"blocked_server_not_configured\":10,\"ok_with_documented_examples\":16,\"ok_no_upstream_call\":7,\"blocked_gateway_policy\":26}; planned 936/936 clean 501; byok 36535/36541 clean key-required, 0 upstream calls",
+    "qa/mcp/protocol.mjs -> 49/49 checks pass",
+    "qa/mcp/live.mjs -> 6 of 24 real calls returned data; by host {\"registry.npmjs.org\":{\"total\":2,\"ok\":2},\"api.github.com\":{\"total\":18,\"ok\":0},\"pypi.org\":{\"total\":2,\"ok\":2},\"crates.io\":{\"total\":2,\"ok\":2}}",
+    "claude -p ... --mcp-config mcp-config.json --strict-mcp-config --allowedTools mcp__apizie__* -> success in 6 turns, answer 'express 5.3.0 via search-tools:npm', server usage +1",
+    "qa/mcp/agent.mjs -> dental clinics BLOCKED (reasons recorded, nothing fabricated); multi-source PASS; paging PASS; missing capability PASS"
+  ]
+}

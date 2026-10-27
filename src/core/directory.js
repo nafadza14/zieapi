@@ -24,11 +24,23 @@ export const DIRECTORY_CATEGORIES = [
   { slug: "education", displayName: "Education", color: "#fbbf24", description: "Learning and education data." },
 ];
 
+// Providers whose OpenAPI specs omit the security scheme although every call needs credentials (documented by the
+// provider). Without this they would be listed as keyless "live" and fail upstream with 401.
+const KNOWN_AUTH = [
+  [/(^|\.)googleapis\.com$/i, "key", { t: "key", in: "query", name: "key" }], // Google APIs: API key (?key=) or OAuth
+  [/(^|\.)amadeus\.com$/i, "bearer", { t: "bearer" }], // Amadeus Self-Service: OAuth2 client-credentials token
+];
+
 let cache = null;
 export function loadDirectoryIndex() {
   if (cache) return cache;
   const file = DIR + "index.json";
   cache = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).apis : [];
+  for (const e of cache) {
+    if (e.a) continue;
+    const hit = KNOWN_AUTH.find(([re]) => re.test(String(e.p ?? "").split(":")[0]));
+    if (hit) { e.a = hit[1]; e.authOverride = hit[2]; }
+  }
   return cache;
 }
 
@@ -36,7 +48,7 @@ const T = { s: "string" };
 /** Build Apizie endpoints for one directory API (called lazily). */
 export function loadEndpoints(entry, buildEndpoint) {
   const raw = JSON.parse(readFileSync(`${DIR}apis/${entry.f}.json`, "utf8"));
-  const api = { key: entry.k, name: entry.n, base: raw.base, auth: raw.auth };
+  const api = { key: entry.k, name: entry.n, base: raw.base, auth: raw.auth ?? entry.authOverride ?? null };
   return raw.ops.map(([slug, method, path, summary, fields, body]) => {
     const fl = fields.map(([name, type, req, loc, extra = {}]) => ({
       name,
@@ -48,6 +60,14 @@ export function loadEndpoints(entry, buildEndpoint) {
       ...(extra.e ? { enum: extra.e } : {}),
       ...(extra.ex !== undefined ? { example: extra.ex } : {}),
     }));
+    // Some specs use {placeholders} in the path without declaring them (or declare them only at path-item level).
+    // Expose them as required path fields so the schema is complete and the operation is callable.
+    for (const m of path.matchAll(/\{([^}]+)\}/g)) {
+      const name = m[1];
+      const have = fl.find((f) => f.name === name);
+      if (!have) fl.push({ name, type: "string", required: true, src: "path", description: `Path parameter {${name}}` });
+      else if (have.src !== "path") { have.src = "path"; have.required = true; }
+    }
     if (body && method !== "GET" && method !== "HEAD" && !fl.some((f) => f.name === "body")) fl.push({ name: "body", type: "object", required: body === 2 || body === 4, src: "body", description: body >= 3 ? "Form fields as a JSON object" : "JSON request body" });
     const op = { method, path, fields: fl, body };
     return buildEndpoint({

@@ -172,7 +172,7 @@ export class Catalog {
     };
   }
 
-  list({ q, cat, cursor, limit, sort = "popular", bulk, indonesian, live, auth, origin } = {}, stats = {}, disabled = new Set()) {
+  list({ q, cat, cursor, limit, sort = "popular", bulk, indonesian, live, auth, origin, status } = {}, stats = {}, disabled = new Set()) {
     let rows = this.scrapers;
     if (cat) rows = rows.filter((s) => s.category === cat);
     if (origin) rows = rows.filter((s) => (s.origin ?? "native") === origin);
@@ -185,7 +185,8 @@ export class Catalog {
       const needle = String(q).toLowerCase();
       rows = rows.filter((s) => searchText(s).includes(needle));
     }
-    const items = rows.map((s) => this.listItem(s, stats[s.id], disabled));
+    let items = rows.map((s) => this.listItem(s, stats[s.id], disabled));
+    if (status) items = items.filter((i) => i.status === status);
     if (sort === "name") items.sort((a, b) => a.displayName.localeCompare(b.displayName));
     else if (sort === "endpoints") items.sort((a, b) => b.endpointCount - a.endpointCount);
     else items.sort((a, b) => b.totalRequests - a.totalRequests || b.liveEndpoints - a.liveEndpoints || a.displayName.localeCompare(b.displayName));
@@ -206,6 +207,7 @@ export class Catalog {
         displayName: e.displayName,
         description: e.description,
         method: e.method,
+        ...(e.upstreamMethod && e.upstreamMethod !== e.method ? { upstreamMethod: e.upstreamMethod } : {}),
         paramsSchema: Object.fromEntries(e.fields.map((f) => [f.name, f.type])),
         fields: this.schemaFields(e),
         cacheTtl: e.cacheTtl,
@@ -221,7 +223,11 @@ export class Catalog {
 
   schemaFields(e) {
     const names = pathFieldNames(e);
-    return e.fields.map(({ in: loc, ...f }) => ({ ...f, in: names.includes(f.name) ? "path" : loc === "body" || e.method === "POST" ? "body" : "query" }));
+    // Directory operations carry the upstream location in `src` (path | query | header | body); native fields use `in`.
+    return e.fields.map(({ in: loc, src, ...f }) => {
+      const where = names.includes(f.name) ? "path" : src ?? loc ?? (e.method === "POST" ? "body" : "query");
+      return { ...f, in: where };
+    });
   }
 
   schema(ref, endpointSlug) {

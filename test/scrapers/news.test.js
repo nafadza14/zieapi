@@ -100,7 +100,9 @@ test("limit trims items", async () => {
   assert.equal(r.items.length, 5);
 });
 
-test("upstream error surfaces as ScraperError", async () => {
-  const fetch = mockFetch([[/./, () => new Response("nope", { status: 503 })]]);
-  await assert.rejects(run(defs, "news:antara", "latest", {}, fetch), (e) => e.name === "ScraperError");
+test("upstream outage (5xx) surfaces as UpstreamError 502; upstream 4xx stays a ScraperError", async () => {
+  const down = mockFetch([[/./, () => new Response("nope", { status: 503 })]]);
+  await assert.rejects(run(defs, "news:antara", "latest", {}, down), (e) => e.name === "UpstreamError" && e.httpStatus === 502 && e.upstreamStatus === 503);
+  const missing = mockFetch([[/./, () => new Response("nope", { status: 404 })]]);
+  await assert.rejects(run(defs, "news:antara", "latest", {}, missing), (e) => e.name === "ScraperError");
 });

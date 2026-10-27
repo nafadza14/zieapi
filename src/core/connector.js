@@ -34,11 +34,19 @@ function credentialFor(api, ctx) {
   return null;
 }
 
-async function checkHost(url, lookup) {
+async function checkHost(url, lookup, apiName) {
   const u = new URL(url);
   const exp = hostOk.get(u.host);
   if (exp && exp > Date.now()) return;
-  await assertPublicUrl(url, lookup ?? undefined);
+  try {
+    await assertPublicUrl(url, lookup ?? undefined);
+  } catch (e) {
+    // The host comes from the provider's spec (or its redirect), never from the caller, so these are upstream failures
+    // (502, not billed), not invalid input.
+    if (/could not be resolved/i.test(e?.message ?? "")) throw new HttpError(502, { content: { upstreamHost: u.host }, message: `${apiName ?? u.host} is unreachable (DNS lookup failed)`, errors: [] });
+    // Blocked by the SSRF guard (private address, unusual port, or a redirect to one): still not the caller's fault.
+    throw new HttpError(502, { content: { upstreamHost: u.host }, message: `${apiName ?? u.host} cannot be called through Apizie: ${e?.message ?? "blocked"}`, errors: [] });
+  }
   hostOk.set(u.host, Date.now() + 10 * 60_000);
 }
 
@@ -124,7 +132,7 @@ export function makeHandler(api, op) {
     let url = api.base + path + (query.toString() ? (path.includes("?") ? "&" : "?") + query : "");
     let res;
     for (let hop = 0; hop <= 3; hop++) {
-      await checkHost(url, ctx.lookup);
+      await checkHost(url, ctx.lookup, api.name);
       try {
         res = await ctx.fetch(url, { method: op.method, headers, body: op.method === "GET" || op.method === "HEAD" ? undefined : body, redirect: "manual", signal: ctx.signal });
       } catch (e) {

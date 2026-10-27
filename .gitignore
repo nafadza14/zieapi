@@ -5,3 +5,8 @@ data/
 .DS_Store
 coverage/
 .vercel
+qa/mcp/node_modules/
+qa/mcp/*.out.json
+qa/mcp/ops.json
+qa/mcp/mcp-config.json
+qa/mcp/*.log

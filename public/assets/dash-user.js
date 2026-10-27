@@ -8,7 +8,7 @@
 
   const firstName = (n) => String(n ?? "").split(/\s+/)[0] || "there";
   const keyLabel = (l) => (l.keyName ? `${l.keyName}` : l.key ?? "–");
-  const sampleUrl = (c) => `${c.D.apiUrl}/v1/search-tools:wikipedia/search?query=Borobudur`;
+  const sampleUrl = (c) => `${c.D.apiUrl}/v1/search-tools:wikipedia/search?query=Eiffel%20Tower`;
 
   // ===== Dashboard ============================================================================
   S.dashboard = async (c) => {
@@ -340,7 +340,7 @@
     const langs = {
       cURL: (k) => `curl "${sampleUrl(c)}" \\\n  -H "x-api-key: ${k}"`,
       JavaScript: (k) => `const res = await fetch("${sampleUrl(c)}", {\n  headers: { "x-api-key": "${k}" },\n});\nconst { data } = await res.json();`,
-      Python: (k) => `import requests\n\nr = requests.get(\n    "${c.D.apiUrl}/v1/search-tools:wikipedia/search",\n    params={"query": "Borobudur"},\n    headers={"x-api-key": "${k}"},\n)\nprint(r.json()["data"])`,
+      Python: (k) => `import requests\n\nr = requests.get(\n    "${c.D.apiUrl}/v1/search-tools:wikipedia/search",\n    params={"query": "Eiffel Tower"},\n    headers={"x-api-key": "${k}"},\n)\nprint(r.json()["data"])`,
       Go: (k) => `req, _ := http.NewRequest("GET", "${sampleUrl(c)}", nil)\nreq.Header.Set("x-api-key", "${k}")\nres, _ := http.DefaultClient.Do(req)`,
       PHP: (k) => `$ch = curl_init("${sampleUrl(c)}");\ncurl_setopt($ch, CURLOPT_HTTPHEADER, ["x-api-key: ${k}"]);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n$data = json_decode(curl_exec($ch), true)["data"];`,
       MCP: (k) => `claude mcp add --transport http apizie ${c.D.apiUrl}/mcp \\\n  --header "x-api-key: ${k}"`,

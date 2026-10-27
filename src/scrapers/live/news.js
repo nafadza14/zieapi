@@ -3,7 +3,7 @@
 
 import { url, feed, f, stripHtml, ScraperError } from "../kit.js";
 
-const limitField = f.int("limit", { default: 20, min: 1, max: 50, description: "Jumlah item maksimum" });
+const limitField = f.int("limit", { default: 20, min: 1, max: 50, description: "Maximum number of items" });
 
 /**
  * Build a news scraper.

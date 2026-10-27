@@ -956,7 +956,7 @@ const wikipedia = {
       "search",
       "Search",
       "Full-text search of a Wikipedia language edition.",
-      [f.req("query", { example: "Jakarta" }), page(), limit(10, 50), f.enm("lang", WIKI_LANGS, { default: "en" })],
+      [f.req("query", { example: "Eiffel Tower" }), page(), limit(10, 50), f.enm("lang", WIKI_LANGS, { default: "en" })],
       async (p, ctx) => {
         const j = await getJson(ctx, url(`https://${p.lang}.wikipedia.org/w/api.php`, { action: "query", list: "search", srsearch: p.query, sroffset: (p.page - 1) * p.limit, srlimit: p.limit, format: "json", formatversion: 2, origin: "*" }));
         if (j?.error) throw new ScraperError(j.error.info ?? "Wikipedia API error");
@@ -971,7 +971,7 @@ const wikipedia = {
       "summary",
       "Summary",
       "Lead extract, description and thumbnail of one article.",
-      [f.req("title", { example: "Jakarta" }), f.enm("lang", WIKI_LANGS, { default: "en" })],
+      [f.req("title", { example: "Eiffel Tower" }), f.enm("lang", WIKI_LANGS, { default: "en" })],
       async (p, ctx) => {
         const j = await getJson(ctx, `https://${p.lang}.wikipedia.org/api/rest_v1/page/summary/${enc(p.title.replace(/ /g, "_"))}?redirect=true`);
         return { title: j.title, description: j.description ?? null, extract: j.extract ?? null, type: j.type ?? null, thumbnail: j.thumbnail?.source ?? null, coordinates: j.coordinates ?? null, timestamp: j.timestamp ?? null, url: j.content_urls?.desktop?.page ?? null };

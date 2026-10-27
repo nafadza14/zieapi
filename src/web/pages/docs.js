@@ -24,10 +24,10 @@ export const DOCS = [
         slug: "quickstart",
         title: "Quickstart",
         body: (api) => `<ol class="steps-list"><li><a href="/register">Create an account</a> and copy your first key from <a href="/dashboard/keys">Dashboard → API keys</a>.</li><li>Pick a scraper from the <a href="/scrapers">catalog</a>.</li><li>Call it:</li></ol>
-${c(`curl "${api}/v1/indonesia:bmkg/gempa-terkini" \\\n  -H "x-api-key: apz_xxx"`)}
-<p>Response:</p>${c(`{\n  "project": "indonesia:bmkg",\n  "data": { "magnitude": 5.1, "wilayah": "…", "source": "BMKG" },\n  "timestamp": "2026-10-26T03:00:00.000Z"\n}`, "json")}
-<h2>From JavaScript</h2>${c(`const res = await fetch("${api}/v1/finance:coingecko/simple-price?ids=bitcoin&vs_currencies=idr", {\n  headers: { "x-api-key": process.env.APIZIE_KEY },\n});\nconst { data } = await res.json();`, "javascript")}
-<h2>From Python</h2>${c(`import requests\nr = requests.get("${api}/v1/news:antara/latest", params={"limit": 5},\n                 headers={"x-api-key": "apz_xxx"})\nprint(r.json()["data"]["items"][0]["title"])`, "python")}`,
+${c(`curl "${api}/v1/places:open-meteo/forecast?latitude=48.8566&longitude=2.3522" \\\n  -H "x-api-key: apz_xxx"`)}
+<p>Response:</p>${c(`{\n  "project": "places:open-meteo",\n  "data": {\n    "latitude": 48.86, "longitude": 2.35, "timezone": "Europe/Paris",\n    "current": { "temperature_2m": 14.2, "wind_speed_10m": 9.4, "...": "…" },\n    "daily": { "temperature_2m_max": [16.1, 15.4, "…"], "...": "…" }\n  },\n  "timestamp": "2026-10-26T03:00:00.000Z"\n}`, "json")}
+<h2>From JavaScript</h2>${c(`const res = await fetch("${api}/v1/finance:coingecko/simple-price?ids=bitcoin,ethereum&vsCurrencies=usd", {\n  headers: { "x-api-key": process.env.APIZIE_KEY },\n});\nconst { data } = await res.json();`, "javascript")}
+<h2>From Python</h2>${c(`import requests\nr = requests.get("${api}/v1/news:guardian/feed", params={"section": "technology", "limit": 5},\n                 headers={"x-api-key": "apz_xxx"})\nprint(r.json()["data"]["items"][0]["title"])`, "python")}`,
       },
       {
         slug: "authentication",
@@ -101,7 +101,7 @@ ${c(`import { createHmac, timingSafeEqual } from "node:crypto";\n\nfunction veri
 <tr><td><code>GET /api/scrapers/{category:slug}</code></td><td>Scraper detail with endpoints</td></tr>
 <tr><td><code>GET /api/public/scrapers/{slug}/endpoints/{endpoint}/schema</code></td><td>Parameter schema</td></tr>
 <tr><td><code>GET /api/public/scrapers/{slug}/stats</code></td><td>Requests and success rate</td></tr></table>
-<p>Catalog responses use <code>{ content, message, errors }</code>.</p>${c(`curl "${api}/api/scrapers/list?q=saham&limit=5"`)}
+<p>Catalog responses use <code>{ content, message, errors }</code>.</p>${c(`curl "${api}/api/scrapers/list?q=weather&limit=5"`)}
 <p>Extra filters: <code>origin=native|directory</code> and <code>auth=none|byok</code>. Each global API also has its own spec at <code>/api/{category}/{slug}/openapi.json</code>.</p>`,
       },
       {

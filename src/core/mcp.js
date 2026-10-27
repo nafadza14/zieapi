@@ -20,7 +20,7 @@ export const MCP_TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        query: s("string", "Free-text search, e.g. 'weather', 'github', 'rupiah'. Omit to list everything."),
+        query: s("string", "Free-text search, e.g. 'weather', 'github', 'bitcoin'. Omit to list everything."),
         category: s("string", "Category slug filter, e.g. 'finance' (see list_categories)"),
         status: s("string", "Only items with this status", { enum: ["live", "byok", "planned"] }),
         limit: s("integer", "Max results per page (1-50)", { minimum: 1, maximum: 50, default: 10 }),

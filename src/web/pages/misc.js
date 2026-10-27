@@ -41,7 +41,7 @@ ${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.
   <div class="grid-4 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Server</span><b>Apizie · Streamable HTTP</b></div><div class="card"><span class="muted">Sign-in</span><b>OAuth 2.1 (no key needed)</b></div><div class="card"><span class="muted">Or use a key</span><b>Bearer · x-api-key · api-key</b></div></div>
   <div class="steps-row mt">
     <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open a Apizie sign-in window. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
-    <div class="card"><span class="step-n">02</span><h3>Ask in plain language</h3><p>“Latest BMKG earthquakes”, “Bitcoin price in rupiah”, “Search GitHub repos about MCP”. The agent picks the tools.</p></div>
+    <div class="card"><span class="step-n">02</span><h3>Ask in plain language</h3><p>“Earthquakes in the last hour”, “Bitcoin price in euros”, “Search GitHub repos about MCP”. The agent picks the tools.</p></div>
     <div class="card"><span class="step-n">03</span><h3>Watch usage</h3><p>Every tool call shows up in your request logs and counts against your plan, exactly like REST.</p></div>
   </div>
   <h2 class="display-2 mt">Connect with one click (OAuth)</h2>

@@ -13,7 +13,7 @@ export const BRAND = {
   legalName: "Zieads",
   tagline: "One API key for every public data source",
   description:
-    "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, BMKG, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 600 requests a month.",
+    "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 600 requests a month.",
   repo: "https://github.com/nafadza14/zieapi",
   email: "support@zieads.com",
   locale: "en_US",

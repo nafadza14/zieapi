@@ -42,7 +42,7 @@ export function footer() {
       <div><h4>Legal</h4><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/aup">Acceptable use</a><a href="/refund">Refunds</a></div>
     </div>
   </div>
-  <div class="footer-bottom"><span>© ${new Date().getFullYear()} Apizie · Zieads</span><span>Made in Indonesia</span></div>
+  <div class="footer-bottom"><span>© ${new Date().getFullYear()} Apizie · Zieads</span><span>Built for developers and AI agents</span></div>
 </footer>`;
 }
 

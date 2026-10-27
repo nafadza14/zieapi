@@ -4,11 +4,11 @@ import { HERO_BRANDS } from "../brands.js";
 import { webPageLd, faqLd } from "../seo.js";
 
 export const HOME_FAQ = [
-  ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, BMKG, Indonesian news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
+  ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
   ["How do I use Apizie with Claude, ChatGPT or Cursor?", "Add the Apizie MCP server URL (/mcp) to your app. Claude.ai, Claude Desktop and ChatGPT connect with one click through OAuth; Cursor, VS Code and Gemini CLI use an API key header. The agent can then search the catalog and call any API as a tool."],
   ["Is Apizie free?", "Yes. The Free plan includes 600 requests a month at 100 requests a minute on every live endpoint, with no credit card. Paid plans (Pro, Ultra, Max) raise the limits and add bulk jobs and webhooks."],
-  ["Which data sources does Apizie cover?", "Indonesian sources (BMKG earthquakes and weather, IDX stocks, prayer times, postal codes, local news), global finance and crypto (Binance, OKX, CoinGecko), research (PubMed, arXiv), developer tools (GitHub, npm, Docker Hub) and 1,300+ global APIs imported from public OpenAPI specifications."],
-  ["What does a request look like?", "GET /v1/{category}:{api}/{endpoint}?param=value with the header x-api-key. For example /v1/search-tools:wikipedia/search?query=Borobudur returns Wikipedia search results as JSON."],
+  ["Which data sources does Apizie cover?", "Finance and crypto (Binance, OKX, CoinGecko, SEC EDGAR, ECB rates), news (The Guardian, BBC, Google News, Hacker News), research (PubMed, arXiv), developer tools (GitHub, npm, DNS, WHOIS), media (Apple Music, Deezer) and 1,300+ global APIs imported from public OpenAPI specifications."],
+  ["What does a request look like?", "GET /v1/{category}:{api}/{endpoint}?param=value with the header x-api-key. For example /v1/search-tools:wikipedia/search?query=Eiffel%20Tower returns Wikipedia search results as JSON."],
 ];
 
 
@@ -18,11 +18,11 @@ const GLOBE_VIDEO = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOtt
 export function homePage({ user, totals, categories, top, global = [], liveKeys = null, apiUrl, publicUrl }) {
   const apiCount = `${(Math.floor((totals.scrapers ?? 0) / 100) * 100).toLocaleString("en-US")}+`;
   const examples = [
-    { key: "indonesia:bmkg", ep: "gempa-terkini", qs: "", label: "Gempa BMKG" },
-    { key: "finance:coingecko", ep: "simple-price", qs: "?ids=bitcoin&vs_currencies=idr", label: "Harga kripto" },
-    { key: "news:antara", ep: "latest", qs: "?limit=5", label: "Berita Antara" },
-    { key: "indonesia:sholat-kemenag", ep: "city-search", qs: "?q=bandung", label: "Jadwal sholat" },
-    { key: "search-tools:wikipedia", ep: "search", qs: "?q=Borobudur", label: "Wikipedia" },
+    { key: "search-tools:wikipedia", ep: "search", qs: "?query=Eiffel%20Tower", label: "Wikipedia" },
+    { key: "finance:coingecko", ep: "simple-price", qs: "?ids=bitcoin&vsCurrencies=usd", label: "Crypto prices" },
+    { key: "search-tools:hackernews", ep: "search", qs: "?query=ai%20agents&limit=5", label: "Hacker News" },
+    { key: "search-tools:arxiv", ep: "search", qs: "?query=large%20language%20models&count=5", label: "arXiv papers" },
+    { key: "social-media:github-user", ep: "trending", qs: "?since=daily", label: "GitHub trending" },
   ];
 
   const hero = `
@@ -32,12 +32,11 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
     <video class="hero-video" src="${GLOBE_VIDEO}" muted loop playsinline preload="auto" data-hero-video></video>
   </div>
   <div class="hero-chips" aria-hidden="true">
-    <span class="chip-coin c1">{ }</span><span class="chip-coin c2">Rp</span><span class="chip-coin c3">₿</span><span class="chip-coin c4"><svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2" opacity=".7"/></svg></span>
+    <span class="chip-coin c1">{ }</span><span class="chip-coin c2">$</span><span class="chip-coin c3">₿</span><span class="chip-coin c4"><svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2" opacity=".7"/></svg></span>
   </div>
   <div class="hero-inner">
     <a href="/mcp" class="hero-pill rise r1"><span class="pill-new">New</span><span class="pill-long">MCP server for Claude, ChatGPT &amp; Cursor</span><span class="pill-short">MCP for Claude &amp; ChatGPT</span><span aria-hidden="true">→</span></a>
     ${heroTitle(apiCount)}
-    <p class="hero-sub rise r4">Stock prices, earthquakes, news, GitHub and Wikipedia as clean JSON. Call them from your code, or let Claude, ChatGPT and Cursor use them through MCP.</p>
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
     ${brandStrip(totals, liveKeys)}
   </div>
@@ -69,7 +68,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   const find = `
 <section class="section wrap">
   <div class="section-head"><span class="eyebrow">Catalog</span><h2 class="display-2">Find the scraper you need.</h2></div>
-  <form action="/scrapers" class="search-xl" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input name="q" placeholder="Try “saham”, “gempa”, “tiktok”, “jadwal sholat”…" aria-label="Search scrapers"><button class="pill pill-white">Search</button></form>
+  <form action="/scrapers" class="search-xl" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input name="q" placeholder="Try “bitcoin”, “weather”, “arxiv”, “github”…" aria-label="Search scrapers"><button class="pill pill-white">Search</button></form>
   <div class="cat-chips">${categories.slice(0, 14).map((c) => `<a href="/category/${c.slug}" class="cat-chip" style="--c:${esc(c.color)}"><i></i>${esc(c.displayName)} <span>${c.scrapers}</span></a>`).join("")}</div>
   <div class="grid-4 top-grid">${top.map(scraperCard).join("")}</div>
   <div class="center"><a href="/scrapers" class="pill pill-outline">See all ${fmt(totals.scrapers)} scrapers →</a></div>
@@ -109,7 +108,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
     <article class="card feat f-wide"><h3>We keep every scraper working</h3><p>Sources change their markup and APIs constantly. Health checks run around the clock and every endpoint reports its live status in the catalog, so you never guess.</p><div class="mini-status">${["live", "live", "live", "upstream", "live", "live", "planned", "live"].map((s) => `<i class="dot-${s}"></i>`).join("")}</div></article>
     <article class="card feat"><h3>One response shape</h3><p><code>project</code>, <code>data</code>, <code>timestamp</code>. Errors use the same codes everywhere.</p></article>
     <article class="card feat"><h3>Built for AI agents</h3><p>A remote MCP server exposes the whole catalog as tools for Claude, Cursor and VS Code.</p></article>
-    <article class="card feat"><h3>Indonesian sources, first class</h3><p>IDX, BMKG, Kemenag, wilayah, Rupiah, local news and jobs. Not an afterthought.</p></article>
+    <article class="card feat"><h3>Bring your own key</h3><p>Stripe, Twilio, Spotify and 1,300+ more run with your provider key, sent per request and never stored.</p></article>
     <article class="card feat"><h3>Pay for what you use</h3><p>A 5xx never costs you a request. Quotas reset on the 1st (UTC) and every response tells you what is left.</p></article>
   </div>
 </section>`;
@@ -144,7 +143,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div class="section-head"><span class="eyebrow">FAQ</span><h2 class="display-2">Questions, answered.</h2></div>
   <div class="faq">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>`;
-  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, BMKG, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 600 requests/month.`;
+  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 600 requests/month.`;
   return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
 }
 
@@ -159,13 +158,26 @@ export function scraperCard(s) {
 
 export const _json = json;
 
-// Rotating hero headlines. Each headline is two lines of [text, gradient] segments; site.js swaps them
-// every 7 s (words appear one by one over 2 s, then hold for 5 s). The first one is server-rendered.
+// Rotating hero headlines, each with the sentence under it. A headline is two lines of [text, gradient]
+// segments; site.js swaps them every 7 s (words appear one by one over 2 s, then hold for 5 s).
+// The first one is server-rendered so search engines and no-JS visitors read it.
 const HEADLINES = (apiCount) => [
-  [[["One API key", "l"], ["for"]], [[apiCount, "r"], ["data sources"]]],
-  [[["The API key", "l"], ["for"]], [["your AI agent", "r"]]],
-  [[["Live data", "l"]], [["as"], ["clean JSON", "r"]]],
-  [[["Local data,", "l"]], [["global reach", "r"]]],
+  {
+    lines: [[["One API key", "l"], ["for"]], [[apiCount, "r"], ["data sources"]]],
+    sub: "Finance, news, research, developer tools and 1,300+ global APIs as clean JSON. Call them from your code or hand them to your AI agent.",
+  },
+  {
+    lines: [[["The API key", "l"], ["for"]], [["your AI agent", "r"]]],
+    sub: "Connect Apizie over MCP and Claude, ChatGPT or Cursor can search the catalog and call any API as a tool, on your key and your quota.",
+  },
+  {
+    lines: [[["Live data", "l"]], [["as"], ["clean JSON", "r"]]],
+    sub: "Every source answers in the same shape, { project, data, timestamp }, with the same URL pattern, the same auth and the same errors.",
+  },
+  {
+    lines: [[["Ship features,", "l"]], [["not integrations", "r"]]],
+    sub: "Skip each provider's SDK, auth and response format. Caching and rate limits are built in, and a 5xx never counts against your quota.",
+  },
 ];
 // Word colours sample the same gradients as .grad-l / .grad-r, so each word can animate on its own.
 const STOPS = { l: [[0, [255, 158, 207]], [0.7, [255, 255, 255]], [1, [255, 255, 255]]], r: [[0, [255, 255, 255]], [0.6, [183, 164, 255]], [1, [255, 158, 207]]] };
@@ -187,9 +199,10 @@ function headlineWords(lines) {
   );
 }
 function heroTitle(apiCount) {
-  const all = HEADLINES(apiCount).map(headlineWords);
+  const all = HEADLINES(apiCount).map((h) => ({ lines: headlineWords(h.lines), sub: h.sub }));
   const line = (words, cls) => `<span class="hl-line rise ${cls}">${words.map((w) => `<span class="w"${w.c ? ` style="color:${w.c}"` : ""}>${esc(w.t)}</span>`).join(" ")}</span>`;
-  return `<h1 class="hero-title" data-hero-rotate="${esc(JSON.stringify(all))}" aria-live="off">${line(all[0][0], "r2")}${line(all[0][1], "r3")}</h1>`;
+  return `<h1 class="hero-title" data-hero-rotate="${esc(JSON.stringify(all))}" aria-live="off">${line(all[0].lines[0], "r2")}${line(all[0].lines[1], "r3")}</h1>
+    <p class="hero-sub rise r4" data-hero-sub>${esc(all[0].sub)}</p>`;
 }
 
 function brandStrip(totals, liveKeys) {
@@ -197,10 +210,13 @@ function brandStrip(totals, liveKeys) {
   if (!brands.length) return "";
   const item = (b, hidden) => {
     const [cat, slug] = b.key.split(":");
-    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API${b.byok ? ", with your own ${esc(b.name)} key" : ""}"`}><span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="${esc(b.color)}" d="${b.path}"/></svg></span><span>${esc(b.name)}</span>${b.byok ? '<span class="brand-key" title="Uses your own key">your key</span>' : ""}</a>`;
+    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API (live)"`}><span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="${esc(b.color)}" d="${b.path}"/></svg></span><span>${esc(b.name)}</span></a>`;
   };
+  // Three rows, most used platforms first; the middle row runs the other way.
+  const per = Math.ceil(brands.length / 3);
+  const rows = [0, 1, 2].map((i) => brands.slice(i * per, (i + 1) * per)).filter((r) => r.length);
   return `<div class="hero-brands rise r6">
-      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>The platforms people use most, ready to call</p>
-      <div class="brand-marquee"><div class="brand-track">${brands.map((b) => item(b, false)).join("")}${brands.map((b) => item(b, true)).join("")}</div></div>
+      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>Live right now, no extra keys needed</p>
+      ${rows.map((r, i) => `<div class="brand-marquee${i === 1 ? " rev" : ""}"><div class="brand-track">${r.map((b) => item(b, false)).join("")}${r.map((b) => item(b, true)).join("")}</div></div>`).join("")}
     </div>`;
 }

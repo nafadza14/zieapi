@@ -285,7 +285,20 @@ test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", asy
   assert.match(home, /<h1 class="hero-title"[^>]*>.*>One<\/span> <span[^>]*>API<\/span> <span[^>]*>key<\/span> <span class="w">for<\/span>/);
   const rotate = JSON.parse(/data-hero-rotate="([^"]+)"/.exec(home)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   assert.equal(rotate.length, 4);
-  assert.ok(rotate.some((h) => h.flat().map((w) => w.t).join(" ") === "The API key for your AI agent"));
+  assert.ok(rotate.some((h) => h.lines.flat().map((w) => w.t).join(" ") === "The API key for your AI agent"));
+  assert.ok(rotate.every((h) => h.sub && !/Indonesia|BMKG|rupiah/i.test(h.sub)));
+  // Global landing page: no Indonesia-only copy, and hero logos are keyless live APIs only.
+  const visible = home.replace(/<script[\s\S]*?<\/script>/g, "");
+  assert.doesNotMatch(visible, /Indonesia|BMKG|Kemenag|sholat|Borobudur/i);
+  const full = createApp({ logger: null, quiet: true, env: {}, kv: new MemoryKV() }); // the real live scrapers
+  await new Promise((r) => full.server.listen(0, "127.0.0.1", r));
+  const fullHome = await (await fetch(`http://127.0.0.1:${full.server.address().port}/`)).text();
+  await new Promise((r) => full.server.close(r));
+  assert.equal((fullHome.match(/class="brand-marquee/g) ?? []).length, 3);
+  assert.match(fullHome, /class="brand-marquee rev"/);
+  assert.doesNotMatch(fullHome.replace(/<script[\s\S]*?<\/script>/g, ""), /Indonesia|BMKG|Kemenag|sholat|Borobudur/i);
+  const { HERO_BRANDS } = await import("../src/web/brands.js");
+  for (const b of HERO_BRANDS) assert.equal(full.catalog.find(b.key)?.status, "live", `${b.name} is live`);
   const graphs = [...home.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
   const types = graphs.flatMap((g) => g["@graph"].map((n) => n["@type"]));
   for (const t of ["Organization", "WebSite", "SoftwareApplication", "FAQPage"]) assert.ok(types.includes(t), t);

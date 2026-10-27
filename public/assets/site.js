@@ -64,6 +64,7 @@
     const HOLD = 5000;
     const FADE = 350;
     const WORD = 450;
+    const sub = $("[data-hero-sub]");
     const build = (lines) => lines.map((ws) => `<span class="hl-line">${ws.map((w) => `<span class="w"${w.c ? ` style="color:${w.c}"` : ""}>${esc(w.t)}</span>`).join(" ")}</span>`).join("");
     // Reserve the height of the tallest headline so the page never jumps when they swap.
     const fit = () => {
@@ -72,24 +73,42 @@
       Object.assign(probe.style, { position: "absolute", visibility: "hidden", left: "0", top: "0", width: "max-content", maxWidth: hl.parentNode.clientWidth + "px", minHeight: "0" });
       hl.parentNode.appendChild(probe);
       let max = 0;
-      for (const lines of list) {
-        probe.innerHTML = build(lines);
+      for (const h of list) {
+        probe.innerHTML = build(h.lines);
         max = Math.max(max, probe.offsetHeight);
       }
       probe.remove();
       hl.style.minHeight = max + "px";
+      if (sub) {
+        const sp = sub.cloneNode(false);
+        Object.assign(sp.style, { position: "absolute", visibility: "hidden", left: "0", top: "0", width: sub.offsetWidth + "px", minHeight: "0", animation: "none" });
+        sub.parentNode.appendChild(sp);
+        let sm = 0;
+        for (const h of list) {
+          sp.textContent = h.sub;
+          sm = Math.max(sm, sp.offsetHeight);
+        }
+        sp.remove();
+        sub.style.minHeight = sm + "px";
+      }
     };
     fit();
     addEventListener("resize", () => {
       hl.style.minHeight = "";
+      if (sub) sub.style.minHeight = "";
       fit();
     });
     let i = 0;
     const show = () => {
       i = (i + 1) % list.length;
       hl.classList.add("hl-out");
+      sub?.classList.add("hl-out");
       setTimeout(() => {
-        hl.innerHTML = build(list[i]);
+        hl.innerHTML = build(list[i].lines);
+        if (sub) {
+          sub.textContent = list[i].sub;
+          sub.classList.remove("hl-out");
+        }
         const words = $$(".w", hl);
         const step = words.length > 1 ? (REVEAL - WORD) / (words.length - 1) : 0;
         words.forEach((w, k) => (w.style.animationDelay = `${Math.round(k * step)}ms`));

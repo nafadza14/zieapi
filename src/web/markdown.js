@@ -25,7 +25,7 @@ export function homeMd({ totals, categories, publicUrl, apiUrl, faq }) {
 
 ## Example
 \`\`\`
-curl "${apiUrl}/v1/search-tools:wikipedia/search?query=Borobudur" -H "x-api-key: $APIZIE_KEY"
+curl "${apiUrl}/v1/search-tools:wikipedia/search?query=Eiffel%20Tower" -H "x-api-key: $APIZIE_KEY"
 \`\`\`
 
 ## Categories

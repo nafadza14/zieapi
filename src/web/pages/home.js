@@ -36,7 +36,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   </div>
   <div class="hero-inner">
     <a href="/mcp" class="hero-pill rise r1"><span class="pill-new">New</span><span class="pill-long">MCP server for Claude, ChatGPT &amp; Cursor</span><span class="pill-short">MCP for Claude &amp; ChatGPT</span><span aria-hidden="true">→</span></a>
-    <h1 class="hero-title"><span class="rise r2"><span class="grad-l">One API key</span> for</span><span class="rise r3"><span class="grad-r">${apiCount}</span> data sources</span></h1>
+    ${heroTitle(apiCount)}
     <p class="hero-sub rise r4">Stock prices, earthquakes, news, GitHub and Wikipedia as clean JSON. Call them from your code, or let Claude, ChatGPT and Cursor use them through MCP.</p>
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
     ${brandStrip(totals, liveKeys)}
@@ -159,15 +159,48 @@ export function scraperCard(s) {
 
 export const _json = json;
 
+// Rotating hero headlines. Each headline is two lines of [text, gradient] segments; site.js swaps them
+// every 7 s (words appear one by one over 2 s, then hold for 5 s). The first one is server-rendered.
+const HEADLINES = (apiCount) => [
+  [[["One API key", "l"], ["for"]], [[apiCount, "r"], ["data sources"]]],
+  [[["The API key", "l"], ["for"]], [["your AI agent", "r"]]],
+  [[["Live data", "l"]], [["as"], ["clean JSON", "r"]]],
+  [[["Local data,", "l"]], [["global reach", "r"]]],
+];
+// Word colours sample the same gradients as .grad-l / .grad-r, so each word can animate on its own.
+const STOPS = { l: [[0, [255, 158, 207]], [0.7, [255, 255, 255]], [1, [255, 255, 255]]], r: [[0, [255, 255, 255]], [0.6, [183, 164, 255]], [1, [255, 158, 207]]] };
+function gradAt(stops, t) {
+  const i = stops.findIndex(([p]) => p >= t);
+  if (i <= 0) return stops[0][1];
+  const [p0, c0] = stops[i - 1];
+  const [p1, c1] = stops[i];
+  const k = (t - p0) / (p1 - p0 || 1);
+  return c0.map((v, j) => Math.round(v + (c1[j] - v) * k));
+}
+const hex = (rgb) => "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
+function headlineWords(lines) {
+  return lines.map((line) =>
+    line.flatMap(([text, g]) => {
+      const words = String(text).split(" ");
+      return words.map((t, i) => ({ t, c: g ? hex(gradAt(STOPS[g], words.length === 1 ? 0.3 : (i / (words.length - 1)) * 0.9)) : null }));
+    })
+  );
+}
+function heroTitle(apiCount) {
+  const all = HEADLINES(apiCount).map(headlineWords);
+  const line = (words, cls) => `<span class="hl-line rise ${cls}">${words.map((w) => `<span class="w"${w.c ? ` style="color:${w.c}"` : ""}>${esc(w.t)}</span>`).join(" ")}</span>`;
+  return `<h1 class="hero-title" data-hero-rotate="${esc(JSON.stringify(all))}" aria-live="off">${line(all[0][0], "r2")}${line(all[0][1], "r3")}</h1>`;
+}
+
 function brandStrip(totals, liveKeys) {
   const brands = HERO_BRANDS.filter((b) => !liveKeys || liveKeys.has(b.key));
   if (!brands.length) return "";
   const item = (b, hidden) => {
     const [cat, slug] = b.key.split(":");
-    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API (live)"`}><span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="${esc(b.color)}" d="${b.path}"/></svg></span><span>${esc(b.name)}</span></a>`;
+    return `<a class="brand" href="/api/${esc(cat)}/${esc(slug)}"${hidden ? ' tabindex="-1" aria-hidden="true"' : ` aria-label="${esc(b.name)} API${b.byok ? ", with your own ${esc(b.name)} key" : ""}"`}><span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="${esc(b.color)}" d="${b.path}"/></svg></span><span>${esc(b.name)}</span>${b.byok ? '<span class="brand-key" title="Uses your own key">your key</span>' : ""}</a>`;
   };
   return `<div class="hero-brands rise r6">
-      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>Live right now, no extra keys needed</p>
+      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>The platforms people use most, ready to call</p>
       <div class="brand-marquee"><div class="brand-track">${brands.map((b) => item(b, false)).join("")}${brands.map((b) => item(b, true)).join("")}</div></div>
     </div>`;
 }

@@ -56,6 +56,52 @@
     }
   }
 
+  // ---------- rotating hero headline: words appear one by one over 2 s, hold 5 s, then swap ----------
+  const hl = $("[data-hero-rotate]");
+  if (hl && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const list = JSON.parse(hl.dataset.heroRotate);
+    const REVEAL = 2000;
+    const HOLD = 5000;
+    const FADE = 350;
+    const WORD = 450;
+    const build = (lines) => lines.map((ws) => `<span class="hl-line">${ws.map((w) => `<span class="w"${w.c ? ` style="color:${w.c}"` : ""}>${esc(w.t)}</span>`).join(" ")}</span>`).join("");
+    // Reserve the height of the tallest headline so the page never jumps when they swap.
+    const fit = () => {
+      const probe = hl.cloneNode(false);
+      probe.removeAttribute("data-hero-rotate");
+      Object.assign(probe.style, { position: "absolute", visibility: "hidden", left: "0", top: "0", width: "max-content", maxWidth: hl.parentNode.clientWidth + "px", minHeight: "0" });
+      hl.parentNode.appendChild(probe);
+      let max = 0;
+      for (const lines of list) {
+        probe.innerHTML = build(lines);
+        max = Math.max(max, probe.offsetHeight);
+      }
+      probe.remove();
+      hl.style.minHeight = max + "px";
+    };
+    fit();
+    addEventListener("resize", () => {
+      hl.style.minHeight = "";
+      fit();
+    });
+    let i = 0;
+    const show = () => {
+      i = (i + 1) % list.length;
+      hl.classList.add("hl-out");
+      setTimeout(() => {
+        hl.innerHTML = build(list[i]);
+        const words = $$(".w", hl);
+        const step = words.length > 1 ? (REVEAL - WORD) / (words.length - 1) : 0;
+        words.forEach((w, k) => (w.style.animationDelay = `${Math.round(k * step)}ms`));
+        hl.classList.remove("hl-out");
+        hl.classList.add("hl-anim");
+        setTimeout(show, REVEAL + HOLD);
+      }, FADE);
+    };
+    // The first headline rises in with the rest of the hero (about 2 s), then holds for 5 s.
+    setTimeout(show, REVEAL + HOLD);
+  }
+
   // ---------- copy buttons ----------
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-copy-code]");

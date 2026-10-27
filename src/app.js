@@ -569,7 +569,8 @@ export function createApp(opts = {}) {
       const all = await items();
       const pick = (keys) => keys.map((k) => all.find((i) => i.key === k)).filter(Boolean);
       const global = pick(["business:github-api-github", "finance:stripe", "communication:twilio-api", "media:spotify", "communication:sendgrid", "business:slack", "business:trello", "open-data:nasa-asteroids-neows"]);
-      const liveKeys = new Set(all.filter((i) => i.status === "live").map((i) => i.key));
+      // Hero logos: anything callable today (keyless or bring-your-own-key), never planned or disabled.
+      const liveKeys = new Set(all.filter((i) => i.status === "live" || i.status === "byok").map((i) => i.key));
       return html(homePage({ user, totals, categories: catalog.categoryList(), top: all.filter((i) => i.origin !== "directory").slice(0, 8), global, liveKeys, apiUrl, publicUrl }));
     }
     if (p === "/scrapers" || p === "/playground") return html(scrapersPage({ user, totals, categories: catalog.categoryList(), items: await items(), q: q.q ?? "", cat: q.cat ?? "" }));

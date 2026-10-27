@@ -281,7 +281,11 @@ test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", asy
   assert.match(home, /<link rel="canonical" href="http:\/\/zie\.test\/">/);
   assert.match(home, /<meta property="og:image" content="http:\/\/zie\.test\/assets\/og\/home\.png">/);
   assert.match(home, /<meta name="twitter:card" content="summary_large_image">/);
-  assert.match(home, /One API key<\/span> for/);
+  // First headline is server-rendered word by word; the other three rotate in from data-hero-rotate.
+  assert.match(home, /<h1 class="hero-title"[^>]*>.*>One<\/span> <span[^>]*>API<\/span> <span[^>]*>key<\/span> <span class="w">for<\/span>/);
+  const rotate = JSON.parse(/data-hero-rotate="([^"]+)"/.exec(home)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.equal(rotate.length, 4);
+  assert.ok(rotate.some((h) => h.flat().map((w) => w.t).join(" ") === "The API key for your AI agent"));
   const graphs = [...home.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
   const types = graphs.flatMap((g) => g["@graph"].map((n) => n["@type"]));
   for (const t of ["Organization", "WebSite", "SoftwareApplication", "FAQPage"]) assert.ok(types.includes(t), t);

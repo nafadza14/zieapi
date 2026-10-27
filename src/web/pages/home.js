@@ -227,7 +227,7 @@ function brandStrip(totals, liveKeys) {
   const per = Math.ceil(brands.length / 3);
   const rows = [0, 1, 2].map((i) => brands.slice(i * per, (i + 1) * per)).filter((r) => r.length);
   return `<div class="hero-brands rise r6">
-      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>Live right now, no extra keys needed</p>
+      <p class="hero-brands-label"><span class="live-dot" aria-hidden="true"></span>Ready to call with just your Apizie key</p>
       ${rows.map((r, i) => `<div class="brand-marquee${i === 1 ? " rev" : ""}"><div class="brand-track">${r.map((b) => item(b, false)).join("")}${r.map((b) => item(b, true)).join("")}</div></div>`).join("")}
     </div>`;
 }

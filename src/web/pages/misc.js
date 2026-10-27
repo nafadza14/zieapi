@@ -226,6 +226,10 @@ const I = {
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+  live: '<circle cx="12" cy="12" r="2"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>',
+  health: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+  users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.2a3 3 0 0 1 0 5.6M17.5 14a5 5 0 0 1 3 5"/>',
+  revenue: '<path d="M4 19V5M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/>',
 };
 export const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[name] ?? ""}</svg>`;
 
@@ -298,13 +302,20 @@ export function dashboardPage({ user, section, plan, apiUrl, publicUrl, storage,
   return layout({ title: me[2], user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-user.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }
 
-const ADMIN_NAV = [["", "Overview", "dashboard"], ["setup", "Setup checks", "settings"], ["users", "Users", "affiliate"], ["invoices", "Invoices", "billing"], ["payouts", "Payouts", "usage"], ["scrapers", "Scrapers", "browse"], ["reports", "Reports", "support"], ["showcase", "Showcase", "showcase"]];
+const ADMIN_GROUPS = [
+  { group: "Monitor", items: [["", "Overview", "dashboard", "Everything that matters on one screen"], ["traffic", "Traffic", "usage", "Platform-wide requests, errors and latency"], ["live", "Live requests", "live", "The latest calls across every customer, refreshed automatically"], ["health", "Source health", "health", "Which upstream sources fail, slow down or are switched off"], ["revenue", "Revenue", "revenue", "Paid invoices, recurring revenue and plan mix"]] },
+  { group: "Operate", items: [["users", "Customers", "users", "Find a customer, change a plan, suspend or promote"], ["invoices", "Invoices", "billing", "Confirm bank transfers and activate plans"], ["payouts", "Payouts", "affiliate", "Affiliate payout requests"], ["scrapers", "Catalog", "browse", "Switch sources on or off and set logos"], ["reports", "Reports", "support", "Issues reported by customers"], ["showcase", "Showcase", "showcase", "Review community submissions"], ["setup", "Setup checks", "settings", "Production readiness: database, sign-in, email, payments"]] },
+];
+const ADMIN_NAV = ADMIN_GROUPS.flatMap((g) => g.items);
 export const ADMIN_SLUGS = ADMIN_NAV.map((x) => x[0]);
 export function adminPage({ user, section }) {
   const cur = ADMIN_NAV.find((x) => x[0] === section) ?? ADMIN_NAV[0];
   const href = (s) => `/admin${s ? "/" + s : ""}`;
-  const sideHtml = `<div class="ap-side-nav"><nav class="ap-group" aria-label="Admin"><p class="ap-group-label">Admin</p>${ADMIN_NAV.map(([s, label, ic]) => sideLink(href(s), s === cur[0], ic, label)).join("")}</nav></div><div class="ap-side-foot">${sideLink("/dashboard", false, "dashboard", "Back to dashboard")}</div>`;
-  const menuHtml = `<div class="ap-menu-user"><b>Admin</b><small>${esc(user.email ?? "")}</small></div><a href="/dashboard">${icon("dashboard")}Back to dashboard</a><hr><button type="button" data-logout>${icon("logout")}Sign out</button>`;
-  const body = shell({ user: { ...user, name: "Admin" }, title: cur[1], subtitle: "Operate Apizie: customers, payments and sources", sideHtml, menuHtml, bodyAttr: `data-admin="${esc(cur[0] || "overview")}"`, bell: false });
+  const groups = ADMIN_GROUPS.map((g) => `<nav class="ap-group" aria-label="${g.group}"><p class="ap-group-label">${g.group}</p>${g.items.map(([s, label, ic]) => sideLink(href(s), s === cur[0], ic, label)).join("")}</nav>`).join("");
+  const sideHtml = `<div class="ap-side-nav">${groups}</div><div class="ap-side-foot"><span class="ap-admin-badge">${icon("admin")}<span>Super admin</span></span>${sideLink("/dashboard", false, "dashboard", "My dashboard")}</div>`;
+  const menuHtml = `<div class="ap-menu-user"><b>${esc(user.name ?? "Admin")}</b><small>${esc(user.email ?? "")}</small></div><a href="/dashboard">${icon("dashboard")}My dashboard</a><a href="/admin/setup">${icon("settings")}Setup checks</a><hr><button type="button" data-logout>${icon("logout")}Sign out</button>`;
+  // Admins see every range (no plan locks) and the palette lists admin pages.
+  const data = `<script type="application/json" id="dash-data">${json({ admin: true, user: { id: user.id, name: user.name, email: user.email, role: user.role }, plan: { id: "admin", logDays: 90 }, sections: ADMIN_NAV.map(([slug, label]) => ({ slug, label, base: "/admin" })) })}</script>`;
+  const body = shell({ user, title: cur[1], subtitle: cur[3], sideHtml, menuHtml, bodyAttr: `data-admin="${esc(cur[0] || "overview")}"`, bell: false, data });
   return layout({ title: "Admin", user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-admin.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }

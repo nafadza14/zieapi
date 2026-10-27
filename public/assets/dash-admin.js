@@ -9,29 +9,295 @@
 
   const planOptions = (cur) => ["free", "pro", "ultra", "max"].map((p) => `<option value="${p}"${p === cur ? " selected" : ""}>${p}</option>`).join("");
 
+  // ===== Shared monitoring helpers ===========================================================
+  const RW = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days", "90d": "last 90 days" };
+  const idrShort = (n) => { const v = Number(n ?? 0); return v >= 1e9 ? `Rp${(v / 1e9).toFixed(2)}B` : v >= 1e6 ? `Rp${(v / 1e6).toFixed(2)}M` : "Rp" + Math.round(v).toLocaleString("id-ID"); };
+  const usd = (n) => "$" + Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const deltaTag = (v, { goodUp = true } = {}) => {
+    if (v === null || v === undefined || !Number.isFinite(v)) return "";
+    const up = v >= 0;
+    const good = goodUp ? up : !up;
+    const txt = Math.abs(v) >= 10 ? ">999%" : `${Math.abs(v * 100).toFixed(Math.abs(v) < 0.1 ? 1 : 0)}%`;
+    return `<span class="delta ${Math.abs(v) < 0.005 ? "flat" : good ? "good" : "bad"}" title="Compared with the previous period">${up ? "▲" : "▼"} ${txt}</span>`;
+  };
+  /** Simple bar chart for counts or money per day. */
+  const barChart = (c, series, { fmt = c.num, label = "value", height = 150 } = {}) => {
+    const max = Math.max(1, ...series.map((p) => p.v));
+    const n = series.length;
+    const every = Math.max(1, Math.ceil(n / 6));
+    return `<div class="bars" style="--h:${height}px" role="img" aria-label="${c.esc(label)} per day, highest ${c.esc(fmt(max))}">${series
+      .map((p, i) => `<div class="bar-col" title="${c.esc(new Date(p.t + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }))}: ${c.esc(fmt(p.v))}"><i style="height:${p.v ? Math.max(3, (p.v / max) * 100) : 0}%"></i><span>${i % every === 0 || i === n - 1 ? new Date(p.t + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</span></div>`)
+      .join("")}</div>`;
+  };
+  const loadAnalytics = (c) => c.api(`/api/admin/analytics?range=${c.state.range}&tz=${c.tz}`).then((r) => r.content);
+  const sysLine = (c, o) => {
+    const sub = c.$("[data-sub]");
+    if (!sub) return;
+    const s = o.system;
+    sub.innerHTML = `<span class="sys">${s.state === "operational" ? '<span class="pulse ok" aria-hidden="true"></span>All systems operational' : '<span class="pulse warn" aria-hidden="true"></span>Elevated server errors in the last hour'}</span><span aria-hidden="true">·</span><span>${c.esc(s.storage)}${s.region ? ` · ${c.esc(s.region)}` : ""}</span><span aria-hidden="true">·</span><span>Updated ${c.time(o.generatedAt)}</span>`;
+  };
+  const customerCell = (c, x) => `${x.email ? `<a href="/admin/users?q=${encodeURIComponent(x.email)}"><b>${c.esc(x.name ?? x.email)}</b></a><br><span class="muted-sm">${c.esc(x.email)}</span>` : `<b>${c.esc(x.name ?? "Unknown")}</b>`}`;
+  const sourceRows = (c, list) =>
+    list.map(
+      (x) => `<tr>
+        <td><a href="/api/${c.esc(x.project.replace(":", "/"))}"><b>${c.esc(x.name)}</b></a><br><span class="muted-sm mono">${c.esc(x.project)}</span></td>
+        <td class="num">${c.num(x.requests)}</td>
+        <td class="num">${c.num(x.errors)}</td>
+        <td class="num">${x.serverErrors ? `<b class="t-bad">${c.num(x.serverErrors)}</b>` : "0"}</td>
+        <td class="num">${c.pct(Math.round(x.errorRate * 1000) / 10)}</td>
+        <td>${x.disabled ? c.h.badge("disabled", "off") : x.requests >= 5 && x.serverErrors / x.requests >= 0.2 ? c.h.badge("failed", "failing") : c.h.badge("ok", "healthy")}</td>
+      </tr>`
+    );
+
   // ===== Overview ===========================================================================
   A.overview = async (c) => {
-    const { h, num, idr, api } = c;
-    setActions(`<a class="btn btn-ghost" href="/admin/setup">Setup checks</a>`);
-    c.root.innerHTML = h.skeleton(4);
-    const [{ content: o }, { content: setup }] = await Promise.all([api("/api/admin/overview"), api("/api/admin/setup")]);
-    const failing = setup.checks.filter((x) => x.status === "fail");
-    const series = o.days.map((d) => ({ t: d.day ?? d.date ?? d.t, requests: d.requests ?? d.count ?? 0, errors: 0 }));
-    c.root.innerHTML = `
-      ${failing.length ? `<div class="ds-banner" role="alert"><b>${c.plural(failing.length, "setup check")} failing.</b> ${failing.map((x) => c.esc(x.label)).join(", ")}. <a href="/admin/setup">Fix them</a></div>` : ""}
-      <div class="grid-4">
-        ${h.stat("Users", num(o.users), Object.entries(o.byPlan).map(([p, n]) => `${num(n)} ${p}`).join(" · "))}
-        ${h.stat("Revenue this month", idr(o.revenueThisMonth), "Paid invoices, VAT included")}
-        ${h.stat("Waiting for review", num(o.pendingInvoices), `<a href="/admin/invoices">Open invoices</a>`)}
-        ${h.stat("Open reports", num(o.openReports), `<a href="/admin/reports">Open reports</a>`)}
-      </div>
-      <section class="ds-card"><div class="card-top"><h2>Requests, last 30 days</h2><span class="meta">${num(o.requests)} all time</span></div>${series.some((p) => p.requests) ? c.lineChart(series) : h.empty("No traffic yet", "Requests from every customer show up here.")}</section>
-      <section class="ds-card"><h2>Catalog</h2><div class="grid-4">${Object.entries(o.catalog)
-        .filter(([, v]) => typeof v === "number")
-        .slice(0, 8)
-        .map(([k, v]) => `<div class="kv"><span>${c.esc(k.replace(/([A-Z])/g, " $1").toLowerCase())}</span><b>${num(v)}</b></div>`)
-        .join("")}</div></section>`;
-    setHandlers({});
+    const { h, esc, num, idr } = c;
+    let last = null;
+    let breakdown = "endpoints";
+    const range = c.rangeControl(() => load());
+    const header = () => setActions(`${range.html}<button class="btn btn-ghost" data-act="retry">Refresh</button>`);
+    const bd = (t) => {
+      if (breakdown === "categories") return c.hbars(t.categories.slice(0, 8), { total: t.total, href: (x) => `/category/${encodeURIComponent(x.name)}` });
+      if (breakdown === "sources") return c.hbars(t.sources.map((x) => ({ ...x, name: x.name === "mcp" ? "MCP (AI agents)" : x.name === "rest" ? "REST API" : x.name })), { total: t.total });
+      if (breakdown === "errors") return c.hbars(t.statuses.map((x) => ({ name: String(x.status), count: x.count })), { total: t.errors, empty: "No errors in this range." });
+      return c.hbars(t.endpoints.slice(0, 8), { total: t.total });
+    };
+    const render = (o) => {
+      last = o;
+      sysLine(c, o);
+      const t = o.traffic, cu = o.customers, rv = o.revenue, at = o.attention;
+      const rw = RW[o.range];
+      const todo = [
+        [at.invoicesToReview, "invoice", "to confirm", "/admin/invoices"],
+        [at.payoutsRequested, "payout request", at.payoutAmount ? `· ${idr(at.payoutAmount)}` : "", "/admin/payouts"],
+        [at.openReports, "open report", "", "/admin/reports"],
+        [at.showcasePending, "showcase submission", "to review", "/admin/showcase"],
+        [at.failingSources, "failing source", "≥20% server errors", "/admin/health"],
+        [at.disabledSources, "source", "switched off", "/admin/scrapers"],
+      ].filter(([n]) => n > 0);
+      c.root.innerHTML = `
+        <div data-setup-banner></div>
+        <section class="ds-card kpis" aria-label="Key numbers, ${rw}">
+          <div class="kpi kpi-lead"><span class="stat-label">Requests · ${rw}</span><b class="hero-num">${c.compact(t.total)}</b><span class="stat-sub">${deltaTag(t.change?.total)} ${num(t.allTime)} all time</span></div>
+          <div class="kpi"><span class="stat-label">Active customers</span><b class="stat-value">${num(t.activeCustomers)}</b><span class="stat-sub">made a call · ${rw}</span></div>
+          <div class="kpi"><span class="stat-label">New sign-ups</span><b class="stat-value">${num(cu.newInRange)}</b><span class="stat-sub">${cu.newPrevious !== null ? deltaTag(cu.newPrevious ? (cu.newInRange - cu.newPrevious) / cu.newPrevious : null) : ""} ${num(cu.total)} total</span></div>
+          <div class="kpi"><span class="stat-label">Revenue · ${rw}</span><b class="stat-value" title="${idr(rv.inRange)}">${idrShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)} ${num(rv.paidCount)} paid invoices</span></div>
+          <div class="kpi"><span class="stat-label">Success rate</span><b class="stat-value">${c.pct(t.successRate)}</b><span class="stat-sub">p95 ${t.p95Ms === null ? "–" : "≤ " + c.ms(t.p95Ms)} · ${num(t.serverErrors)} server errors</span></div>
+        </section>
+        <div class="ov-row">
+          <section class="ds-card"><div class="card-top"><h2>Platform traffic</h2><span class="meta push">${t.granularity === "hour" ? "Hourly" : "Daily"}</span></div>${t.total ? c.lineChart(t.series, { gran: t.granularity }) : h.empty("No traffic in this range", "Requests from every customer, REST and MCP, show up here.")}</section>
+          <div class="stack">
+            <section class="ds-card"><div class="card-top"><h2>Needs attention</h2></div>${
+              todo.length
+                ? `<ul class="todo">${todo.map(([n, w, sub, href]) => `<li><a href="${href}"><b>${num(n)}</b><span>${c.plural(n, w).replace(/^[\d,]+ /, "")} ${esc(sub)}</span>${icoArrow}</a></li>`).join("")}</ul>`
+                : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing waiting. Invoices, payouts, reports and sources are all clear.</p>`
+            }</section>
+            <section class="ds-card"><div class="card-top"><h2>Customers</h2><a class="link-sm push" href="/admin/users">All</a></div>
+              <div class="row-between"><b class="stat-value">${num(cu.paying)}</b><span class="meta">paying of ${num(cu.total)} · ${c.pct(cu.conversion === null ? null : Math.round(cu.conversion * 1000) / 10)} conversion</span></div>
+              <div class="planmix">${["free", "pro", "ultra", "max"].map((p) => `<span class="pm-seg pm-${p}" style="flex:${cu.byPlan[p] || 0}" title="${c.cap(p)}: ${num(cu.byPlan[p])}"></span>`).join("")}</div>
+              <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.cap(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
+              <p class="meta">MRR ${usd(rv.mrrUsd)} at list price · ARPU ${usd(rv.arpuUsd)}${cu.suspended ? ` · ${num(cu.suspended)} suspended` : ""}</p>
+            </section>
+          </div>
+        </div>
+        <div class="ov-row">
+          <section class="ds-card"><div class="card-top"><h2>Top customers</h2><span class="meta push">by requests · ${rw}</span></div>${
+            cu.top.length ? h.table(["Customer", "Plan", "Requests", "Share"], cu.top.slice(0, 7).map((x) => `<tr><td>${customerCell(c, x)}</td><td>${x.plan ? h.badge(x.plan) : ""}</td><td class="num">${num(x.requests)}</td><td class="num">${c.pct(Math.round(x.usedShare * 1000) / 10)}</td></tr>`)) : h.empty("No customer traffic yet")
+          }</section>
+          <section class="ds-card"><div class="card-top"><h2>Breakdown</h2><div class="push">${h.seg("breakdown", [["endpoints", "Endpoints"], ["categories", "Categories"], ["sources", "REST vs MCP"], ["errors", "Errors"]], breakdown)}</div></div><div data-breakdown>${bd(t)}</div></section>
+        </div>
+        <div class="ov-row">
+          <section class="ds-card"><div class="card-top"><h2>Source health</h2><a class="link-sm push" href="/admin/health">All sources</a></div>${
+            o.sources.top.length ? h.table(["Source", "Requests", "Errors", "5xx", "Error rate", ""], sourceRows(c, o.sources.top.slice(0, 6))) : h.empty("No source traffic yet")
+          }</section>
+          <div class="stack">
+            <section class="ds-card"><div class="card-top"><h2>New sign-ups</h2><span class="meta push">${num(cu.newInRange)} · ${rw}</span></div>${barChart(c, cu.signups.map((x) => ({ t: x.t, v: x.count })), { label: "Sign-ups", height: 90 })}
+              <ul class="mini-list">${cu.recent.slice(0, 5).map((u) => `<li><a href="/admin/users?q=${encodeURIComponent(u.email ?? "")}"><span>${esc(u.email ?? u.name)}</span>${h.badge(u.plan)}<small>${c.ago(u.createdAt)}</small></a></li>`).join("") || '<li class="muted-sm">No customers yet.</li>'}</ul>
+            </section>
+            <section class="ds-card"><div class="card-top"><h2>Latest payments</h2><a class="link-sm push" href="/admin/revenue">Revenue</a></div>${
+              rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.slice(0, 5).map((i) => `<li><span>${esc(i.email ?? i.id)}</span><b>${idr(i.amount)}</b><small>${c.ago(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
+            }</section>
+          </div>
+        </div>
+        <section class="ds-card"><div class="card-top"><h2>When customers call</h2><span class="meta push">Requests by weekday and hour, your timezone</span></div>${c.heatmap(t.heatmap)}</section>`;
+    };
+    const load = async () => {
+      header();
+      if (!last) c.root.innerHTML = `<div class="grid-dash">${h.skeleton(5)}</div>`;
+      render(await loadAnalytics(c));
+      // Setup problems are fetched separately: the checks call Supabase and can be slower.
+      c.api("/api/admin/setup").then(({ content: setup }) => {
+        const failing = setup.checks.filter((x) => x.status === "fail");
+        const el = c.$("[data-setup-banner]", c.root);
+        if (el && failing.length) el.innerHTML = `<div class="ds-banner" role="alert"><b>${c.plural(failing.length, "setup check")} failing.</b> ${failing.map((x) => esc(x.label)).join(", ")}. <a href="/admin/setup">Fix them</a></div>`;
+      }).catch(() => {});
+    };
+    setHandlers({
+      range: range.handler,
+      retry: load,
+      breakdown: (el) => {
+        breakdown = el.dataset.v;
+        c.$$('[data-act="breakdown"]', c.root).forEach((b) => { b.classList.toggle("on", b === el); b.setAttribute("aria-pressed", String(b === el)); });
+        c.$("[data-breakdown]", c.root).innerHTML = bd(last.traffic);
+      },
+    });
+    await load();
+  };
+  const icoArrow = `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>`;
+
+  // ===== Traffic ============================================================================
+  A.traffic = async (c) => {
+    const { h, num } = c;
+    const range = c.rangeControl(() => load());
+    const load = async () => {
+      setActions(range.html);
+      c.root.innerHTML = h.skeleton(5);
+      const o = await loadAnalytics(c);
+      sysLine(c, o);
+      const t = o.traffic;
+      const rw = RW[o.range];
+      const by = (name) => t.sources.find((x) => x.name === name)?.requests ?? 0;
+      c.root.innerHTML = `
+        <section class="ds-card kpis" aria-label="Traffic, ${rw}">
+          <div class="kpi kpi-lead"><span class="stat-label">Requests · ${rw}</span><b class="hero-num">${c.compact(t.total)}</b><span class="stat-sub">${deltaTag(t.change?.total)}${t.previous ? ` vs ${num(t.previous.total)} before` : ""}</span></div>
+          <div class="kpi"><span class="stat-label">Errors</span><b class="stat-value">${num(t.errors)}</b><span class="stat-sub">${deltaTag(t.change?.errors, { goodUp: false })} ${num(t.serverErrors)} server (5xx)</span></div>
+          <div class="kpi"><span class="stat-label">Success rate</span><b class="stat-value">${c.pct(t.successRate)}</b><span class="stat-sub">${t.previous?.successRate !== null && t.previous ? `was ${c.pct(t.previous.successRate)}` : ""}</span></div>
+          <div class="kpi"><span class="stat-label">Latency p95</span><b class="stat-value">${t.p95Ms === null ? "–" : "≤ " + c.ms(t.p95Ms)}</b><span class="stat-sub">${t.avgMs !== null ? `average ${c.ms(t.avgMs)}` : ""}</span></div>
+          <div class="kpi"><span class="stat-label">REST / MCP</span><b class="stat-value">${num(by("rest"))} / ${num(by("mcp"))}</b><span class="stat-sub">${num(by("bulk"))} bulk · ${num(by("dashboard") + by("playground"))} dashboard</span></div>
+        </section>
+        <section class="ds-card"><div class="card-top"><h2>Requests and errors</h2><span class="meta push">${t.granularity === "hour" ? "Hourly" : "Daily"}</span></div>${t.total ? c.lineChart(t.series, { gran: t.granularity, height: 300, maxW: 1200 }) : h.empty("No traffic in this range")}</section>
+        <div class="grid-2">
+          <section class="ds-card"><div class="card-top"><h2>Top endpoints</h2></div>${c.hbars(t.endpoints, { total: t.total })}</section>
+          <section class="ds-card"><div class="card-top"><h2>Categories</h2></div>${c.hbars(t.categories, { total: t.total, href: (x) => `/category/${encodeURIComponent(x.name)}` })}</section>
+          <section class="ds-card"><div class="card-top"><h2>Errors by status</h2></div>${c.hbars(t.statuses.map((x) => ({ name: String(x.status), count: x.count })), { total: t.errors, empty: "No errors in this range." })}</section>
+          <section class="ds-card"><div class="card-top"><h2>Channels</h2></div>${c.hbars(t.sources.map((x) => ({ ...x, name: x.name === "mcp" ? "MCP (AI agents)" : x.name === "rest" ? "REST API" : x.name })), { total: t.total })}</section>
+        </div>
+        <section class="ds-card"><div class="card-top"><h2>When customers call</h2><span class="meta push">Your timezone</span></div>${c.heatmap(t.heatmap)}</section>`;
+    };
+    setHandlers({ range: range.handler, retry: load });
+    await load();
+  };
+
+  // ===== Live requests ======================================================================
+  A.live = async (c) => {
+    const { h, esc, num } = c;
+    let filter = "all", auto = true, timer = null, rows = [], shown = 50;
+    const draw = () => {
+      const all = rows.filter((r) => filter === "all" || (filter === "error" ? r.status >= 400 : r.source === filter));
+      const list = all.slice(0, shown);
+      $list.innerHTML = list.length
+        ? h.table(["Time", "Customer", "Endpoint", "Status", "Latency", "Channel"], list.map((r) => `<tr class="${r.status >= 500 ? "row-bad" : ""}">
+            <td class="mono">${c.time(r.at)}</td>
+            <td>${r.email ? `<a href="/admin/users?q=${encodeURIComponent(r.email)}">${esc(r.email)}</a>` : `<span class="muted-sm">${esc(r.owner ?? "–")}</span>`}</td>
+            <td><span class="mono">${esc(r.project)}/${esc(r.endpoint)}</span>${r.error ? `<br><span class="muted-sm">${esc(r.error)}</span>` : ""}</td>
+            <td>${h.status(r.status)}${r.cache === "HIT" ? ' <span class="muted-sm">cache</span>' : ""}</td>
+            <td class="num">${c.ms(r.ms)}</td>
+            <td>${h.badge(r.source ?? "rest", r.source === "mcp" ? "MCP" : r.source ?? "rest")}</td>
+          </tr>`))
+        : h.empty("No requests yet", "Calls from every customer appear here within a second.");
+      if (all.length > shown) $list.insertAdjacentHTML("beforeend", `<div class="pager"><button class="btn btn-ghost btn-sm" data-act="more">Show ${num(Math.min(50, all.length - shown))} more</button></div>`);
+      $count.textContent = `${num(list.length)} of ${num(all.length)} latest · ${auto ? "auto-refresh every 5 s" : "paused"}`;
+    };
+    const load = async () => {
+      const { content } = await c.api("/api/admin/live?limit=200");
+      rows = content.items;
+      draw();
+    };
+    const tick = () => {
+      clearTimeout(timer);
+      if (!auto || !document.body.contains($list)) return;
+      timer = setTimeout(async () => { if (!document.hidden) await load().catch(() => {}); tick(); }, 5000);
+    };
+    const controls = () => setActions(`${h.seg("filter", [["all", "All"], ["error", "Errors"], ["mcp", "MCP"], ["rest", "REST"]], filter)}<button class="btn btn-ghost" data-act="toggle">${auto ? "Pause" : "Resume"}</button>`);
+    c.root.innerHTML = `<p class="muted-sm" data-count></p><div data-list>${h.skeleton(8)}</div>`;
+    const $list = c.$("[data-list]", c.root);
+    const $count = c.$("[data-count]", c.root);
+    controls();
+    setHandlers({
+      retry: load,
+      filter: (el) => { filter = el.dataset.v; shown = 50; controls(); draw(); },
+      more: () => { shown += 50; draw(); },
+      toggle: () => { auto = !auto; controls(); draw(); tick(); },
+    });
+    await load();
+    tick();
+  };
+
+  // ===== Source health ======================================================================
+  A.health = async (c) => {
+    const { h, num } = c;
+    const range = c.rangeControl(() => load());
+    let show = "problems";
+    let o = null;
+    const draw = () => {
+      const list = show === "problems" ? o.sources.top.filter((x) => x.errors || x.disabled) : o.sources.top;
+      c.$("[data-list]", c.root).innerHTML = list.length ? h.table(["Source", "Requests", "Errors", "5xx", "Error rate", ""], sourceRows(c, list)) : h.empty(show === "problems" ? "No source errors in this range" : "No source traffic yet", show === "problems" ? "Every source that was called answered without errors." : "");
+    };
+    const load = async () => {
+      setActions(range.html);
+      c.root.innerHTML = h.skeleton(5);
+      o = await c.api(`/api/admin/analytics?range=${c.state.range}&tz=${c.tz}&full=1`).then((r) => r.content);
+      sysLine(c, o);
+      const cat = o.system.catalog;
+      c.root.innerHTML = `
+        <section class="ds-card kpis">
+          <div class="kpi kpi-lead"><span class="stat-label">System</span><b class="stat-value">${o.system.state === "operational" ? '<span class="pulse ok" aria-hidden="true"></span> Operational' : '<span class="pulse warn" aria-hidden="true"></span> Degraded'}</b><span class="stat-sub">${c.plural(o.system.requests, "request")}, ${c.plural(o.system.serverErrors, "server error")} in the last hour</span></div>
+          <div class="kpi"><span class="stat-label">Failing sources</span><b class="stat-value">${num(o.sources.failing.length)}</b><span class="stat-sub">≥20% server errors · ${RW[o.range]}</span></div>
+          <div class="kpi"><span class="stat-label">Sources called</span><b class="stat-value">${num(o.sources.withTraffic)}</b><span class="stat-sub">of ${num(cat.scrapers)} in the catalog</span></div>
+          <div class="kpi"><span class="stat-label">Switched off</span><b class="stat-value">${num(o.attention.disabledSources)}</b><span class="stat-sub"><a href="/admin/scrapers">Manage catalog</a></span></div>
+          <div class="kpi"><span class="stat-label">Catalog</span><b class="stat-value">${c.compact(cat.endpoints)}</b><span class="stat-sub">endpoints · ${num(cat.liveScrapers)} live, ${num(cat.byokScrapers)} BYOK</span></div>
+        </section>
+        <section class="ds-card"><div class="card-top"><h2>Sources</h2><div class="push">${h.seg("show", [["problems", "With errors"], ["all", "All called"]], show)}</div></div><div data-list></div>
+          <p class="muted-sm">4xx errors are usually bad input from the caller; 5xx means the source itself failed or timed out. Switch a source off in <a href="/admin/scrapers">Catalog</a> while it is broken.</p></section>
+        <section class="ds-card"><div class="card-top"><h2>Platform</h2></div><div class="grid-4">
+          <div class="kv"><span>Storage</span><b>${c.esc(o.system.storage)}</b></div>
+          <div class="kv"><span>Region</span><b>${c.esc(o.system.region ?? "local")}</b></div>
+          <div class="kv"><span>Version</span><b>${c.esc(o.system.version)}</b></div>
+          <div class="kv"><span>Setup checks</span><b><a href="/admin/setup">Open</a></b></div>
+        </div></section>`;
+      draw();
+    };
+    setHandlers({ range: range.handler, retry: load, show: (el) => { show = el.dataset.v; c.$$('[data-act="show"]', c.root).forEach((b) => b.classList.toggle("on", b === el)); draw(); } });
+    await load();
+  };
+
+  // ===== Revenue ============================================================================
+  A.revenue = async (c) => {
+    const { h, esc, num, idr } = c;
+    const range = c.rangeControl(() => load());
+    const load = async () => {
+      setActions(`${range.html}<a class="btn btn-ghost" href="/admin/invoices">Invoices</a>`);
+      c.root.innerHTML = h.skeleton(5);
+      const o = await loadAnalytics(c);
+      sysLine(c, o);
+      const rv = o.revenue, cu = o.customers;
+      const rw = RW[o.range];
+      c.root.innerHTML = `
+        <section class="ds-card kpis">
+          <div class="kpi kpi-lead"><span class="stat-label">Revenue · ${rw}</span><b class="hero-num" title="${idr(rv.inRange)}">${idrShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)}${rv.previous !== null ? ` vs ${idr(rv.previous)} before` : ""} · VAT included</span></div>
+          <div class="kpi"><span class="stat-label">MRR</span><b class="stat-value">${usd(rv.mrrUsd)}</b><span class="stat-sub">active paid plans at list price</span></div>
+          <div class="kpi"><span class="stat-label">Paying customers</span><b class="stat-value">${num(cu.paying)}</b><span class="stat-sub">${c.pct(cu.conversion === null ? null : Math.round(cu.conversion * 1000) / 10)} of ${num(cu.total)}</span></div>
+          <div class="kpi"><span class="stat-label">ARPU</span><b class="stat-value">${usd(rv.arpuUsd)}</b><span class="stat-sub">per paying customer / month</span></div>
+          <div class="kpi"><span class="stat-label">To confirm</span><b class="stat-value">${num(o.attention.invoicesToReview)}</b><span class="stat-sub">${num(rv.pending)} more awaiting transfer</span></div>
+        </section>
+        <div class="ov-row">
+          <section class="ds-card"><div class="card-top"><h2>Paid per day</h2><span class="meta push">${num(rv.paidCount)} invoices · ${rw}</span></div>${rv.inRange ? barChart(c, rv.series.map((x) => ({ t: x.t, v: x.amount })), { fmt: idr, label: "Revenue" }) : h.empty("No payments in this range", "Approved invoices count on the day they are marked paid.")}</section>
+          <section class="ds-card"><div class="card-top"><h2>Plan mix</h2></div>
+            <div class="planmix">${["free", "pro", "ultra", "max"].map((p) => `<span class="pm-seg pm-${p}" style="flex:${cu.byPlan[p] || 0}"></span>`).join("")}</div>
+            <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.cap(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
+          </section>
+        </div>
+        <div class="grid-2">
+          <section class="ds-card"><div class="card-top"><h2>Waiting for your confirmation</h2><a class="link-sm push" href="/admin/invoices">Review</a></div>${
+            rv.awaitingReview.length ? `<ul class="mini-list">${rv.awaitingReview.map((i) => `<li><a href="/admin/invoices"><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : `${c.cap(i.plan)} × ${i.months} mo`}</span><b>${idr(i.amount)}</b><small>${c.ago(i.createdAt)}</small></a></li>`).join("")}</ul>` : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing to confirm.</p>`
+          }</section>
+          <section class="ds-card"><div class="card-top"><h2>Latest payments</h2></div>${
+            rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.map((i) => `<li><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : c.cap(i.plan ?? "plan")}</span><b>${idr(i.amount)}</b><small>${c.day(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
+          }</section>
+        </div>`;
+    };
+    setHandlers({ range: range.handler, retry: load });
+    await load();
   };
 
   // ===== Setup checks ======================================================================
@@ -62,7 +328,7 @@
   A.users = async (c) => {
     const { h, esc, num, api, day } = c;
     let users = [];
-    let q = "";
+    let q = (new URLSearchParams(location.search).get("q") ?? "").trim().toLowerCase();
     let page = 0;
     const draw = () => {
       const list = users.filter((u) => !q || `${u.email} ${u.name}`.toLowerCase().includes(q));
@@ -86,7 +352,7 @@
       users = (await api("/api/admin/users")).content;
       draw();
     };
-    c.root.innerHTML = `<div class="filterbar"><label class="search-box"><span class="visually-hidden">Search customers</span><input type="search" placeholder="Search email or name" data-input="search" aria-label="Search customers"></label></div><div data-list></div>`;
+    c.root.innerHTML = `<div class="filterbar"><label class="search-box"><span class="visually-hidden">Search customers</span><input type="search" placeholder="Search email or name" data-input="search" aria-label="Search customers" value="${esc(q)}"></label></div><div data-list></div>`;
     const $list = c.$("[data-list]", c.root);
     setActions("");
     setHandlers({

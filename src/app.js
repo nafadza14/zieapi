@@ -36,6 +36,7 @@ import { homePage } from "./web/pages/home.js";
 import { scrapersPage, categoryPage, scraperPage } from "./web/pages/catalog.js";
 import { pricingPage } from "./web/pages/pricing.js";
 import { docsPage, DOC_SLUGS } from "./web/pages/docs.js";
+import { createAdminAnalytics } from "./dashboard/admin-analytics.js";
 import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage, DASH_SLUGS, ADMIN_SLUGS } from "./web/pages/misc.js";
 
 export const VERSION = "2.0.0";
@@ -146,6 +147,7 @@ export function createApp(opts = {}) {
   // ---------- helpers --------------------------------------------------------
   const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), keyId: null, keyPreview: "dashboard", keyName: "Dashboard", ip: clientIp(req), user, source });
   const isAdmin = (u) => u?.role === "admin" || (u?.email && adminEmails.has(u.email));
+  const adminAnalytics = createAdminAnalytics({ repo, kv, catalog, storage, version: VERSION, env });
   const accountApi = createAccountApi({ repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, bankConfigured, vatPercent, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
   const requireUser = (ctx) => {
     if (!ctx.user) throw E.unauthorized("Sign in required");
@@ -444,6 +446,8 @@ export function createApp(opts = {}) {
     requireAdmin(ctx);
     if (m !== "GET") requireCsrf(ctx.req);
     let mm;
+    if (p === "/api/admin/analytics" && m === "GET") return json(200, okContent(await adminAnalytics.overview(q)), { "Cache-Control": "private, no-store" });
+    if (p === "/api/admin/live" && m === "GET") return json(200, okContent(await adminAnalytics.live(q)), { "Cache-Control": "private, no-store" });
     if (p === "/api/admin/overview") {
       const [users, invoices, reports, days, requests] = await Promise.all([repo.listUsers(), repo.listItems("invoice"), repo.listItems("report"), repo.dailyUsage(null, 30), repo.globalRequests()]);
       const byPlan = {};

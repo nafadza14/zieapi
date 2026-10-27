@@ -38,11 +38,24 @@ export function rollupFields(e) {
   return out;
 }
 
+/** Platform-wide counters for the admin dashboard: the same fields without per-key copies, plus who called (ow|)
+ * and which sources failed (pe| any error, p5| server errors). */
+export function globalFields(owner, e) {
+  const f = rollupFields({ ...e, keyId: null });
+  if (owner) f[`ow|${owner}`] = 1;
+  if (e.status >= 400) f[`pe|${e.project}`] = 1;
+  if (e.status >= 500) f[`p5|${e.project}`] = 1;
+  return f;
+}
+export const GLOBAL_LOG = "glog";
+export const GLOBAL_LOG_CAP = 500;
+
 export function recordCommands(owner, e, now = Date.now()) {
   const hk = hourKey(now);
   return [
     ["HMINCR", `ah:${owner}:${hk}`, rollupFields(e), ROLLUP_TTL],
-    ["HMINCR", `ah:_g:${hk}`, { req: 1, ...(e.status >= 500 ? { e5: 1 } : {}), ...(e.status >= 400 ? { err: 1 } : {}) }, ROLLUP_TTL],
+    ["HMINCR", `ah:_g:${hk}`, globalFields(owner, e), ROLLUP_TTL],
+    ["LPUSH", GLOBAL_LOG, JSON.stringify({ at: e.at, owner, project: e.project, endpoint: e.endpoint, status: e.status, ms: e.ms, source: e.source, cache: e.cache, code: e.code, error: e.error ? String(e.error).slice(0, 160) : null }), GLOBAL_LOG_CAP],
   ];
 }
 

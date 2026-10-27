@@ -77,9 +77,9 @@
   };
 
   /** Requests (area) and errors (line) over time, drawn as an SVG on one honest scale. */
-  function lineChart(series, { gran = "day", height = 220 } = {}) {
+  function lineChart(series, { gran = "day", height = 220, maxW = 640 } = {}) {
     // Narrow screens get a narrower drawing so axis labels stay readable after scaling.
-    const W = Math.round(Math.max(340, Math.min(640, (root.clientWidth || 640) - 40)));
+    const W = Math.round(Math.max(340, Math.min(maxW, (root.clientWidth || 640) - 40)));
     const H = W < 500 ? Math.round(height * 0.85) : height;
     const pad = { l: 36, r: 12, t: 12, b: 26 };
     const max = Math.max(3, ...series.map((p) => p.requests));
@@ -372,7 +372,7 @@
     let items = [];
     let sel = 0;
     let timer;
-    const pages = (D.sections ?? []).map((s) => ({ label: s.label, hint: "Dashboard", href: `/dashboard${s.slug ? "/" + s.slug : ""}` })).concat([{ label: "Docs", hint: "Guides", href: "/docs" }, { label: "MCP setup", hint: "Guides", href: "/mcp" }, { label: "Browse APIs", hint: "Catalog", href: "/scrapers" }]);
+    const pages = (D.sections ?? []).map((s) => ({ label: s.label, hint: s.base === "/admin" ? "Admin" : "Dashboard", href: `${s.base ?? "/dashboard"}${s.slug ? "/" + s.slug : ""}` })).concat([{ label: "Docs", hint: "Guides", href: "/docs" }, { label: "MCP setup", hint: "Guides", href: "/mcp" }, { label: "Browse APIs", hint: "Catalog", href: "/scrapers" }]);
     const draw = () => {
       list.innerHTML = items.length ? items.map((it, i) => `<li role="option" aria-selected="${i === sel}"><a href="${esc(it.href)}" class="${i === sel ? "on" : ""}"><span>${esc(it.label)}</span><small>${esc(it.hint)}</small></a></li>`).join("") : `<li class="pal-empty">No matches</li>`;
     };

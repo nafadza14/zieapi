@@ -23,10 +23,10 @@ export function nav({ active, user }) {
   const links = NAV.map(([href, label, key]) => `<a href="${href}" class="nav-link${active === key ? " active" : ""}"${active === key ? ' aria-current="page"' : ""}>${active === key ? '<span class="nav-dot" aria-hidden="true"></span>' : ""}${label}</a>`).join("");
   const right = user
     ? `<a class="pill pill-outline" href="/dashboard">Dashboard</a><a class="avatar" href="/dashboard/settings" title="${esc(user.name)}">${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">` : esc((user.name ?? "?")[0].toUpperCase())}</a>`
-    : `<a class="pill pill-white" href="/register">Sign up</a><a class="pill pill-outline" href="/login">Log In</a>`;
+    : `<a class="nav-login" href="/login">Log in</a><a class="pill pill-white" href="/register">Get free API key</a>`;
   return `<header class="nav" id="nav">
   <a href="/" class="nav-brand" aria-label="Apizie home">${logo()}</a>
-  <nav class="nav-links" aria-label="Primary">${links}</nav>
+  <nav class="nav-links" aria-label="Primary">${links}${user ? "" : '<a href="/login" class="nav-link nav-link-login">Log in</a>'}</nav>
   <div class="nav-right">${right}<button class="nav-toggle" aria-label="Open menu" aria-expanded="false" data-nav-toggle><span></span><span></span></button></div>
 </header>`;
 }

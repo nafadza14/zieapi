@@ -48,7 +48,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div class="hero-inner">
     <a href="/mcp" class="hero-pill rise r1"><span class="pill-new">New</span><span class="pill-long">MCP server for Claude, ChatGPT &amp; Cursor</span><span class="pill-short">MCP for Claude &amp; ChatGPT</span><span aria-hidden="true">→</span></a>
     ${heroTitle(apiCount)}
-    <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
+    <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">${user ? "Open dashboard" : "Get free API key"} <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
     ${brandStrip(totals, liveKeys)}
   </div>
 </section>`;

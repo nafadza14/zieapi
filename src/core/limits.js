@@ -30,13 +30,14 @@ export class Limiter {
     const month = monthKey(new Date(now));
     const window = Math.floor(now / 60000);
 
-    let monthUsed = await this.repo.incrMonth(owner, n, month);
+    let [monthUsed, minuteUsed] = this.repo.incrUsage ? await this.repo.incrUsage(owner, n, month, window) : [await this.repo.incrMonth(owner, n, month), null];
     let payg = 0;
     if (monthUsed > p.monthly) {
       monthUsed = await this.repo.incrMonth(owner, -n, month);
       // Over the plan quota: the pay-as-you-go balance covers it when the owner opted in.
       const balance = await this.repo.tryPaygDebit(owner, n);
       if (balance === null) {
+        if (minuteUsed !== null) await this.repo.incrMinute(owner, -n, window);
         const used = monthUsed;
         const retryAfterSec = secondsToMonthReset(new Date(now));
         throw new HttpError(
@@ -50,7 +51,7 @@ export class Limiter {
         this.onPayg?.(owner, balance);
       } catch {}
     }
-    const minuteUsed = await this.repo.incrMinute(owner, n, window);
+    if (minuteUsed === null) minuteUsed = await this.repo.incrMinute(owner, n, window);
     if (minuteUsed > p.perMinute) {
       await this.repo.incrMinute(owner, -n, window);
       if (payg) await this.repo.refundPayg(owner, payg);

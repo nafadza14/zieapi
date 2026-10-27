@@ -14,10 +14,36 @@ const LOG_CAP = 5000;
 export const DEFAULT_PREFS = { quotaWarning: true, quotaExceeded: true, balance: true, affiliate: true, product: false, payg: false, lowBalanceAlert: true };
 
 export class Repo {
-  constructor(kv, { vaultSecret = null } = {}) {
+  constructor(kv, { vaultSecret = null, hotCacheMs = 15_000 } = {}) {
     this.kv = kv;
     this.envKeys = new Map(); // hash -> key record (from APIZIE_KEYS), not persisted
+    // Per-instance cache for the records every API/MCP call reads (key, owner, disabled list). Each saves a storage
+    // round trip; changes made on this instance invalidate at once, other instances see them within hotCacheMs.
+    this.hotCacheMs = hotCacheMs;
+    this.hot = new Map();
     this.setVault(vaultSecret);
+  }
+  async _hot(k, load) {
+    const now = Date.now();
+    const e = this.hot.get(k);
+    if (e && e.exp > now) return e.v;
+    const v = await load();
+    if (this.hotCacheMs > 0) {
+      if (this.hot.size > 5000) this.hot.delete(this.hot.keys().next().value);
+      this.hot.set(k, { v, exp: now + this.hotCacheMs });
+    }
+    return v;
+  }
+  _unhot(k) {
+    this.hot.delete(k);
+  }
+  /** getKeyBySecret / getUser through the hot cache: for authenticating API and MCP calls only. */
+  authKey(secret) {
+    const hash = sha256(secret);
+    return this.envKeys.get(hash) ?? this._hot(`key:${hash}`, async () => J(await this.kv.get(`key:${hash}`)));
+  }
+  authUser(id) {
+    return id ? this._hot(`user:${id}`, () => this.getUser(id)) : null;
   }
   /** Key used to encrypt API key secrets so their owner can reveal them later. */
   setVault(secret) {
@@ -70,6 +96,7 @@ export class Repo {
     if (!u) return null;
     const next = { ...u, ...(typeof patch === "function" ? patch(u) : patch) };
     await this.kv.set(`user:${id}`, S(next));
+    this._unhot(`user:${id}`);
     return next;
   }
   async listUsers() {
@@ -167,12 +194,14 @@ export class Repo {
     if (!k) return null;
     const next = { ...k, ...patch };
     await this.kv.set(`key:${k.hash}`, S(next));
+    this._unhot(`key:${k.hash}`);
     return next;
   }
   async deleteKey(id) {
     const k = await this.getKeyById(id);
     if (!k) return false;
     await this.kv.del(`key:${k.hash}`);
+    this._unhot(`key:${k.hash}`);
     await this.kv.del(`key_id:${id}`);
     await this.kv.srem(`user_keys:${k.userId}`, id);
     return true;
@@ -189,6 +218,11 @@ export class Repo {
   // ---------- usage & rate limits -------------------------------------------
   async incrMinute(owner, n, window) {
     return this.kv.incrby(`rl:${owner}:${window}`, n, 120);
+  }
+  /** Month and minute counters in one storage round trip: [monthUsed, minuteUsed]. */
+  async incrUsage(owner, n, month, window) {
+    const [m, w] = await this.kv.batch([["INCRBY", `use:${owner}:${month}`, n], ["INCRBY", `rl:${owner}:${window}`, n, 120]]);
+    return [Number(m), Number(w)];
   }
   async incrMonth(owner, n, month = monthKey()) {
     return this.kv.incrby(`use:${owner}:${month}`, n);
@@ -293,11 +327,12 @@ export class Repo {
 
   // ---------- scraper toggles -------------------------------------------------
   async disabledScrapers() {
-    return new Set(await this.kv.smembers("scr_off"));
+    return this._hot("scr_off", async () => new Set(await this.kv.smembers("scr_off")));
   }
   async setScraperEnabled(key, enabled) {
     if (enabled) await this.kv.srem("scr_off", key);
     else await this.kv.sadd("scr_off", key);
+    this._unhot("scr_off");
   }
 
   // ---------- admin logo overrides -----------------------------------------
@@ -442,6 +477,7 @@ export class Repo {
     for (const [prov, pid] of Object.entries(u.providers ?? {})) cmds.push(["DEL", `user_oauth:${prov}:${pid}`]);
     if (u.affCode) cmds.push(["DEL", `aff_code:${u.affCode}`]);
     await this.kv.batch(cmds);
+    this._unhot(`user:${userId}`);
     return true;
   }
 

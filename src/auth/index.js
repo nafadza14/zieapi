@@ -1,7 +1,7 @@
 // Authentication: API keys (for /v1 + /mcp), cookie sessions (website/dashboard),
 // email+password (scrypt) and OAuth (GitHub, Google, Discord).
 
-import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
+import { scrypt, randomBytes, timingSafeEqual, createHash } from "node:crypto";
 import { E } from "../core/envelope.js";
 import { ipAllowed } from "../dashboard/account.js";
 
@@ -57,13 +57,13 @@ export async function apiKeyCaller(repo, req, oauth = null) {
   if (!raw) throw E.unauthorized("API key required (x-api-key, Authorization: Bearer, or api-key header)");
   if (raw.startsWith("zoa_")) {
     // OAuth access token issued to an MCP client (see src/auth/oauth.js)
-    const rec = oauth ? await oauth.resolveAccessToken(raw) : null;
+    const rec = oauth ? await repo._hot(`oat:${createHash("sha256").update(raw).digest("hex")}`, () => oauth.resolveAccessToken(raw)) : null;
     if (!rec) throw E.unauthorized("Invalid or expired access token");
-    const user = await repo.getUser(rec.userId);
+    const user = await repo.authUser(rec.userId);
     if (!user || user.status !== "active") throw E.unauthorized("Account disabled");
     return { owner: user.id, plan: repo.effectivePlan(user), keyId: `oauth_${rec.clientId}`, keyPreview: `MCP · ${rec.clientName}`.slice(0, 40), keyName: `MCP · ${rec.clientName}`.slice(0, 40), ip: clientIp(req), user, oauth: true, requestId: req.zieRequestId };
   }
-  const key = await repo.getKeyBySecret(raw);
+  const key = await repo.authKey(raw);
   if (!key) throw E.unauthorized("Invalid API key");
   if (key.status !== "active") throw E.unauthorized(key.status === "revoked" ? "API key revoked" : "API key disabled");
   const ip = clientIp(req);
@@ -71,7 +71,7 @@ export async function apiKeyCaller(repo, req, oauth = null) {
   let user = null;
   let plan = key.plan ?? "free";
   if (key.userId) {
-    user = await repo.getUser(key.userId);
+    user = await repo.authUser(key.userId);
     if (!user || user.status !== "active") throw E.unauthorized("Account disabled");
     plan = repo.effectivePlan(user);
     repo.touchKey(key).catch(() => {});

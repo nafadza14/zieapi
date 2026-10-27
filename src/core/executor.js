@@ -18,8 +18,8 @@ export function effectiveTtl(endpointTtl, requested, planMin) {
 }
 
 export class Executor {
-  constructor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl = globalThis.fetch, lookupImpl = null, upstream = null, logger = null }) {
-    Object.assign(this, { catalog, repo, limiter, webhooks, publicUrl, fetchImpl, lookupImpl, upstream, logger });
+  constructor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl = globalThis.fetch, lookupImpl = null, upstream = null, logger = null, background = null }) {
+    Object.assign(this, { catalog, repo, limiter, webhooks, publicUrl, fetchImpl, lookupImpl, upstream, logger, background });
     this.mem = new Map(); // L1 cache (per instance)
   }
 
@@ -47,31 +47,41 @@ export class Executor {
       if (endpoint.status === "planned" || (endpoint.status === "upstream" && !this.upstream))
         throw new HttpError(501, { content: { status: "planned" }, message: `${projectKey}/${endpointSlug} is in the catalog but not live on this server yet.`, errors: [] });
 
-      if (!reserved) ticket = await this.limiter.reserve(caller.owner, caller.plan, 1);
-
-      const merged = { ...params };
-      const names = pathFieldNames(endpoint);
-      if (pathRest && names.length) {
-        const segs = pathRest.split("/").filter(Boolean).map(safeDecode);
-        names.forEach((n, i) => {
-          const v = i === names.length - 1 ? segs.slice(i).join("/") : segs[i];
-          if (v !== undefined && v !== "") merged[n] = v;
-        });
-      } else if (pathRest && !names.length) {
-        throw E.notFound(`Endpoint "${endpointSlug}/${pathRest}" not found on ${projectKey}`);
+      // Prepare params and the cache lookup first (pure work), then run the quota check and the cache read in parallel:
+      // one storage round trip instead of two. Errors found here are raised after the quota check, as before.
+      let pre = null, value, errors = [], requestedTtl, cacheKey = null, readTtl = 0, writeTtl = 0;
+      try {
+        const merged = { ...params };
+        const names = pathFieldNames(endpoint);
+        if (pathRest && names.length) {
+          const segs = pathRest.split("/").filter(Boolean).map(safeDecode);
+          names.forEach((n, i) => {
+            const v = i === names.length - 1 ? segs.slice(i).join("/") : segs[i];
+            if (v !== undefined && v !== "") merged[n] = v;
+          });
+        } else if (pathRest && !names.length) {
+          throw E.notFound(`Endpoint "${endpointSlug}/${pathRest}" not found on ${projectKey}`);
+        }
+        requestedTtl = merged.ttl;
+        delete merged.ttl;
+        ({ value, errors } = validateParams(endpoint.fields, merged));
+        ({ readTtl, writeTtl } = effectiveTtl(endpoint.cacheTtl, requestedTtl, getPlan(caller.plan).minCacheTtl));
+        // Never share cached responses fetched with someone's own upstream credentials.
+        const authTag = upstreamAuth && (upstreamAuth.key || upstreamAuth.authorization) ? `#${caller.owner}:${sha256(JSON.stringify(upstreamAuth)).slice(0, 16)}` : "";
+        cacheKey = `cache:${scraper.key}/${endpoint.slug}?${stableStringify(value)}${authTag}`;
+      } catch (e) {
+        pre = e;
       }
-      const requestedTtl = merged.ttl;
-      delete merged.ttl;
+      const cachedP = !pre && !errors.length && readTtl > 0 ? this._cacheGet(cacheKey) : Promise.resolve(null);
+      cachedP.catch(() => {});
 
-      const { value, errors } = validateParams(endpoint.fields, merged);
+      if (!reserved) ticket = await this.limiter.reserve(caller.owner, caller.plan, 1);
+      if (pre) throw pre;
       if (errors.length) throw E.invalidParams(errors);
 
-      const { readTtl, writeTtl } = effectiveTtl(endpoint.cacheTtl, requestedTtl, getPlan(caller.plan).minCacheTtl);
-      // Never share cached responses fetched with someone's own upstream credentials.
-      const authTag = upstreamAuth && (upstreamAuth.key || upstreamAuth.authorization) ? `#${caller.owner}:${sha256(JSON.stringify(upstreamAuth)).slice(0, 16)}` : "";
-      const cacheKey = `cache:${scraper.key}/${endpoint.slug}?${stableStringify(value)}${authTag}`;
       let data;
-      const cached = readTtl > 0 ? await this._cacheGet(cacheKey) : null;
+      const cmds = [];
+      const cached = await cachedP;
       if (cached && Date.now() - cached.at <= readTtl * 1000) {
         data = cached.value;
         headers["X-Cache"] = "HIT";
@@ -79,9 +89,13 @@ export class Executor {
       } else {
         headers["X-Cache"] = writeTtl > 0 ? (readTtl === 0 ? "BYPASS" : "MISS") : "NONE";
         data = endpoint.handler ? await this._runHandler(endpoint, value, caller, scraper, signal, upstreamAuth) : await this._runUpstream(scraper, endpoint, value, pathRest, signal);
-        if (writeTtl > 0) await this._cacheSet(cacheKey, data, writeTtl);
+        if (writeTtl > 0) {
+          const setCmd = this._cacheSet(cacheKey, data, writeTtl, { deferred: true });
+          if (setCmd) cmds.push(setCmd);
+        }
       }
-      await this._after(caller, scraper, endpoint.slug, 200, Date.now() - t0, !!ticket, { method: method ?? endpoint.method, cache: headers["X-Cache"] });
+      // Cache write, stats, usage rollups and the log line go out in one batch, after the response when the host allows.
+      await this._later(this._after(caller, scraper, endpoint.slug, 200, Date.now() - t0, !!ticket, { method: method ?? endpoint.method, cache: headers["X-Cache"], cmds }));
       if (ticket) Object.assign(headers, ticket.headers());
       return { status: 200, body: okRun(scraper.key, data), headers };
     } catch (err) {
@@ -145,14 +159,25 @@ export class Executor {
       return null;
     }
   }
-  async _cacheSet(k, value, ttl) {
+  /** Returns the storage command when deferred, so the cache write can join the request's single batch. */
+  _cacheSet(k, value, ttl, { deferred = false } = {}) {
     const entry = { value, at: Date.now() };
     if (this.mem.size > 2000) this.mem.delete(this.mem.keys().next().value);
     this.mem.set(k, { ...entry, exp: Date.now() + ttl * 1000 });
+    let s;
     try {
-      const s = JSON.stringify(entry);
-      if (s.length < 512_000) await this.repo.kv.set(k, s, { ex: ttl });
-    } catch {}
+      s = JSON.stringify(entry);
+    } catch {
+      return null;
+    }
+    if (s.length >= 512_000) return null;
+    if (deferred) return ["SET", k, s, ttl];
+    return Promise.resolve(this.repo.kv.set(k, s, { ex: ttl })).catch(() => {});
+  }
+
+  /** Let bookkeeping finish after the response when the host supports it (Vercel waitUntil); otherwise await it. */
+  _later(p) {
+    return this.background ? this.background(p) : p;
   }
 
   /** All per-request bookkeeping (stats, usage, log line, dashboard rollups) in one storage round trip. */
@@ -160,7 +185,7 @@ export class Executor {
     try {
       const day = dayKey();
       const owner = caller.owner;
-      const cmds = [["INCRBY", "g:requests", 1]];
+      const cmds = [["INCRBY", "g:requests", 1], ...(extra.cmds ?? [])];
       if (scraper.id) cmds.push(["INCRBY", `stat:${scraper.id}:req`, 1], ...(status < 400 ? [["INCRBY", `stat:${scraper.id}:ok`, 1]] : []));
       if (billed) cmds.push(["INCRBY", `useday:${owner}:${day}`, 1, 100 * 86400], ["INCRBY", `g:day:${day}`, 1, 100 * 86400], ["HINCRBY", `usescr:${owner}:${monthKey()}`, scraper.key, 1]);
       if (owner && caller.source !== "playground-public") {

@@ -121,7 +121,16 @@ export function createApp(opts = {}) {
       }
     },
   });
-  const executor = new Executor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookupImpl: opts.lookup ?? null, upstream, logger });
+  // On Vercel, request bookkeeping finishes after the response (waitUntil); elsewhere it is awaited as before.
+  const background = opts.background ?? ((p) => {
+    const ctx = globalThis[Symbol.for("@vercel/request-context")]?.get?.();
+    if (typeof ctx?.waitUntil === "function") {
+      ctx.waitUntil(Promise.resolve(p).catch(() => {}));
+      return undefined;
+    }
+    return p;
+  });
+  const executor = new Executor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookupImpl: opts.lookup ?? null, upstream, logger, background });
   const bulk = new BulkManager({ catalog, repo, executor, limiter, webhooks, publicUrl, apiUrl });
   const oauth = createOAuth({ repo, apiUrl, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookup: opts.lookup ?? null });
   const mcp = createMcpHandler({ catalog, repo, executor, limiter, bulk, version: VERSION, authenticate: (req) => apiKeyCaller(repo, req, oauth), wwwAuthenticate: oauth.wwwAuthenticate });

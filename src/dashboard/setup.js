@@ -14,8 +14,20 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
     );
   } else {
     try {
+      const t0 = Date.now();
       const [pong] = await kv.batch([["PING"]]);
-      add("storage", "Database", pong === "PONG" ? "ok" : "fail", `${storage.backend} answered ${JSON.stringify(pong)}.`);
+      const t1 = Date.now();
+      await kv.batch([["PING"]]); // second call: connection already warm
+      const rtt = Date.now() - t1;
+      add("storage", "Database", pong === "PONG" ? "ok" : "fail", `${storage.backend} answered ${JSON.stringify(pong)} (first call ${t1 - t0} ms).`);
+      const region = env.VERCEL_REGION ? ` from Vercel region ${env.VERCEL_REGION}` : "";
+      add(
+        "latency",
+        "Database round trip",
+        rtt <= 60 ? "ok" : "warn",
+        `${rtt} ms per storage round trip${region}. Every API and MCP call needs at least one.`,
+        rtt <= 60 ? null : "Run the functions in the same region as the database: Vercel, Project Settings, Functions, Function Region (or \"regions\" in vercel.json), set to the region closest to your Supabase project (Supabase, Project Settings, General shows it). Example: Supabase ap-southeast-1 (Singapore) -> Vercel sin1."
+      );
     } catch (e) {
       const missing = /function|apizie_kv|schema cache/i.test(e.message);
       add("storage", "Database", "fail", `${storage.backend}: ${e.message}`, missing ? "The SQL migration has not been run. Open the Supabase SQL editor and run supabase/migrations/0001_apizie.sql." : "Check SUPABASE_SECRET_KEY (Project Settings, API Keys, secret key).");

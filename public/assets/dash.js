@@ -313,7 +313,38 @@
   });
 
   popover($("[data-menu-btn]"), $("[data-menu]"), (panel) => $("a,button", panel)?.focus());
-  const sheet = popover($("[data-sheet-btn]"), $("[data-sheet]"), (panel) => $("a", panel)?.focus());
+
+  // Mobile: the sidebar slides in over the page. On desktop it is always visible and this does nothing.
+  const side = $("[data-sheet]");
+  const sideBtn = $("[data-sheet-btn]");
+  const scrim = $("[data-sheet-close]");
+  const sheet = {
+    get isOpen() {
+      return !!side?.classList.contains("open");
+    },
+    open() {
+      closeAll(sheet);
+      side.classList.add("open");
+      scrim.hidden = false;
+      sideBtn.setAttribute("aria-expanded", "true");
+      $(".ap-link.on", side)?.focus();
+    },
+    close() {
+      if (!this.isOpen) return;
+      side.classList.remove("open");
+      scrim.hidden = true;
+      sideBtn.setAttribute("aria-expanded", "false");
+    },
+  };
+  if (side && sideBtn) {
+    pops.push(sheet);
+    sideBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      sheet.isOpen ? sheet.close() : sheet.open();
+    });
+    scrim.addEventListener("click", () => sheet.close());
+    side.addEventListener("click", (e) => e.stopPropagation());
+  }
 
   popover($("[data-bell]"), $("[data-bell-pop]"), async (panel) => {
     panel.innerHTML = `<div class="ap-pop-head">Notifications</div><p class="ap-pop-empty">Loading…</p>`;

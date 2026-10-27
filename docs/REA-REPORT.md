@@ -285,3 +285,31 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 
 # Iterasi 6: Hero, favicon, metadata, SEO dan GEO (26 Okt 2026)
 Bukti E42-E45; detail dan sumber di [`SEO-GEO.md`](SEO-GEO.md). Hero baru ("One API key for 1,600+ data sources"), logo brand live berwarna asli, favicon yang terbaca di tab terang/gelap, metadata lengkap per halaman, JSON-LD (WebAPI per API), twin Markdown, robots.txt untuk crawler AI, sitemap dengan lastmod. Diverifikasi dengan `npm test` (153 lulus) dan tangkapan layar desktop/mobile.
+
+# Iterasi 7: Dashboard lengkap dan siap dipakai (27 Okt 2026)
+
+## A. Observations baru
+- O-70: 9 tangkapan layar dashboard zapi.ink dari pemilik (Dashboard, Logs, API keys, Bulk, Webhooks, Billing, Affiliate, Settings, Support). Struktur: sidebar 3 grup (Overview, API, Account) dengan badge jumlah key, kunci plan (Ultra/Pro), pencarian ⌘K dan meter kuota tersegmentasi; header per halaman dengan kontrol rentang 24H/7D/30D (Pro)/90D (Ultra) dan filter "All API keys".
+- O-71: QA pemilik di `https://zieapi.vercel.app` gagal. `GET /healthz` menjawab `{"storage":"MemoryKV","uptimeSec":1}`: tidak ada database, jadi akun, sesi, key dan log hilang di antara instance serverless. Ini akar masalah utama, bukan bug UI.
+
+## B. Inferensi
+- I-40: Semua angka di dashboard zapi diturunkan dari agregat per jam (heatmap 7×24, p95, error per status, endpoint teratas). Apizie menyimpannya sebagai hash per jam `ah:<owner>:<jam UTC>` dengan salinan per key, sehingga filter key dan zona waktu penonton tetap tepat untuk 24 jam sampai 90 hari.
+- I-41: Billing zapi memakai saldo pay-as-you-go (top up Rp50k/100k/250k/1M, minimum Rp20k, PPN 11%) di samping plan bulanan. Apizie: saldo dipotong Rp2,2 per request hanya setelah kuota plan habis dan hanya jika pengguna mengaktifkannya.
+
+## C. Rekonstruksi di Apizie
+| Fitur | Berkas |
+|---|---|
+| Shell dashboard (sidebar, ⌘K, lonceng notifikasi, drawer mobile, banner storage) | `src/web/pages/misc.js`, `public/assets/dash.js`, `public/assets/dash.css` |
+| 11 halaman pengguna: Dashboard, Usage, Logs, API keys, Bulk, Webhooks, Billing, Affiliate, Showcase, Settings, Support | `public/assets/dash-user.js`, API di `src/dashboard/account.js` |
+| Admin: Overview, Setup checks, Users, Invoices, Payouts, Scrapers, Reports, Showcase | `public/assets/dash-admin.js`, `src/dashboard/setup.js`, `/api/admin/*` |
+| Rollup analitik per jam (p95 dari bucket latensi, heatmap zona waktu lokal, status sistem) | `src/core/analytics.js`, `executor._after` (satu batch KV per request) |
+| `batch()` di semua backend KV + perintah `HMINCR` di RPC Supabase | `src/db/kv.js`, `supabase/migrations/0001_apizie.sql` |
+| Key bisa ditampilkan lagi (AES-256-GCM), revoke permanen, batas key per plan, IP allowlist + CIDR | `src/db/repo.js`, `src/auth/index.js` |
+| Saldo PAYG, invoice top-up + PPN, transaksi, komisi afiliasi, payout | `src/core/limits.js`, `src/core/plans.js`, `src/app.js` |
+| Sesi aktif (perangkat, IP, keluar dari jarak jauh), ganti password mengeluarkan sesi lain, hapus akun | `src/dashboard/account.js` |
+| Riwayat pengiriman webhook, kirim ulang, aktif/nonaktif, rotasi secret, blokir alamat privat (SSRF) | `src/core/webhooks.js` |
+
+## D. Verifikasi
+- `npm test`: 165 tes lulus di MemoryKV dan di Postgres 16 lokal dengan migration Supabase yang sama (lewat shim PostgREST). Suite baru `test/account.test.js` menguji seluruh API dashboard.
+- Klik-tembus Playwright (`45/45 PASS`) di desktop 1440px dan mobile 390px: setiap tombol, modal, filter, ekspor CSV, unduhan JSON, alur invoice sampai disetujui admin, webhook ke penerima lokal (gagal lalu dikirim ulang), referral, hapus akun. Tidak ada error JavaScript; satu-satunya error konsol adalah 400 yang memang diuji (validasi) dan aset CDN yang diblokir sandbox.
+- Belum terverifikasi: Supabase produksi. Dashboard akan tetap kosong di Vercel sampai migration dijalankan dan `SUPABASE_SECRET_KEY` + `APIZIE_SESSION_SECRET` diset. Halaman `/admin/setup` menunjukkan apa yang masih kurang.

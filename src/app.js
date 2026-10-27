@@ -16,9 +16,11 @@ import { Executor } from "./core/executor.js";
 import { BulkManager } from "./core/bulk.js";
 import { WebhookDispatcher, WEBHOOK_EVENTS, newWebhookSecret } from "./core/webhooks.js";
 import { createMcpHandler } from "./core/mcp.js";
+import { createAccountApi } from "./dashboard/account.js";
+import { setupReport } from "./dashboard/setup.js";
 import { buildOpenApi, buildLlmsTxt } from "./core/openapi.js";
 import { E, HttpError, okContent, errBody } from "./core/envelope.js";
-import { PLANS, getPlan } from "./core/plans.js";
+import { PLANS, PAYG, getPlan } from "./core/plans.js";
 import { ulid, monthKey } from "./core/util.js";
 import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
 import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
@@ -34,7 +36,7 @@ import { homePage } from "./web/pages/home.js";
 import { scrapersPage, categoryPage, scraperPage } from "./web/pages/catalog.js";
 import { pricingPage } from "./web/pages/pricing.js";
 import { docsPage, DOC_SLUGS } from "./web/pages/docs.js";
-import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage } from "./web/pages/misc.js";
+import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage, DASH_SLUGS, ADMIN_SLUGS } from "./web/pages/misc.js";
 
 export const VERSION = "2.0.0";
 const MAX_BODY = 1_000_000;
@@ -54,7 +56,12 @@ export function createApp(opts = {}) {
   // Must be identical on every serverless instance; falls back to a value derived from the Supabase secret.
   const sbSecret = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
   const stateSecret = env.ZIE_SESSION_SECRET ?? (sbSecret ? createHmac("sha256", "apizie-state").update(sbSecret).digest("hex") : randomBytes(32).toString("hex"));
-  const bank = env.ZIE_BANK_INFO ?? "Bank transfer details are not configured yet. Set APIZIE_BANK_INFO on the server.";
+  const stableSecret = env.ZIE_SESSION_SECRET ?? sbSecret ?? null;
+  const bankConfigured = !!env.ZIE_BANK_INFO;
+  const bank = env.ZIE_BANK_INFO ?? "Bank transfer details are not configured yet. The site owner must set APIZIE_BANK_INFO.";
+  const vatPercent = Math.max(0, Math.min(30, Number(env.ZIE_VAT_PERCENT ?? 11)));
+  const affPercent = Math.max(0, Math.min(50, Number(env.ZIE_AFFILIATE_PERCENT ?? 10)));
+  const support = { email: env.ZIE_SUPPORT_EMAIL ?? null, discord: env.ZIE_DISCORD_URL ?? null };
   const upstream = env.ZIE_UPSTREAM_URL ? { url: env.ZIE_UPSTREAM_URL.replace(/\/+$/, ""), key: env.ZIE_UPSTREAM_KEY ?? "", header: (env.ZIE_UPSTREAM_HEADER ?? "x-api-key").toLowerCase() } : null;
 
   const kv = opts.kv ?? kvFromEnv(env, { file: opts.dataFile ?? env.ZIE_DATA_FILE ?? null });
@@ -64,7 +71,8 @@ export function createApp(opts = {}) {
     const sb = (sbAuth?.providers ?? []).filter((id) => PROVIDERS[id] && !own.some((o) => o.id === id)).map((id) => ({ id, label: PROVIDERS[id].label }));
     return [...sb, ...own].sort((a, b) => (a.id === "google" ? -1 : b.id === "google" ? 1 : 0));
   };
-  const repo = new Repo(kv);
+  const repo = new Repo(kv, { vaultSecret: opts.vaultSecret ?? stableSecret });
+  const storage = { backend: kv.constructor.name, persistent: kv.constructor.name !== "MemoryKV" || (!serverless && !!(opts.dataFile ?? env.ZIE_DATA_FILE)), serverless };
   repo.seedEnvKeys(opts.keys ?? env.ZIE_KEYS);
   const catalog = opts.catalog ?? new Catalog({ live: opts.scrapers ?? liveScrapers, upstream: !!upstream, seed: opts.seed !== false });
 
@@ -72,14 +80,43 @@ export function createApp(opts = {}) {
     if (owner?.startsWith("key_")) return [...repo.envKeys.values()].find((k) => `key_${k.id}` === owner)?.plan ?? "free";
     return repo.effectivePlan(await repo.getUser(owner));
   };
-  const webhooks = new WebhookDispatcher(repo, { fetchImpl: opts.webhookFetch ?? globalThis.fetch, backoffMs: opts.webhookBackoffMs ?? 400, logger, planOf: planOfOwner });
+  const webhooks = new WebhookDispatcher(repo, { fetchImpl: opts.webhookFetch ?? globalThis.fetch, backoffMs: opts.webhookBackoffMs ?? 400, logger, planOf: planOfOwner, lookup: opts.lookup ?? null, allowPrivate: env.ZIE_WEBHOOKS_ALLOW_PRIVATE === "1" });
+  const emailFetch = opts.emailFetch ?? globalThis.fetch;
+  /** In-app notification (and email when RESEND_API_KEY is set), gated by the user's preferences. */
+  const notify = (userId, pref, title, text, extra = {}) => {
+    if (!userId || userId.startsWith("key_")) return;
+    const job = (async () => {
+      const prefs = await repo.getPrefs(userId);
+      if (pref && prefs[pref] === false) return;
+      await repo.addNotification(userId, { type: pref ?? "info", title, text, ...extra });
+      if (env.RESEND_API_KEY && env.ZIE_EMAIL_FROM) {
+        const u = await repo.getUser(userId);
+        if (u?.email) await emailFetch("https://api.resend.com/emails", { method: "POST", headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify({ from: env.ZIE_EMAIL_FROM, to: u.email, subject: `Apizie: ${title}`, text: `${text}\n\n${publicUrl}/dashboard` }) });
+      }
+    })().catch((e) => logger?.warn?.("notify failed: " + e.message));
+    webhooks.pending.add(job);
+    job.finally(() => webhooks.pending.delete(job));
+  };
   const limiter = new Limiter(repo, {
     now: opts.now,
     onUsage: (owner, plan, before, after) => {
       const p = getPlan(plan);
       const warnAt = Math.floor(p.monthly * 0.8);
-      if (before < warnAt && after >= warnAt) webhooks.emit(owner, "quota.warning", { used: after, limit: p.monthly, percent: 80 });
-      if (before < p.monthly && after >= p.monthly) webhooks.emit(owner, "quota.exceeded", { used: after, limit: p.monthly });
+      if (before < warnAt && after >= warnAt) {
+        webhooks.emit(owner, "quota.warning", { used: after, limit: p.monthly, percent: 80 });
+        notify(owner, "quotaWarning", "80% of your monthly quota used", `You have used ${after.toLocaleString("en-US")} of ${p.monthly.toLocaleString("en-US")} requests this month.`);
+      }
+      if (before < p.monthly && after >= p.monthly) {
+        webhooks.emit(owner, "quota.exceeded", { used: after, limit: p.monthly });
+        notify(owner, "quotaExceeded", "Monthly quota used up", "New requests return 429 until the 1st (UTC). Upgrade, or turn on pay-as-you-go in Billing.");
+      }
+    },
+    onPayg: (owner, balanceTenths) => {
+      const threshold = PAYG.lowBalance * 10;
+      if (balanceTenths < threshold && balanceTenths + PAYG.priceTenths >= threshold) {
+        webhooks.emit(owner, "balance.low", { balance: balanceTenths / 10, threshold: PAYG.lowBalance });
+        repo.getPrefs(owner).then((pr) => pr.lowBalanceAlert && notify(owner, "balance", "Balance is running low", `Your pay-as-you-go balance is Rp${Math.floor(balanceTenths / 10).toLocaleString("id-ID")}.`)).catch(() => {});
+      }
     },
   });
   const executor = new Executor({ catalog, repo, limiter, webhooks, publicUrl, fetchImpl: opts.fetch ?? globalThis.fetch, lookupImpl: opts.lookup ?? null, upstream, logger });
@@ -96,8 +133,9 @@ export function createApp(opts = {}) {
   };
 
   // ---------- helpers --------------------------------------------------------
-  const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), keyId: null, keyPreview: "dashboard", ip: clientIp(req), user, source });
+  const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), keyId: null, keyPreview: "dashboard", keyName: "Dashboard", ip: clientIp(req), user, source });
   const isAdmin = (u) => u?.role === "admin" || (u?.email && adminEmails.has(u.email));
+  const accountApi = createAccountApi({ repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, bankConfigured, vatPercent, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
   const requireUser = (ctx) => {
     if (!ctx.user) throw E.unauthorized("Sign in required");
     return ctx.user;
@@ -132,15 +170,22 @@ export function createApp(opts = {}) {
   const safeNext = (n) => (typeof n === "string" && n.startsWith("/") && !n.startsWith("//") ? n : "/dashboard");
 
   async function login(user, req) {
-    const { token, maxAge } = await repo.createSession(user.id);
+    const { token, maxAge } = await repo.createSession(user.id, { ua: req.headers["user-agent"], ip: clientIp(req) });
     return cookie(SESSION_COOKIE, token, { maxAge, secure: isHttps(req) });
   }
-  async function findOrCreateUser({ email, name, avatar, provider, pid }) {
+  async function findOrCreateUser({ email, name, avatar, provider, pid, req = null }) {
     let user = provider ? await repo.getUserByProvider(provider, pid) : null;
     if (!user && email) user = await repo.getUserByEmail(email);
     if (!user) {
       const firstUser = !production && (await repo.listUsers()).length === 0;
       user = await repo.createUser({ email, name, avatar, role: firstUser || (email && adminEmails.has(email.toLowerCase())) ? "admin" : "user" });
+      // Referral cookie set by /?ref=<code>; the referrer earns a share of this user's paid invoices.
+      const refId = req ? await repo.userIdByAffCode(parseCookies(req.headers.cookie).apz_ref) : null;
+      if (refId && refId !== user.id) {
+        user = await repo.updateUser(user.id, { referredBy: refId });
+        await repo.addReferral(refId, user.id);
+        notify(refId, "affiliate", "New referral signed up", "Someone joined Apizie with your referral link.");
+      }
     }
     if (provider) user = await repo.linkProvider(user.id, provider, pid);
     if (avatar && !user.avatar) user = await repo.updateUser(user.id, { avatar });
@@ -212,7 +257,7 @@ export function createApp(opts = {}) {
       if (!verifier || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
       try {
         const prof = await supabaseExchange(sbAuth, { code: q.code, verifier, fetchImpl: opts.oauthFetch ?? globalThis.fetch });
-        const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: "supabase", pid: prof.id });
+        const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: "supabase", pid: prof.id, req });
         if (u.status !== "active") return redirect("/login?error=" + encodeURIComponent("Account suspended"));
         return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_sb", "", { maxAge: 0 })] });
       } catch (e) {
@@ -232,7 +277,7 @@ export function createApp(opts = {}) {
       if (!nonce || nonce !== q.state || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
       try {
         const prof = await exchangeCode(mm[1], { code: q.code, redirectUri: `${publicUrl}/auth/${mm[1]}/callback`, fetchImpl: opts.oauthFetch ?? globalThis.fetch, env });
-        const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: mm[1], pid: prof.id });
+        const u = await findOrCreateUser({ email: prof.email, name: prof.name, avatar: prof.avatar, provider: mm[1], pid: prof.id, req });
         if (u.status !== "active") return redirect("/login?error=" + encodeURIComponent("Account suspended"));
         return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_oauth", "", { maxAge: 0 })] });
       } catch (e) {
@@ -250,7 +295,7 @@ export function createApp(opts = {}) {
       if (password.length < 8) errors.push({ path: "password", message: "At least 8 characters" });
       if (errors.length) throw E.invalidParams(errors);
       if (await repo.getUserByEmail(email)) throw new HttpError(409, errBody("An account with this email already exists. Sign in instead."));
-      const u = await findOrCreateUser({ email, name: name || email.split("@")[0] });
+      const u = await findOrCreateUser({ email, name: name || email.split("@")[0], req });
       await repo.updateUser(u.id, { passwordHash: await hashPassword(password) });
       return json(200, okContent({ ok: true }), { "Set-Cookie": await login(u, req) });
     }
@@ -269,7 +314,12 @@ export function createApp(opts = {}) {
     }
 
     // ----- account API (session) -----------------------------------------------
-    if (p.startsWith("/api/me")) return meApi(ctx, p, m, q, body);
+    if (p.startsWith("/api/me")) {
+      requireUser(ctx);
+      if (m !== "GET") requireCsrf(req);
+      if (p === "/api/me/run" && m === "POST") return runFromDashboard(ctx, body);
+      return accountApi(ctx, p, m, q, body);
+    }
     if (p.startsWith("/api/admin")) return adminApi(ctx, p, m, q, body);
     if (p === "/api/report" && m === "POST") {
       requireCsrf(req);
@@ -363,134 +413,11 @@ export function createApp(opts = {}) {
     return json(r.status, r.body, { ...noStore, ...r.headers });
   }
 
-  async function meApi(ctx, p, m, q, body) {
-    const { req } = ctx;
-    const user = requireUser(ctx);
-    if (m !== "GET") requireCsrf(req);
-    const plan = repo.effectivePlan(user);
-    let mm;
-    if (p === "/api/me" && m === "GET") return json(200, okContent({ user: publicUser(user), plan: getPlan(plan), admin: isAdmin(user), providers: Object.keys(user.providers ?? {}) }));
-    if (p === "/api/me" && m === "PATCH") {
-      const patch = {};
-      if (body?.name !== undefined) patch.name = String(body.name).trim().slice(0, 60) || user.name;
-      if (body?.newPassword !== undefined) {
-        if (String(body.newPassword).length < 8) throw E.invalidParams([{ path: "newPassword", message: "At least 8 characters" }]);
-        if (user.passwordHash && !(await verifyPassword(String(body.currentPassword ?? ""), user.passwordHash))) throw E.invalidParams([{ path: "currentPassword", message: "Current password is wrong" }]);
-        patch.passwordHash = await hashPassword(String(body.newPassword));
-      }
-      return json(200, okContent(publicUser(await repo.updateUser(user.id, patch))));
-    }
-    if (p === "/api/me/overview" && m === "GET") {
-      const [snap, keys, days, scr, logs] = await Promise.all([limiter.snapshot(user.id, plan), repo.listKeys(user.id), repo.dailyUsage(user.id, 14), repo.scraperUse(user.id), repo.getLogs(user.id, { limit: 6 })]);
-      return json(200, okContent({ usage: snap, plan: getPlan(plan), planExpiresAt: user.planExpiresAt, keys: keys.map(publicKey), days, top: topN(scr, 5), recent: logs }));
-    }
-    if (p === "/api/me/keys" && m === "GET") return json(200, okContent((await repo.listKeys(user.id)).map(publicKey)));
-    if (p === "/api/me/keys" && m === "POST") {
-      const keys = await repo.listKeys(user.id);
-      if (keys.length >= 20) throw E.invalidParams([{ path: "name", message: "Maximum 20 keys per account" }]);
-      const { secret, rec } = await repo.createKey(user.id, { name: String(body?.name ?? "New key").slice(0, 60) });
-      webhooks.emit(user.id, "key.created", { keyId: rec.id, name: rec.name });
-      return json(201, okContent({ key: secret, record: publicKey(rec) }, "Created. Copy this key now, it is shown only once."));
-    }
-    if ((mm = /^\/api\/me\/keys\/([^/]+)$/.exec(p))) {
-      const k = await repo.getKeyById(mm[1]);
-      if (!k || k.userId !== user.id) throw E.notFound("Key not found");
-      if (m === "DELETE") {
-        await repo.deleteKey(k.id);
-        return json(200, okContent({ ok: true }));
-      }
-      if (m === "PATCH") {
-        const patch = {};
-        if (body?.name !== undefined) patch.name = String(body.name).slice(0, 60);
-        if (body?.status !== undefined) {
-          if (!["active", "disabled"].includes(body.status)) throw E.invalidParams([{ path: "status", message: "active | disabled" }]);
-          patch.status = body.status;
-          if (body.status === "disabled") webhooks.emit(user.id, "key.disabled", { keyId: k.id });
-        }
-        if (body?.ipAllowlist !== undefined) {
-          if (!getPlan(plan).webhooks) throw E.planGate("pro", `${publicUrl}/pricing`);
-          patch.ipAllowlist = (Array.isArray(body.ipAllowlist) ? body.ipAllowlist : String(body.ipAllowlist).split(/[\s,]+/)).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-        }
-        return json(200, okContent(publicKey(await repo.updateKey(k.id, patch))));
-      }
-    }
-    if (p === "/api/me/apps" && m === "GET") return json(200, okContent(await oauth.listGrants(user.id)));
-    if ((mm = /^\/api\/me\/apps\/([^/]+)$/.exec(p)) && m === "DELETE") {
-      await oauth.revokeGrant(user.id, decodeURIComponent(mm[1]));
-      return json(200, okContent({ ok: true }));
-    }
-    if (p === "/api/me/usage" && m === "GET") {
-      const [snap, days, scr] = await Promise.all([limiter.snapshot(user.id, plan), repo.dailyUsage(user.id, 30), repo.scraperUse(user.id, q.month || monthKey())]);
-      return json(200, okContent({ ...snap, days, scrapers: topN(scr, 50) }));
-    }
-    if (p === "/api/me/logs" && m === "GET") {
-      const limit = Math.min(100, Number(q.limit) || 50);
-      const offset = Math.max(0, Number(q.offset) || 0);
-      const cutoff = Date.now() - getPlan(plan).logDays * 86400000;
-      const logs = (await repo.getLogs(user.id, { limit, offset })).filter((l) => Date.parse(l.at) >= cutoff);
-      return json(200, okContent({ items: logs, limit, offset, retentionDays: getPlan(plan).logDays }));
-    }
-    if (p === "/api/me/bulk" && m === "GET") return json(200, okContent(await bulk.list(user.id)));
-    if ((mm = /^\/api\/me\/bulk\/([^/]+)$/.exec(p)) && m === "GET") return json(200, okContent(await bulk.status({ owner: user.id }, mm[1])));
-    if (p === "/api/me/webhooks") {
-      if (m === "GET") return json(200, okContent({ enabled: getPlan(plan).webhooks, events: WEBHOOK_EVENTS, hooks: (await repo.getWebhooks(user.id)).map(({ secret, ...h }) => ({ ...h, secretPreview: secret.slice(0, 10) + "…" })) }));
-      if (m === "PUT") {
-        if (!getPlan(plan).webhooks) throw E.planGate("pro", `${publicUrl}/pricing`);
-        const list = Array.isArray(body) ? body : body?.webhooks;
-        if (!Array.isArray(list) || list.length > 5) throw E.invalidParams([{ path: "webhooks", message: "Up to 5 webhooks" }]);
-        const prev = await repo.getWebhooks(user.id);
-        const errors = [];
-        const next = list.map((h, i) => {
-          let u;
-          try {
-            u = new URL(h.url);
-          } catch {}
-          if (!u || !/^https?:$/.test(u.protocol)) errors.push({ path: `webhooks.${i}.url`, message: "Must be an http(s) URL" });
-          const events = Array.isArray(h.events) && h.events.length ? h.events : ["*"];
-          const bad = events.filter((e) => e !== "*" && !WEBHOOK_EVENTS.includes(e));
-          if (bad.length) errors.push({ path: `webhooks.${i}.events`, message: `Unknown events: ${bad.join(", ")}` });
-          const ex = prev.find((x) => x.url === h.url);
-          return { id: ex?.id ?? ulid(), url: h.url, events, secret: ex?.secret ?? newWebhookSecret() };
-        });
-        if (errors.length) throw E.invalidParams(errors);
-        await repo.setWebhooks(user.id, next);
-        return json(200, okContent(next));
-      }
-    }
-    if (p === "/api/me/webhooks/test" && m === "POST") {
-      const hooks = await repo.getWebhooks(user.id);
-      const res = await Promise.all(hooks.map((h) => webhooks.deliver(h, "webhook.test", { message: "Hello from Apizie" })));
-      return json(200, okContent(res.map((r, i) => ({ url: hooks[i].url, ok: r.ok, status: r.status }))));
-    }
-    if (p === "/api/me/billing" && m === "GET") {
-      return json(200, okContent({ plan: getPlan(plan), storedPlan: user.plan, planExpiresAt: user.planExpiresAt, plans: Object.values(PLANS), invoices: await repo.listItems("invoice", user.id), bank }));
-    }
-    if (p === "/api/me/invoices" && m === "POST") {
-      const target = PLANS[body?.plan];
-      const months = Math.min(12, Math.max(1, Number(body?.months) || 1));
-      if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
-      const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
-      if (open.length >= 3) throw E.invalidParams([{ path: "plan", message: "You already have open invoices. Pay or cancel them first" }]);
-      const unique = 1 + Math.floor(Math.random() * 999);
-      const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, plan: target.id, months, base: target.priceIdr * months, uniqueCode: unique, amount: target.priceIdr * months + unique, currency: "IDR", method: "bank_transfer", status: "pending", reference: null, createdAt: new Date().toISOString() };
-      return json(201, okContent(await repo.put("invoice", inv, user.id)));
-    }
-    if ((mm = /^\/api\/me\/invoices\/([^/]+)\/(confirm|cancel)$/.exec(p)) && m === "POST") {
-      const inv = await repo.getItem("invoice", mm[1]);
-      if (!inv || inv.userId !== user.id) throw E.notFound("Invoice not found");
-      if (inv.status !== "pending") throw E.invalidParams([{ path: "status", message: `Invoice is ${inv.status}` }]);
-      if (mm[2] === "cancel") return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "cancelled" })));
-      const reference = String(body?.reference ?? "").trim().slice(0, 200);
-      if (!reference) throw E.invalidParams([{ path: "reference", message: "Enter the transfer reference / sender name" }]);
-      return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "awaiting_review", reference, confirmedAt: new Date().toISOString() })));
-    }
-    if (p === "/api/me/run" && m === "POST") {
-      // dashboard / scraper-page playground: run an endpoint with the session (billed to the account)
-      const up = body?.upstreamKey ? { key: String(body.upstreamKey).slice(0, 4000) } : null;
-      const r = await executor.run({ caller: userCaller(user, req), projectKey: String(body?.project ?? ""), endpointSlug: String(body?.endpoint ?? ""), params: isPlainObject(body?.params) ? body.params : {}, upstreamAuth: up });
-      return json(r.status, r.body, r.headers);
-    }
-    throw E.notFound("Not found");
+  async function runFromDashboard(ctx, body) {
+    const up = body?.upstreamKey ? { key: String(body.upstreamKey).slice(0, 4000) } : null;
+    const caller = { ...userCaller(ctx.user, ctx.req), requestId: ctx.requestId };
+    const r = await executor.run({ caller, projectKey: String(body?.project ?? ""), endpointSlug: String(body?.endpoint ?? ""), params: isPlainObject(body?.params) ? body.params : {}, upstreamAuth: up });
+    return json(r.status, r.body, r.headers);
   }
 
   async function adminApi(ctx, p, m, q, body) {
@@ -528,14 +455,46 @@ export function createApp(opts = {}) {
       const inv = await repo.getItem("invoice", mm[1]);
       if (!inv) throw E.notFound("Invoice not found");
       if (!["pending", "awaiting_review"].includes(inv.status)) throw E.invalidParams([{ path: "status", message: `Invoice is ${inv.status}` }]);
-      if (mm[2] === "reject") return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "rejected", note: String(body?.note ?? "").slice(0, 200) })));
+      if (mm[2] === "reject") {
+        const note = String(body?.note ?? "").slice(0, 200);
+        notify(inv.userId, null, `Invoice ${inv.id} was rejected`, note || "Contact support if you already paid.");
+        return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "rejected", note })));
+      }
       const u = await repo.getUser(inv.userId);
-      const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
-      const until = new Date(base + inv.months * 30 * 86400000).toISOString();
-      await repo.updateUser(u.id, { plan: inv.plan, planExpiresAt: until });
-      webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
+      if (!u) throw E.notFound("Customer account no longer exists");
+      const subtotal = inv.subtotal ?? inv.base;
+      if (inv.type === "topup") {
+        await repo.creditBalance(u.id, subtotal * 10);
+        notify(u.id, "balance", "Balance topped up", `Rp${subtotal.toLocaleString("id-ID")} was added to your pay-as-you-go balance.`);
+      } else {
+        const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
+        const until = new Date(base + inv.months * 30 * 86400000).toISOString();
+        await repo.updateUser(u.id, { plan: inv.plan, planExpiresAt: until });
+        webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
+        notify(u.id, null, `${inv.plan[0].toUpperCase() + inv.plan.slice(1)} plan is active`, `Active until ${until.slice(0, 10)}.`);
+      }
+      if (u.referredBy && affPercent > 0) {
+        const tenths = Math.round((subtotal * affPercent) / 10);
+        await repo.addAffEarning(u.referredBy, { invoiceId: inv.id, amountTenths: tenths, from: u.id });
+        notify(u.referredBy, "affiliate", "Affiliate commission earned", `Rp${Math.floor(tenths / 10).toLocaleString("id-ID")} from a referral's payment.`);
+      }
+      webhooks.emit(u.id, "invoice.paid", { invoice: inv.id, type: inv.type ?? "plan", amount: inv.amount });
       return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "paid", paidAt: new Date().toISOString() })));
     }
+    if (p === "/api/admin/payouts" && m === "GET") return json(200, okContent(await repo.listItems("payout")));
+    if ((mm = /^\/api\/admin\/payouts\/([^/]+)\/(paid|reject)$/.exec(p)) && m === "POST") {
+      const po = await repo.getItem("payout", mm[1]);
+      if (!po) throw E.notFound("Payout not found");
+      if (po.status !== "requested") throw E.invalidParams([{ path: "status", message: `Payout is ${po.status}` }]);
+      if (mm[2] === "reject") {
+        await repo.kv.incrby(`aff_avail:${po.userId}`, po.amount * 10);
+        notify(po.userId, "affiliate", "Payout request returned", String(body?.note ?? "The amount is back in your available earnings."));
+        return json(200, okContent(await repo.patchItem("payout", po.id, { status: "rejected", note: String(body?.note ?? "").slice(0, 200) })));
+      }
+      notify(po.userId, "affiliate", "Payout sent", `Rp${po.amount.toLocaleString("id-ID")} was transferred to your account.`);
+      return json(200, okContent(await repo.patchItem("payout", po.id, { status: "paid", paidAt: new Date().toISOString(), reference: String(body?.reference ?? "").slice(0, 200) })));
+    }
+    if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, bankConfigured, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
     if (p === "/api/admin/scrapers" && m === "GET") {
       const off = await repo.disabledScrapers();
       const st = await statsFor(catalog.scrapers);
@@ -570,6 +529,13 @@ export function createApp(opts = {}) {
   async function pages(ctx, p, q) {
     const { user } = ctx;
     let mm;
+    if (q.ref && !user && /^[a-z0-9]{4,12}$/.test(q.ref) && parseCookies(ctx.req.headers.cookie).apz_ref !== q.ref) {
+      const refId = await repo.userIdByAffCode(q.ref);
+      if (refId) {
+        await repo.recordAffClick(refId);
+        ctx.setCookies = [...(ctx.setCookies ?? []), cookie("apz_ref", q.ref, { maxAge: 30 * 86400, secure: isHttps(ctx.req) })];
+      }
+    }
     const totals = catalog.totals();
     const html = (s, status = 200, headers = {}) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": user ? "private, no-store" : "public, max-age=0, s-maxage=60, stale-while-revalidate=600", ...headers } });
     const items = async () => catalog.list({ limit: 2000 }, await statsFor(catalog.scrapers), await repo.disabledScrapers()).items;
@@ -639,15 +605,21 @@ export function createApp(opts = {}) {
       return html(authPage({ mode: p.slice(1), providers: loginProviders(), next: safeNext(q.next), error: q.error ?? "", plan: q.plan ?? "" }));
     }
     if (p === "/dashboard" || (mm = /^\/dashboard\/([a-z]+)$/.exec(p))) {
-      if (!user) return redirect(`/login?next=${encodeURIComponent(p + (q.plan ? `?plan=${q.plan}` : ""))}`);
+      if (!user) return redirect(`/login?next=${encodeURIComponent(p + ctx.url.search)}`);
       const section = p === "/dashboard" ? "" : mm[1];
-      if (!["", "keys", "usage", "logs", "bulk", "webhooks", "billing", "settings"].includes(section)) return html(notFoundPage({ user }), 404);
-      return html(dashboardPage({ user, section, plan: repo.effectivePlan(user), apiUrl, bank }));
+      if (!DASH_SLUGS.includes(section)) return html(notFoundPage({ user }), 404);
+      const plan = getPlan(repo.effectivePlan(user));
+      const [snap, keys, notes] = await Promise.all([limiter.snapshot(user.id, plan.id), repo.listKeys(user.id), repo.listNotifications(user.id, 1)]);
+      const now = new Date();
+      const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+      return html(dashboardPage({ user: { ...user, role: isAdmin(user) ? "admin" : user.role }, section, plan, apiUrl, publicUrl, storage, quota: { ...snap, resetsAt }, keyCount: keys.filter((k) => k.status === "active").length, unread: notes.unread }));
     }
     if (p === "/admin" || (mm = /^\/admin\/([a-z]+)$/.exec(p))) {
       if (!user) return redirect(`/login?next=${encodeURIComponent(p)}`);
       if (!isAdmin(user)) return html(notFoundPage({ user }), 404);
-      return html(adminPage({ user, section: p === "/admin" ? "" : mm[1] }));
+      const section = p === "/admin" ? "" : mm[1];
+      if (!ADMIN_SLUGS.includes(section)) return html(notFoundPage({ user }), 404);
+      return html(adminPage({ user, section }));
     }
     return html(notFoundPage({ user }), 404);
   }
@@ -687,11 +659,18 @@ export function createApp(opts = {}) {
     try {
       if (req.method === "OPTIONS") out = { status: 204, body: "", headers: {} };
       else {
+        req.zieRequestId = requestId;
         const sessionToken = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-        const user = sessionToken ? await repo.getSessionUser(sessionToken) : null;
+        const session = sessionToken ? await repo.getSession(sessionToken) : null;
+        const user = session ? await repo.getSessionUser(sessionToken) : null;
         if (user && isAdmin(user) && user.role !== "admin") user.role = "admin";
         const body = await readBody(req);
-        out = await runWithSeo({ publicUrl, path: url.pathname.replace(/\/+$/, "") || "/" }, () => route({ req, url, body, user, sessionToken }));
+        const ctx = { req, url, body, user, sessionToken, sessionId: session?.id ?? null, requestId };
+        out = await runWithSeo({ publicUrl, path: url.pathname.replace(/\/+$/, "") || "/" }, () => route(ctx));
+        if (ctx.setCookies?.length) {
+          const prev = out.headers?.["Set-Cookie"];
+          out.headers = { ...out.headers, "Set-Cookie": [...(prev ? [].concat(prev) : []), ...ctx.setCookies] };
+        }
       }
     } catch (err) {
       if (err instanceof HttpError) {

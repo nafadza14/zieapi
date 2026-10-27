@@ -88,6 +88,18 @@ begin
       returning z.v -> fld into r;
     return r;
 
+  elsif op = 'HMINCR' then
+    ex := nullif(c->>3, '')::int;
+    insert into apizie_kv as z (k, t, v, exp)
+      values (key, 'h', coalesce(c->2, '{}'::jsonb), case when ex is null then null else now() + make_interval(secs => ex) end)
+      on conflict (k) do update set
+        t = 'h',
+        v = case when z.t <> 'h' or (z.exp is not null and z.exp <= now()) then excluded.v
+                 else z.v || (select coalesce(jsonb_object_agg(e.key, to_jsonb(coalesce((z.v->>e.key)::numeric, 0) + (e.value #>> '{}')::numeric)), '{}'::jsonb)
+                              from jsonb_each(excluded.v) e) end,
+        exp = case when z.exp is not null and z.exp <= now() then excluded.exp else coalesce(z.exp, excluded.exp) end;
+    return '1'::jsonb;
+
   elsif op = 'HGETALL' then
     select * into row_ from apizie_kv where k = key;
     if not found or (row_.exp is not null and row_.exp <= now()) or row_.t <> 'h' then return '{}'::jsonb; end if;

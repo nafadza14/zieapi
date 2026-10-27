@@ -5,7 +5,8 @@ import { E, HttpError, okRun, nowIso } from "./envelope.js";
 import { maxPlan, planAllows, getPlan } from "./plans.js";
 import { pathFieldNames } from "./catalog.js";
 import { validateParams } from "./validate.js";
-import { stableStringify, dayKey, sha256 } from "./util.js";
+import { stableStringify, dayKey, monthKey, sha256, ulid } from "./util.js";
+import { recordCommands } from "./analytics.js";
 import { ScraperError, NotConfiguredError } from "./errors.js";
 
 export { ScraperError, NotConfiguredError };
@@ -80,11 +81,11 @@ export class Executor {
         data = endpoint.handler ? await this._runHandler(endpoint, value, caller, scraper, signal, upstreamAuth) : await this._runUpstream(scraper, endpoint, value, pathRest, signal);
         if (writeTtl > 0) await this._cacheSet(cacheKey, data, writeTtl);
       }
-      await this._after(caller, scraper, endpoint.slug, 200, Date.now() - t0, !!ticket);
+      await this._after(caller, scraper, endpoint.slug, 200, Date.now() - t0, !!ticket, { method: method ?? endpoint.method, cache: headers["X-Cache"] });
       if (ticket) Object.assign(headers, ticket.headers());
       return { status: 200, body: okRun(scraper.key, data), headers };
     } catch (err) {
-      return this._fail(err, { ticket, headers, caller, projectKey, endpointSlug, scraper, t0 });
+      return this._fail(err, { ticket, headers, caller, projectKey, endpointSlug, scraper, t0, method });
     }
   }
 
@@ -140,19 +141,43 @@ export class Executor {
     } catch {}
   }
 
-  async _after(caller, scraper, endpointSlug, status, ms, billed) {
+  /** All per-request bookkeeping (stats, usage, log line, dashboard rollups) in one storage round trip. */
+  async _after(caller, scraper, endpointSlug, status, ms, billed, extra = {}) {
     try {
-      const jobs = [this.repo.recordStat(scraper.id, status < 400)];
-      if (billed) jobs.push(this.repo.incrDay(caller.owner, 1), this.repo.incrScraperUse(caller.owner, scraper.key, 1));
-      if (caller.owner && caller.source !== "playground-public")
-        jobs.push(this.repo.addLog(caller.owner, { at: nowIso(), project: scraper.key, endpoint: endpointSlug, status, ms, key: caller.keyPreview ?? null, ip: caller.ip ?? null, source: caller.source ?? "rest", billed }));
-      await Promise.all(jobs);
+      const day = dayKey();
+      const owner = caller.owner;
+      const cmds = [["INCRBY", "g:requests", 1]];
+      if (scraper.id) cmds.push(["INCRBY", `stat:${scraper.id}:req`, 1], ...(status < 400 ? [["INCRBY", `stat:${scraper.id}:ok`, 1]] : []));
+      if (billed) cmds.push(["INCRBY", `useday:${owner}:${day}`, 1, 100 * 86400], ["INCRBY", `g:day:${day}`, 1, 100 * 86400], ["HINCRBY", `usescr:${owner}:${monthKey()}`, scraper.key, 1]);
+      if (owner && caller.source !== "playground-public") {
+        const entry = {
+          id: caller.requestId ?? ulid(),
+          at: nowIso(),
+          method: extra.method ?? "GET",
+          project: scraper.key,
+          endpoint: endpointSlug,
+          category: scraper.category,
+          status,
+          ms,
+          keyId: caller.keyId ?? null,
+          key: caller.keyPreview ?? null,
+          keyName: caller.keyName ?? null,
+          ip: caller.ip ?? null,
+          source: caller.source ?? "rest",
+          billed,
+          cache: extra.cache ?? null,
+          error: extra.error ? String(extra.error).slice(0, 300) : null,
+          code: extra.code ?? null,
+        };
+        cmds.push(this.repo.logCommand(owner, entry), ...recordCommands(owner, entry));
+      }
+      await this.repo.kv.batch(cmds);
     } catch (e) {
       this.logger?.warn?.("metering failed: " + e.message);
     }
   }
 
-  async _fail(err, { ticket, headers, caller, projectKey, endpointSlug, scraper, t0 }) {
+  async _fail(err, { ticket, headers, caller, projectKey, endpointSlug, scraper, t0, method: ctxMethod }) {
     let status, body, extra = {};
     if (err instanceof HttpError) {
       status = err.status;
@@ -174,7 +199,8 @@ export class Executor {
     }
     const free = status >= 500 || body?.error?.code === "upstream_key_required";
     if (ticket && free) await ticket.refund();
-    if (scraper && ticket) await this._after(caller, scraper, endpointSlug, status, Date.now() - t0, !free);
+    const subject = scraper ?? (projectKey?.includes(":") ? { id: null, key: projectKey, category: projectKey.split(":")[0] } : null);
+    if (subject && caller?.owner) await this._after(caller, subject, endpointSlug, status, Date.now() - t0, !!ticket && !free, { method: ctxMethod, error: body?.message ?? body?.error?.message ?? (typeof body?.error === "string" ? body.error : null), code: body?.error?.code ?? body?.content?.code ?? null });
     if (ticket) extra = { ...ticket.headers(), ...extra };
     if (status >= 500 || status === 400) this.webhooks?.emit(caller.owner, "request.error", { project: projectKey, endpoint: endpointSlug, status, message: body.message ?? body.error });
     return { status, body, headers: { ...headers, ...extra } };

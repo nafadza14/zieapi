@@ -109,8 +109,10 @@ test("register → session → key → call API → logs/usage", async () => {
   const logs = await c("/api/me/logs");
   assert.equal(logs.body.content.items[0].project, "dev-tools:hash");
   const usage = await c("/api/me/usage");
-  assert.equal(usage.body.content.month.used, 1);
-  assert.equal(usage.body.content.scrapers[0].project, "dev-tools:hash");
+  assert.equal(usage.body.content.quota.month.used, 1);
+  assert.equal(usage.body.content.scrapersThisMonth["dev-tools:hash"], 1);
+  assert.equal(usage.body.content.summary.total, 1);
+  assert.equal(usage.body.content.perKey[0].requests, 1);
 
   // session playground run
   const pg = await c("/api/me/run", { method: "POST", body: { project: "dev-tools:uuid", endpoint: "v4", params: { count: 2 } } });
@@ -163,7 +165,9 @@ test("plan gate, admin upgrade, invoices, bulk, webhooks", async () => {
 
   const inv = await c("/api/me/invoices", { method: "POST", body: { plan: "ultra", months: 1 } });
   assert.equal(inv.status, 201);
-  assert.ok(inv.body.content.amount > 129000 && inv.body.content.amount < 130000);
+  assert.equal(inv.body.content.subtotal, 129000);
+  assert.equal(inv.body.content.vat, 14190);
+  assert.ok(inv.body.content.amount > 143190 && inv.body.content.amount < 144190);
   const conf = await c(`/api/me/invoices/${inv.body.content.id}/confirm`, { method: "POST", body: { reference: "BCA a.n. U" } });
   assert.equal(conf.body.content.status, "awaiting_review");
 

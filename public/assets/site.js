@@ -8,8 +8,10 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   };
   const toast = (msg) => {
+    document.querySelectorAll(".toast").forEach((x) => x.remove());
     const t = document.createElement("div");
     t.className = "toast";
+    t.setAttribute("role", "status");
     t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 2200);

@@ -3,6 +3,7 @@
 
 import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { E } from "../core/envelope.js";
+import { ipAllowed } from "../dashboard/account.js";
 
 export const SESSION_COOKIE = "apz_session";
 
@@ -60,13 +61,13 @@ export async function apiKeyCaller(repo, req, oauth = null) {
     if (!rec) throw E.unauthorized("Invalid or expired access token");
     const user = await repo.getUser(rec.userId);
     if (!user || user.status !== "active") throw E.unauthorized("Account disabled");
-    return { owner: user.id, plan: repo.effectivePlan(user), keyId: `oauth_${rec.clientId}`, keyPreview: `MCP · ${rec.clientName}`.slice(0, 40), ip: clientIp(req), user, oauth: true };
+    return { owner: user.id, plan: repo.effectivePlan(user), keyId: `oauth_${rec.clientId}`, keyPreview: `MCP · ${rec.clientName}`.slice(0, 40), keyName: `MCP · ${rec.clientName}`.slice(0, 40), ip: clientIp(req), user, oauth: true, requestId: req.zieRequestId };
   }
   const key = await repo.getKeyBySecret(raw);
   if (!key) throw E.unauthorized("Invalid API key");
-  if (key.status !== "active") throw E.unauthorized("API key disabled");
+  if (key.status !== "active") throw E.unauthorized(key.status === "revoked" ? "API key revoked" : "API key disabled");
   const ip = clientIp(req);
-  if (key.ipAllowlist?.length && !key.ipAllowlist.includes(ip)) throw E.forbidden(`IP ${ip} is not allowed for this key`);
+  if (!ipAllowed(ip, key.ipAllowlist)) throw E.forbidden(`IP ${ip} is not allowed for this key`);
   let user = null;
   let plan = key.plan ?? "free";
   if (key.userId) {
@@ -75,7 +76,7 @@ export async function apiKeyCaller(repo, req, oauth = null) {
     plan = repo.effectivePlan(user);
     repo.touchKey(key).catch(() => {});
   }
-  return { owner: key.userId ?? `key_${key.id}`, plan, keyId: key.id, keyPreview: key.preview, ip, user };
+  return { owner: key.userId ?? `key_${key.id}`, plan, keyId: key.id, keyPreview: key.preview, keyName: key.name, ip, user, requestId: req.zieRequestId };
 }
 
 // ---------- OAuth ------------------------------------------------------------

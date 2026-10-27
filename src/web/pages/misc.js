@@ -204,31 +204,104 @@ export function notFoundPage({ user }) {
 }
 
 // ---------- Dashboard & admin shells (client-rendered by /assets/dash.js) ----------
-const DASH_NAV = [
-  ["", "Overview"],
-  ["keys", "API keys"],
-  ["usage", "Usage"],
-  ["logs", "Request logs"],
-  ["bulk", "Bulk jobs"],
-  ["webhooks", "Webhooks"],
-  ["billing", "Billing"],
-  ["settings", "Settings"],
-];
+// Icons are 24px strokes chosen for what each page holds (grid = overview, bars = usage, list = logs ...).
+const I = {
+  dashboard: '<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/>',
+  usage: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  logs: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  keys: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
+  bulk: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  webhooks: '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>',
+  billing: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+  affiliate: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z"/>',
+  showcase: '<path d="M3 4h18v12H3zM8 20h8M12 16v4"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
+  support: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  browse: '<path d="M7 17 17 7M8 7h9v9"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+};
+export const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[name] ?? ""}</svg>`;
 
-export function dashboardPage({ user, section, plan, apiUrl, bank }) {
-  const side = DASH_NAV.map(([s, label]) => `<a href="/dashboard${s ? "/" + s : ""}" class="${s === section ? "on" : ""}">${label}</a>`).join("") + (user.role === "admin" ? `<a href="/admin" class="admin-link">Admin</a>` : "");
-  const body = `<main class="dash wrap-wide">
-<aside class="dash-side" aria-label="Dashboard"><div class="dash-user">${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar">${esc(user.name[0]?.toUpperCase() ?? "?")}</span>`}<div><b>${esc(user.name)}</b><span class="badge badge-plan">${esc(plan)}</span></div></div><nav>${side}</nav><button class="pill pill-outline pill-sm pill-block" data-logout>Sign out</button></aside>
-<section class="dash-main" data-dash="${esc(section || "overview")}"><div class="loading">Loading…</div></section>
-<script type="application/json" id="dash-data">${json({ section: section || "overview", apiUrl, user: { id: user.id, name: user.name, email: user.email, role: user.role }, bank })}</script>
-</main>`;
-  return layout({ title: "Dashboard", user, body, scripts: ["/assets/site.js", "/assets/dash.js"], noindex: true, bodyClass: "dash-body" });
+export const DASH_SECTIONS = [
+  { group: "Overview", items: [["", "dashboard", "Dashboard", "Your API usage at a glance"], ["usage", "usage", "Usage", "Traffic, errors and quota across every key"], ["logs", "logs", "Logs", "Request history across your keys. Metadata only, never payloads"]] },
+  { group: "API", items: [["keys", "keys", "API keys", "One key per environment. Keep them secret, rotate any time"], ["bulk", "bulk", "Bulk jobs", "Run one endpoint over many inputs in a single request"], ["webhooks", "webhooks", "Webhooks", "Get notified when quota runs low, keys change or requests fail"]] },
+  { group: "Account", items: [["billing", "billing", "Billing", "Plan, pay-as-you-go balance and invoices"], ["affiliate", "affiliate", "Affiliate", "Earn a share of what the people you refer pay"], ["showcase", "showcase", "Showcase", "Show what you built with Apizie"], ["settings", "settings", "Settings", "Profile, security, notifications and sessions"], ["support", "support", "Support", "Get help and send us what you're seeing"]] },
+];
+const SECTION_LIST = DASH_SECTIONS.flatMap((g) => g.items);
+export const DASH_SLUGS = SECTION_LIST.map((x) => x[0]);
+
+export function dashboardPage({ user, section, plan, apiUrl, publicUrl, storage, quota, keyCount, unread }) {
+  const me = SECTION_LIST.find((x) => x[0] === section) ?? SECTION_LIST[0];
+  const lock = { bulk: !plan.bulk ? "Ultra" : "", webhooks: !plan.webhooks ? "Pro" : "" };
+  const nav = DASH_SECTIONS.map(
+    (g) => `<div class="ds-group"><p class="ds-group-label">${g.group}</p>${g.items
+      .map(([slug, ic, label]) => {
+        const on = slug === me[0];
+        const tag = slug === "keys" ? `<span class="ds-count" aria-label="${keyCount} keys">${keyCount}</span>` : lock[slug] ? `<span class="ds-lock">${lock[slug]}</span>` : "";
+        return `<a href="/dashboard${slug ? "/" + slug : ""}" class="ds-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>${icon(ic)}<span>${label}</span>${tag}</a>`;
+      })
+      .join("")}</div>`
+  ).join("");
+  const pct = quota.month.limit ? Math.min(100, (quota.month.used / quota.month.limit) * 100) : 0;
+  const segs = Array.from({ length: 12 }, (_, i) => `<i class="${pct >= ((i + 1) / 12) * 100 - 0.01 ? "full" : pct > (i / 12) * 100 ? "part" : ""}"></i>`).join("");
+  const resets = new Date(quota.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const handle = (user.email ?? "").split("@")[0];
+  const storageBanner = storage.persistent ? "" : `<div class="ds-banner" role="alert"><b>Storage is not connected.</b> Accounts, keys and usage on this server are kept in memory and will be lost. ${user.role === "admin" ? '<a href="/admin/setup">Open setup checks</a>' : "Tell the site owner."}</div>`;
+  const body = `<div class="ds" data-ds>
+<aside class="ds-side" id="ds-side" aria-label="Dashboard navigation">
+  <div class="ds-brand"><a href="/" aria-label="Apizie home">${logo()}</a><button class="ds-icon-btn ds-close" data-side-close aria-label="Close menu">${icon("menu")}</button></div>
+  <nav class="ds-nav">${nav}</nav>
+  <div class="ds-tools">
+    <button class="ds-link" data-palette-open>${icon("search")}<span>Search</span><kbd>Ctrl K</kbd></button>
+    <a class="ds-link" href="/scrapers">${icon("browse")}<span>Browse APIs</span></a>
+    ${user.role === "admin" ? `<a class="ds-link" href="/admin">${icon("admin")}<span>Admin</span></a>` : ""}
+  </div>
+  <a class="ds-quota" href="/dashboard/usage" aria-label="Monthly quota ${Math.round(pct)} percent used">
+    <span class="ds-quota-top"><span>Quota</span><b>${Math.round(pct)}%</b></span>
+    <span class="ds-segs" aria-hidden="true">${segs}</span>
+    <span class="ds-quota-sub">${quota.month.used.toLocaleString("en-US")} / ${quota.month.limit.toLocaleString("en-US")} · resets ${resets}</span>
+  </a>
+  <div class="ds-user">
+    ${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer" width="34" height="34">` : `<span class="ds-avatar" aria-hidden="true">${esc((user.name?.[0] ?? "?").toUpperCase())}</span>`}
+    <span class="ds-user-text"><b>${esc(user.name)}</b><small>@${esc(handle)} · ${esc(plan.id)}</small></span>
+    <button class="ds-icon-btn" data-logout aria-label="Sign out" title="Sign out">${icon("logout")}</button>
+  </div>
+</aside>
+<div class="ds-scrim" data-side-close hidden></div>
+<main class="ds-main" id="main">
+  <header class="ds-head">
+    <button class="ds-icon-btn ds-menu" data-side-open aria-label="Open menu" aria-controls="ds-side">${icon("menu")}</button>
+    <div class="ds-title"><h1>${me[2]}</h1><p>${me[3]}</p></div>
+    <div class="ds-actions" data-actions></div>
+    <button class="ds-icon-btn ds-bell" data-bell aria-label="Notifications${unread ? `, ${unread} unread` : ""}" aria-haspopup="dialog">${icon("bell")}${unread ? `<span class="ds-dot" aria-hidden="true">${unread > 9 ? "9+" : unread}</span>` : ""}</button>
+  </header>
+  ${storageBanner}
+  <section class="ds-body" data-dash="${esc(me[1])}" aria-live="polite"><div class="ds-loading" role="status"><span class="spinner" aria-hidden="true"></span> Loading…</div></section>
+</main>
+</div>
+<dialog class="ds-modal" data-modal aria-labelledby="modal-title"></dialog>
+<dialog class="ds-palette" data-palette aria-label="Search"><div class="pal-box"><label class="pal-input">${icon("search")}<input data-pal-q placeholder="Jump to a page or search APIs" autocomplete="off" aria-label="Search pages and APIs"></label><ul class="pal-list" data-pal-list role="listbox"></ul><p class="pal-hint">Enter to open · Esc to close</p></div></dialog>
+<script type="application/json" id="dash-data">${json({ section: me[1], apiUrl, publicUrl, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar ?? null }, plan, storage, sections: SECTION_LIST.map(([slug, ic, label]) => ({ slug, label })) })}</script>`;
+  return layout({ title: me[2], user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-user.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }
 
-const ADMIN_NAV = [["", "Overview"], ["users", "Users"], ["invoices", "Invoices"], ["scrapers", "Scrapers"], ["reports", "Reports"], ["showcase", "Showcase"]];
+const ADMIN_NAV = [["", "Overview"], ["setup", "Setup checks"], ["users", "Users"], ["invoices", "Invoices"], ["payouts", "Payouts"], ["scrapers", "Scrapers"], ["reports", "Reports"], ["showcase", "Showcase"]];
+export const ADMIN_SLUGS = ADMIN_NAV.map((x) => x[0]);
 export function adminPage({ user, section }) {
-  const side = ADMIN_NAV.map(([s, label]) => `<a href="/admin${s ? "/" + s : ""}" class="${s === section ? "on" : ""}">${label}</a>`).join("") + `<a href="/dashboard" class="admin-link">← Dashboard</a>`;
-  const body = `<main class="dash wrap-wide"><aside class="dash-side"><div class="dash-user"><span class="avatar">A</span><div><b>Admin</b><span class="badge">${esc(user.email ?? "")}</span></div></div><nav>${side}</nav></aside>
-<section class="dash-main" data-admin="${esc(section || "overview")}"><div class="loading">Loading…</div></section></main>`;
-  return layout({ title: "Admin", user, body, scripts: ["/assets/site.js", "/assets/dash.js"], noindex: true, bodyClass: "dash-body" });
+  const cur = ADMIN_NAV.find((x) => x[0] === section) ?? ADMIN_NAV[0];
+  const side = ADMIN_NAV.map(([s, label]) => `<a href="/admin${s ? "/" + s : ""}" class="ds-link${s === cur[0] ? " on" : ""}"${s === cur[0] ? ' aria-current="page"' : ""}><span>${label}</span></a>`).join("");
+  const body = `<div class="ds">
+<aside class="ds-side" id="ds-side" aria-label="Admin navigation"><div class="ds-brand"><a href="/" aria-label="Apizie home">${logo()}</a><button class="ds-icon-btn ds-close" data-side-close aria-label="Close menu">${icon("menu")}</button></div>
+<nav class="ds-nav"><div class="ds-group"><p class="ds-group-label">Admin</p>${side}</div></nav>
+<div class="ds-tools"><a class="ds-link" href="/dashboard">${icon("dashboard")}<span>Back to dashboard</span></a></div>
+<div class="ds-user"><span class="ds-avatar" aria-hidden="true">A</span><span class="ds-user-text"><b>Admin</b><small>${esc(user.email ?? "")}</small></span><button class="ds-icon-btn" data-logout aria-label="Sign out">${icon("logout")}</button></div></aside>
+<div class="ds-scrim" data-side-close hidden></div>
+<main class="ds-main" id="main"><header class="ds-head"><button class="ds-icon-btn ds-menu" data-side-open aria-label="Open menu" aria-controls="ds-side">${icon("menu")}</button><div class="ds-title"><h1>${cur[1]}</h1><p>Operate Apizie: customers, payments and sources</p></div><div class="ds-actions" data-actions></div></header>
+<section class="ds-body" data-admin="${esc(cur[0] || "overview")}" aria-live="polite"><div class="ds-loading" role="status"><span class="spinner" aria-hidden="true"></span> Loading…</div></section></main></div>
+<dialog class="ds-modal" data-modal aria-labelledby="modal-title"></dialog>`;
+  return layout({ title: "Admin", user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-admin.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }

@@ -1,0 +1,49 @@
+// Production readiness checks shown at /admin/setup. Each check says what is wrong and how to fix it.
+
+export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableSecret, bankConfigured, fetchImpl }) {
+  const checks = [];
+  const add = (id, label, status, detail, fix = null) => checks.push({ id, label, status, detail, fix });
+
+  if (storage.backend === "MemoryKV") {
+    add(
+      "storage",
+      "Database",
+      storage.persistent ? "warn" : "fail",
+      storage.persistent ? "Using a local JSON file. Fine for one server, not for Vercel." : "No database connected. Accounts, keys and usage live in memory and disappear between serverless instances.",
+      "Run supabase/migrations/0001_apizie.sql in the Supabase SQL editor, then set SUPABASE_PROJECT_ID and SUPABASE_SECRET_KEY in Vercel and redeploy."
+    );
+  } else {
+    try {
+      const [pong] = await kv.batch([["PING"]]);
+      add("storage", "Database", pong === "PONG" ? "ok" : "fail", `${storage.backend} answered ${JSON.stringify(pong)}.`);
+    } catch (e) {
+      const missing = /function|apizie_kv|schema cache/i.test(e.message);
+      add("storage", "Database", "fail", `${storage.backend}: ${e.message}`, missing ? "The SQL migration has not been run. Open the Supabase SQL editor and run supabase/migrations/0001_apizie.sql." : "Check SUPABASE_SECRET_KEY (Project Settings, API Keys, secret key).");
+    }
+  }
+
+  add("secret", "Session secret", stableSecret ? "ok" : "fail", stableSecret ? "A stable secret signs sign-in state and encrypts API keys." : "No APIZIE_SESSION_SECRET or SUPABASE_SECRET_KEY. Sign-in can fail across serverless instances and keys can't be revealed later.", stableSecret ? null : "Set APIZIE_SESSION_SECRET to a long random string in Vercel.");
+
+  const pub = env.ZIE_PUBLIC_URL;
+  const https = !!pub && /^https:\/\//.test(pub);
+  add("url", "Public URL", https ? "ok" : "warn", pub ? `APIZIE_PUBLIC_URL is ${pub}.${https ? "" : " Production should use https."}` : `Not set; using ${publicUrl}. OAuth callbacks, sitemap and canonical links use this.`, https ? null : "Set APIZIE_PUBLIC_URL to your final https domain, for example https://apizie.vercel.app.");
+
+  add("admins", "Admin accounts", env.ZIE_ADMIN_EMAILS ? "ok" : "warn", env.ZIE_ADMIN_EMAILS ? `Admins: ${env.ZIE_ADMIN_EMAILS}` : "No admin emails configured, so nobody can approve invoices.", env.ZIE_ADMIN_EMAILS ? null : "Set APIZIE_ADMIN_EMAILS to your email.");
+
+  if (sbAuth) {
+    try {
+      const res = await fetchImpl(`${sbAuth.url}/auth/v1/settings`, { headers: { apikey: sbAuth.key }, signal: AbortSignal.timeout?.(5000) });
+      const s = await res.json().catch(() => ({}));
+      const google = !!s?.external?.google;
+      add("google", "Google sign-in (Supabase)", google ? "ok" : "fail", google ? "Google is enabled in Supabase Auth." : `Supabase answered ${res.status}; Google provider is ${google ? "on" : "off"}.`, `Supabase, Authentication, Providers: enable Google. Then add ${publicUrl}/auth/supabase/callback under Authentication, URL Configuration, Redirect URLs.`);
+    } catch (e) {
+      add("google", "Google sign-in (Supabase)", "warn", `Could not reach Supabase Auth: ${e.message}`, "Check SUPABASE_PROJECT_ID and SUPABASE_PUBLISHABLE_KEY.");
+    }
+  }
+
+  add("bank", "Bank transfer details", bankConfigured ? "ok" : "warn", bankConfigured ? "Shown on every invoice." : "Customers can create invoices but see no account to pay into.", bankConfigured ? null : 'Set APIZIE_BANK_INFO, for example "BCA 1234567890 a.n. PT Zieads".');
+  add("email", "Email notifications", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "ok" : "warn", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "Notifications are also emailed through Resend." : "Notifications appear in the dashboard only.", env.RESEND_API_KEY ? "Set APIZIE_EMAIL_FROM too." : "Optional: set RESEND_API_KEY and APIZIE_EMAIL_FROM.");
+  add("support", "Support contacts", env.ZIE_SUPPORT_EMAIL ? "ok" : "warn", env.ZIE_SUPPORT_EMAIL ? `Support email: ${env.ZIE_SUPPORT_EMAIL}` : "The Support page only offers the report form.", env.ZIE_SUPPORT_EMAIL ? null : "Optional: set APIZIE_SUPPORT_EMAIL and APIZIE_DISCORD_URL.");
+
+  return { storage, checks, ready: checks.every((c) => c.status !== "fail") };
+}

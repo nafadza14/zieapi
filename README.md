@@ -55,7 +55,7 @@ To run the tests: `npm test` (138 tests).
 ## Deploy to Vercel
 
 1. Push this repo to GitHub and import it in Vercel (Framework preset: **Other**). `vercel.json` already sets the build (`npm test`), the output (`public`) and the rewrites to the `api/apizie.js` function.
-2. **Add storage:** Vercel → Storage → **Upstash for Redis** → connect it to the project. This sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Without it, accounts and usage live in memory and reset on every cold start.
+2. **Add storage (required):** run `supabase/migrations/0001_apizie.sql` in the Supabase SQL editor and set `SUPABASE_PROJECT_ID` + `SUPABASE_SECRET_KEY` (or connect Upstash for Redis, which sets `KV_REST_API_URL`/`KV_REST_API_TOKEN`). Without a database, accounts, keys and usage live in memory and vanish between serverless instances; the dashboard shows a red banner and `/admin/setup` says what is missing.
 3. Set these environment variables:
 
    | Name | Value |
@@ -64,9 +64,11 @@ To run the tests: `npm test` (138 tests).
    | `APIZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
    | `APIZIE_SESSION_SECRET` | any long random string |
    | `APIZIE_BANK_INFO` | bank account text shown on invoices |
+   | `APIZIE_SUPPORT_EMAIL`, `APIZIE_DISCORD_URL` | optional, shown on the Support page |
+   | `RESEND_API_KEY`, `APIZIE_EMAIL_FROM` | optional, also email dashboard notifications |
    | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{APIZIE_PUBLIC_URL}/auth/{provider}/callback` |
 
-4. Deploy, open the site, and sign up with the admin email.
+4. Deploy, open the site, sign up with the admin email, then open **/admin/setup**: every check should be green or "Review".
 
 All options are listed in [`.env.example`](.env.example).
 
@@ -93,11 +95,28 @@ Plans, in Rupiah, are defined in `src/core/plans.js`:
 | Ultra | Rp129.000 | 200,000 | 5,000 |
 | Max | Rp399.000 | 1,000,000 | 15,000 |
 
-## Billing flow (manual)
+## Dashboard
 
-1. The user goes to Billing, picks a plan, and creates an invoice. The amount includes a unique 3-digit code.
-2. They transfer the money and click **I've paid**, entering their reference.
-3. An admin approves the invoice in Admin → Invoices. The plan becomes active for 30 days per month paid, and a `plan.changed` webhook fires.
+`/dashboard` has eleven sections, all backed by `/api/me/*` (`src/dashboard/account.js`):
+
+| Section | What works |
+|---|---|
+| Dashboard | requests in range, traffic-by-hour heatmap (your timezone), API key with reveal/copy, monthly quota with projection, requests today, success rate, p95 latency, errors 24h, requests over time, recent requests, top endpoints, categories, errors by status. Range 24H/7D/30D (Pro)/90D (Ultra) and a per-key filter. |
+| Usage | totals, 24h numbers, per-key usage table, request sources, top endpoints |
+| Logs | search (status, endpoint, key, request ID), success/error filter, range, key filter, detail panel with replay cURL, pagination, CSV export. Metadata only, never payloads. |
+| API keys | create (limit per plan), reveal again, copy, rename, IP allowlist with IPv4 CIDR (Pro+), revoke (permanent), delete, 30-day sparkline, connected MCP apps, code samples in 6 languages |
+| Bulk jobs (Ultra) | submit from the dashboard with an API/endpoint picker, job list with filters, per-item results, JSON download |
+| Webhooks (Pro) | up to 5 endpoints, event selection, test, delivery history with payload, redeliver, on/off, rotate secret. Private and localhost targets are refused. |
+| Billing | plan, pay-as-you-go balance, top-ups (Rp50k to Rp1M or custom), plan invoices for 1 to 12 months, VAT, pay/cancel, transactions |
+| Affiliate | referral link (`/?ref=code`, 30-day cookie), clicks, sign-ups, paying customers, commission history, move to balance, bank payout (min Rp100.000) |
+| Showcase, Settings, Support | project submissions; profile photo, name, password, notification switches, active sessions, delete account; support form prefilled from your latest errors |
+
+## Billing flow (manual bank transfer)
+
+1. The user picks a plan (1 to 12 months) or a top-up amount in Billing. The invoice adds VAT (`APIZIE_VAT_PERCENT`, default 11%) and a unique 3-digit code.
+2. They transfer the exact amount and click **I've paid** with their reference.
+3. An admin marks it paid in **Admin → Invoices**. A plan becomes active for 30 days per month paid; a top-up is added to the balance. The `invoice.paid` webhook fires and, if the customer was referred, the referrer earns `APIZIE_AFFILIATE_PERCENT` (default 10%) of the subtotal.
+4. With **Use balance when the plan quota runs out** switched on, requests above the monthly quota cost Rp2,2 each from the balance instead of returning 429 (response header `X-Billing: payg`).
 
 ## Adding scrapers
 
@@ -116,10 +135,11 @@ Operators may set shared provider keys with `APIZIE_UPSTREAM_KEY_<CATEGORY>_<SLU
 
 ```
 api/apizie.js            Vercel function entry
-public/assets/           site.css · site.js · dash.js · favicon
+public/assets/           site.css · site.js · dash.css · dash.js (runtime) · dash-user.js · dash-admin.js · favicon
 src/app.js               router: pages, auth, /api/me, /api/admin, /v1, /mcp
-src/core/                catalog · executor · limits · bulk · webhooks · mcp · openapi · plans · validate
-src/db/                  kv.js (Memory / Upstash) · repo.js (users, keys, usage, logs, invoices…)
+src/core/                catalog · executor · analytics · limits · bulk · webhooks · mcp · openapi · plans · validate
+src/dashboard/           account.js (/api/me/*) · setup.js (production checks)
+src/db/                  kv.js (Memory / Upstash / Supabase) · repo.js (users, keys, usage, logs, invoices…)
 src/auth/                passwords · sessions · API keys · OAuth
 src/web/                 html layout + pages (home, catalog, pricing, docs, misc)
 src/catalog/seed.js      catalog structure (generated by scripts/import-catalog.js)

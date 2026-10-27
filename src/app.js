@@ -247,12 +247,14 @@ export function createApp(opts = {}) {
     // Supabase Auth (Google by default) when the provider is not configured directly.
     if ((mm = /^\/auth\/(github|google|discord)$/.exec(p)) && m === "GET" && sbAuth?.providers.includes(mm[1]) && !enabledProviders(env).some((x) => x.id === mm[1])) {
       const { verifier, challenge } = pkcePair();
-      const st = signState(`${verifier}|${safeNext(q.next)}`);
+      const st = signState(`${mm[1]}|${verifier}|${safeNext(q.next)}`);
       return redirect(supabaseAuthorizeUrl(sbAuth, { provider: mm[1], redirectTo: `${publicUrl}/auth/supabase/callback`, challenge }), { "Set-Cookie": cookie("apz_sb", st, { maxAge: 600, secure: isHttps(req) }) });
     }
     if (p === "/auth/supabase/callback" && m === "GET") {
       const raw = checkState(parseCookies(req.headers.cookie).apz_sb);
-      const [verifier, next] = raw ? raw.split("|") : [];
+      const [provider, verifier, ...rest] = raw ? raw.split("|") : [];
+      const next = rest.join("|");
+      const label = PROVIDERS[provider]?.label ?? "Social";
       if (q.error) return redirect("/login?error=" + encodeURIComponent(String(q.error_description ?? q.error).slice(0, 200)));
       if (!verifier || !q.code) return redirect("/login?error=" + encodeURIComponent("Sign-in expired, please try again"));
       try {
@@ -262,7 +264,7 @@ export function createApp(opts = {}) {
         return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_sb", "", { maxAge: 0 })] });
       } catch (e) {
         logger?.warn?.(e.message);
-        return redirect("/login?error=" + encodeURIComponent("Google sign-in failed, please try again"));
+        return redirect("/login?error=" + encodeURIComponent(`${label} sign-in failed, please try again`));
       }
     }
     if ((mm = /^\/auth\/(github|google|discord)$/.exec(p)) && m === "GET") {
@@ -282,7 +284,7 @@ export function createApp(opts = {}) {
         return redirect(safeNext(next), { "Set-Cookie": [await login(u, req), cookie("apz_oauth", "", { maxAge: 0 })] });
       } catch (e) {
         logger?.warn?.(e.message);
-        return redirect("/login?error=" + encodeURIComponent("Sign-in failed, please try again"));
+        return redirect("/login?error=" + encodeURIComponent(`${PROVIDERS[mm[1]].label} sign-in failed, please try again`));
       }
     }
     if (p === "/auth/register" && m === "POST") {

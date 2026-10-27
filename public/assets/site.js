@@ -45,17 +45,6 @@
     });
   }
 
-  // ---------- hero video: fade in once ready, skip on reduced motion ----------
-  const vid = $("[data-hero-video]");
-  if (vid) {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) vid.remove();
-    else {
-      const ready = () => { vid.classList.add("ready"); vid.play().catch(() => {}); };
-      if (vid.readyState >= 2) ready();
-      else vid.addEventListener("loadeddata", ready, { once: true });
-    }
-  }
-
   // ---------- rotating hero headline: words appear one by one over 2 s, hold 5 s, then swap ----------
   const hl = $("[data-hero-rotate]");
   if (hl && !matchMedia("(prefers-reduced-motion: reduce)").matches) {

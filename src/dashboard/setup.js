@@ -30,16 +30,28 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
 
   add("admins", "Admin accounts", env.ZIE_ADMIN_EMAILS ? "ok" : "warn", env.ZIE_ADMIN_EMAILS ? `Admins: ${env.ZIE_ADMIN_EMAILS}` : "No admin emails configured, so nobody can approve invoices.", env.ZIE_ADMIN_EMAILS ? null : "Set APIZIE_ADMIN_EMAILS to your email.");
 
+  let sbSettings = null;
   if (sbAuth) {
     try {
       const res = await fetchImpl(`${sbAuth.url}/auth/v1/settings`, { headers: { apikey: sbAuth.key }, signal: AbortSignal.timeout?.(5000) });
       const s = await res.json().catch(() => ({}));
-      const google = !!s?.external?.google;
+      sbSettings = s?.external ?? {};
+      const google = !!sbSettings.google;
       add("google", "Google sign-in (Supabase)", google ? "ok" : "fail", google ? "Google is enabled in Supabase Auth." : `Supabase answered ${res.status}; Google provider is ${google ? "on" : "off"}.`, `Supabase, Authentication, Providers: enable Google. Then add ${publicUrl}/auth/supabase/callback under Authentication, URL Configuration, Redirect URLs.`);
     } catch (e) {
       add("google", "Google sign-in (Supabase)", "warn", `Could not reach Supabase Auth: ${e.message}`, "Check SUPABASE_PROJECT_ID and SUPABASE_PUBLISHABLE_KEY.");
     }
   }
+
+  // GitHub sign-in: a GitHub OAuth App (GITHUB_CLIENT_ID/SECRET) or the GitHub provider in Supabase Auth.
+  const ghDirect = !!(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET);
+  const ghListed = !!sbAuth?.providers?.includes("github");
+  const ghSupabase = ghListed && !!sbSettings?.github;
+  const ghFix = `Create a GitHub OAuth App (GitHub, Settings, Developer settings, OAuth Apps, New OAuth App) with Homepage URL ${publicUrl} and Authorization callback URL ${publicUrl}/auth/github/callback. Then set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel and redeploy.`;
+  if (ghDirect) add("github", "GitHub sign-in", "ok", "GitHub OAuth App is configured. Callback: " + `${publicUrl}/auth/github/callback`);
+  else if (ghSupabase) add("github", "GitHub sign-in", "ok", "GitHub is enabled in Supabase Auth.");
+  else if (ghListed) add("github", "GitHub sign-in", "fail", "SUPABASE_AUTH_PROVIDERS lists github, but the GitHub provider is off in Supabase Auth, so the button fails.", "Supabase, Authentication, Providers: enable GitHub with your OAuth App's client ID and secret (callback https://<project>.supabase.co/auth/v1/callback). Or remove github from SUPABASE_AUTH_PROVIDERS and use the direct setup: " + ghFix);
+  else add("github", "GitHub sign-in", "warn", "Not configured, so the login page shows no GitHub button.", ghFix);
 
   add("bank", "Bank transfer details", bankConfigured ? "ok" : "warn", bankConfigured ? "Shown on every invoice." : "Customers can create invoices but see no account to pay into.", bankConfigured ? null : 'Set APIZIE_BANK_INFO, for example "BCA 1234567890 a.n. PT Zieads".');
   add("email", "Email notifications", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "ok" : "warn", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "Notifications are also emailed through Resend." : "Notifications appear in the dashboard only.", env.RESEND_API_KEY ? "Set APIZIE_EMAIL_FROM too." : "Optional: set RESEND_API_KEY and APIZIE_EMAIL_FROM.");

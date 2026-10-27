@@ -23,8 +23,9 @@ export const HOME_FAQ = [
 ];
 
 
-const GLOBE_STILL = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg";
-const GLOBE_VIDEO = "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e71aea27-a808-4ae3-8231-a469d49285d4.mp4";
+// Hero background: dark plate with violet light waves (self-hosted, WebP with JPEG fallback).
+const HERO_BG = "/assets/hero/hero-waves.webp";
+const HERO_BG_JPG = "/assets/hero/hero-waves.jpg";
 
 export function homePage({ user, totals, categories, top, global = [], liveKeys = null, apiUrl, publicUrl }) {
   const apiCount = `${(Math.floor((totals.scrapers ?? 0) / 100) * 100).toLocaleString("en-US")}+`;
@@ -39,8 +40,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   const hero = `
 <section class="hero" aria-label="Introduction">
   <div class="hero-plate" aria-hidden="true">
-    <img class="hero-still" src="${GLOBE_STILL}" alt="" width="1672" height="941" fetchpriority="high">
-    <video class="hero-video" src="${GLOBE_VIDEO}" muted loop playsinline preload="auto" data-hero-video></video>
+    <picture><source srcset="${HERO_BG}" type="image/webp"><img class="hero-still" src="${HERO_BG_JPG}" alt="" width="1780" height="883" fetchpriority="high"></picture>
   </div>
   <div class="hero-chips" aria-hidden="true">
     <span class="chip-coin c1">{ }</span><span class="chip-coin c2">$</span><span class="chip-coin c3">₿</span><span class="chip-coin c4"><svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v10M7.5 9.5l9 5M16.5 9.5l-9 5" stroke="currentColor" stroke-width="1.2" opacity=".7"/></svg></span>
@@ -155,7 +155,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div class="faq">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>`;
   const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests/month, paid plans from $9.`;
-  return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
+  return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${HERO_BG}" type="image/webp">` });
 }
 
 export function scraperCard(s) {

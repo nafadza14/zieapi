@@ -232,20 +232,20 @@ test("billing: top-up invoice with VAT, admin approval credits balance, pay-as-y
   const bill = (await c("/api/me/billing")).c;
   assert.equal(bill.vatPercent, 11);
   assert.equal(bill.bankConfigured, true);
-  assert.deepEqual(bill.payg.topups.map((t) => t.amount), [50000, 100000, 250000, 1000000]);
-  assert.equal((await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 5000 } })).status, 400, "minimum top-up");
+  assert.deepEqual(bill.payg.topups.map((t) => t.amount), [80000, 160000, 400000, 800000]);
+  assert.equal((await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 50000 } })).status, 400, "minimum top-up is Rp80.000 (about $5)");
 
-  const inv = (await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 50000 } })).c;
+  const inv = (await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 80000 } })).c;
   assert.equal(inv.type, "topup");
-  assert.equal(inv.subtotal, 50000);
-  assert.equal(inv.vat, 5500);
-  assert.equal(inv.amount, 55500 + inv.uniqueCode);
+  assert.equal(inv.subtotal, 80000);
+  assert.equal(inv.vat, 8800);
+  assert.equal(inv.amount, 88800 + inv.uniqueCode);
   assert.equal((await c(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: {} })).status, 400, "reference required");
   assert.equal((await c(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: { reference: "BCA a.n. Payg" } })).c.status, "awaiting_review");
   assert.equal((await admin(`/api/admin/invoices/${inv.id}/approve`, { method: "POST" })).c.status, "paid");
   const after = (await c("/api/me/billing")).c;
-  assert.equal(after.balance, 50000);
-  assert.equal(after.balanceRequests, Math.floor(500000 / 22));
+  assert.equal(after.balance, 80000);
+  assert.equal(after.balanceRequests, Math.floor(800000 / 66), "Rp6,6 per request, about $0.40 per 1,000");
   assert.equal(after.transactions.find((t) => t.id === inv.id).status, "paid");
   const notes = (await c("/api/me/notifications")).c;
   assert.ok(notes.items.some((n) => /topped up/i.test(n.title)));
@@ -255,13 +255,13 @@ test("billing: top-up invoice with VAT, admin approval credits balance, pay-as-y
 
   // Use up the free quota, then the balance takes over once the user opts in.
   const k = (await c("/api/me/keys", { method: "POST", body: { name: "k" } })).c.key;
-  await app.kv.set(`use:${u.id}:${monthKey()}`, "600");
+  await app.kv.set(`use:${u.id}:${monthKey()}`, "1000");
   assert.equal((await call(k)).status, 429, "off by default");
   await c("/api/me/prefs", { method: "PATCH", body: { payg: true } });
   const r = await call(k);
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("x-billing"), "payg");
-  assert.equal((await c("/api/me/billing")).c.balance, 50000 - 2.2);
+  assert.equal((await c("/api/me/billing")).c.balance, 80000 - 6.6);
   assert.equal((await call(k, "/v1/dev-tools:flaky/boom")).status, 404);
   const tx = (await c("/api/me/billing")).c.transactions;
   assert.ok(tx.some((t) => t.kind === "usage" && t.total < 0));

@@ -133,12 +133,6 @@ select option { background: #13131d; }
 .c3 { left: 13%; top: 52%; width: 44px; height: 44px; font-size: 15px; }
 .c4 { right: 14%; top: 50%; width: 46px; height: 46px; }
 @media (max-width: 720px) { .hero-chips { display: none; } }
-.scroll-hint { position: absolute; bottom: 26px; left: 50%; translate: -50% 0; width: 120px; height: 120px; display: grid; place-items: center; }
-.scroll-ring { position: absolute; inset: 0; }
-.scroll-ring text { fill: var(--muted); font: 600 11px var(--body); letter-spacing: 0.3em; }
-.mouse { width: 22px; height: 34px; border-radius: 12px; border: 1.5px solid rgba(255, 255, 255, 0.5); display: grid; justify-items: center; padding-top: 6px; }
-.wheel { width: 3px; height: 7px; border-radius: 2px; background: #fff; animation: wheel 1.8s infinite; }
-@keyframes wheel { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(9px); opacity: 0; } 100% { opacity: 0; } }
 .rise { animation: rise 1.6s cubic-bezier(0.2, 0.7, 0.1, 1) both; }
 .r1 { animation-delay: 0.1s; } .r2 { animation-delay: 0.22s; } .r3 { animation-delay: 0.36s; } .r4 { animation-delay: 0.55s; } .r5 { animation-delay: 0.7s; } .r6 { animation-delay: 1s; }
 .hero-chips .chip-coin { animation: rise 1.6s 0.85s both, float 7s 2.4s ease-in-out infinite alternate; }

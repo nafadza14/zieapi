@@ -1,4 +1,4 @@
-import { layout, esc, fmt, idr, json, sourceIcon } from "../html.js";
+import { layout, esc, fmt, json, sourceIcon } from "../html.js";
 import { PLANS, PLAN_COPY } from "../../core/plans.js";
 import { HERO_BRANDS } from "../brands.js";
 import { webPageLd, faqLd } from "../seo.js";
@@ -6,7 +6,7 @@ import { webPageLd, faqLd } from "../seo.js";
 export const HOME_FAQ = [
   ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
   ["How do I use Apizie with Claude, ChatGPT or Cursor?", "Add the Apizie MCP server URL (/mcp) to your app. Claude.ai, Claude Desktop and ChatGPT connect with one click through OAuth; Cursor, VS Code and Gemini CLI use an API key header. The agent can then search the catalog and call any API as a tool."],
-  ["Is Apizie free?", "Yes. The Free plan includes 600 requests a month at 100 requests a minute on every live endpoint, with no credit card. Paid plans (Pro, Ultra, Max) raise the limits and add bulk jobs and webhooks."],
+  ["Is Apizie free?", "Yes. The Free plan includes 1,000 requests a month at 100 requests a minute on every live endpoint, with no credit card. Paid plans (Pro, Ultra, Max) raise the limits and add bulk jobs and webhooks."],
   ["Which data sources does Apizie cover?", "Finance and crypto (Binance, OKX, CoinGecko, SEC EDGAR, ECB rates), news (The Guardian, BBC, Google News, Hacker News), research (PubMed, arXiv), developer tools (GitHub, npm, DNS, WHOIS), media (Apple Music, Deezer) and 1,300+ global APIs imported from public OpenAPI specifications."],
   ["What does a request look like?", "GET /v1/{category}:{api}/{endpoint}?param=value with the header x-api-key. For example /v1/search-tools:wikipedia/search?query=Eiffel%20Tower returns Wikipedia search results as JSON."],
 ];
@@ -40,10 +40,6 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
     <div class="rise r5 hero-cta"><a href="${user ? "/dashboard" : "/register"}" class="pill pill-white pill-lg">Get Started <span aria-hidden="true">→</span></a><a href="/scrapers" class="pill pill-ghost pill-lg">Browse ${fmt(totals.scrapers)} APIs</a></div>
     ${brandStrip(totals, liveKeys)}
   </div>
-  <a href="#steps" class="scroll-hint rise r6" aria-label="Scroll down">
-    <svg viewBox="0 0 120 120" class="scroll-ring" aria-hidden="true"><defs><path id="arcL" d="M18 60a42 42 0 0 1 42-42"/><path id="arcR" d="M60 18a42 42 0 0 1 42 42"/></defs><text><textPath href="#arcL" startOffset="18%">JSON</textPath></text><text><textPath href="#arcR" startOffset="30%">MCP</textPath></text></svg>
-    <span class="mouse"><span class="wheel"></span></span>
-  </a>
 </section>`;
 
   const stats = `
@@ -52,7 +48,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div><b>${fmt(totals.endpoints)}</b><span>endpoints</span></div>
   <div><b>${fmt(totals.liveEndpoints)}</b><span>live right now</span></div>
   <div><b>${totals.categories}</b><span>categories</span></div>
-  <div><b>600</b><span>free requests / month</span></div>
+  <div><b>1,000</b><span>free requests / month</span></div>
 </section>`;
 
   const steps = `
@@ -116,7 +112,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   const pricing = `
 <section class="section wrap">
   <div class="section-head"><span class="eyebrow">Pricing</span><h2 class="display-2">Free until you have users.</h2></div>
-  <div class="grid-4 plans-mini">${Object.values(PLANS).map((p) => `<a href="/pricing#${p.id}" class="card plan-mini${PLAN_COPY[p.id].popular ? " popular" : ""}"><h3>${PLAN_COPY[p.id].name}</h3><b>${p.priceIdr ? idr(p.priceIdr) : "Rp0"}<small>${p.priceIdr ? "/mo" : " forever"}</small></b><span>${fmt(p.monthly)} req / month</span><span>${fmt(p.perMinute)} req / minute</span></a>`).join("")}</div>
+  <div class="grid-4 plans-mini">${Object.values(PLANS).map((p) => `<a href="/pricing#${p.id}" class="card plan-mini${PLAN_COPY[p.id].popular ? " popular" : ""}"><h3>${PLAN_COPY[p.id].name}</h3><b>$${p.priceUsd}<small>${p.priceUsd ? "/mo" : " forever"}</small></b><span>${fmt(p.monthly)} req / month</span><span>${fmt(p.perMinute)} req / minute</span></a>`).join("")}</div>
   <div class="center"><a href="/pricing" class="pill pill-outline">Compare plans →</a></div>
 </section>`;
 
@@ -134,7 +130,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   const cta = `
 <section class="cta-band wrap">
   <h2 class="display-2">Start scraping in a minute.</h2>
-  <p class="lead">600 free requests every month. No credit card.</p>
+  <p class="lead">1,000 free requests every month. No credit card.</p>
   <a href="${user ? "/dashboard/keys" : "/register"}" class="pill pill-white pill-lg">Get a free API key →</a>
 </section>`;
 
@@ -143,7 +139,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div class="section-head"><span class="eyebrow">FAQ</span><h2 class="display-2">Questions, answered.</h2></div>
   <div class="faq">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>`;
-  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 600 requests/month.`;
+  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests/month, paid plans from $9.`;
   return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${GLOBE_STILL}">` });
 }
 

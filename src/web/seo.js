@@ -13,7 +13,7 @@ export const BRAND = {
   legalName: "Zieads",
   tagline: "One API key for every public data source",
   description:
-    "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 600 requests a month.",
+    "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests a month.",
   repo: "https://github.com/nafadza14/zieapi",
   email: "support@zieads.com",
   locale: "en_US",
@@ -76,8 +76,8 @@ export function siteGraph() {
     offers: Object.values(PLANS).map((p) => ({
       "@type": "Offer",
       name: `${PLAN_COPY[p.id]?.name ?? p.id} plan`,
-      price: String(p.priceIdr ?? 0),
-      priceCurrency: "IDR",
+      price: String(p.priceUsd ?? 0),
+      priceCurrency: "USD",
       description: `${p.monthly.toLocaleString("en-US")} requests per month, ${p.perMinute.toLocaleString("en-US")} per minute`,
       url: absUrl("/pricing"),
     })),
@@ -120,7 +120,7 @@ export function apiLd(s, category) {
     provider: { "@id": `${base}#org` },
     ...(s.iconUrl ? { image: absUrl(s.iconUrl) } : {}),
     keywords: [`${s.displayName} API`, `${s.displayName} JSON API`, category?.displayName, ...(s.tags ?? [])].filter(Boolean).join(", "),
-    offers: { "@type": "Offer", name: "Free", price: "0", priceCurrency: "IDR", description: "600 requests per month, no credit card" },
+    offers: { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: "1,000 requests per month, no credit card" },
     ...(s.sourceUrl ? { isBasedOn: s.sourceUrl } : {}),
   };
 }
@@ -182,14 +182,14 @@ export function apiSummary(s, apiUrl) {
   const eps = s.endpoints ?? [];
   const live = eps.filter((e) => e.status === "live").length;
   const names = eps.slice(0, 4).map((e) => e.displayName).join(", ");
-  return `${s.displayName} API on Apizie: ${s.endpointCount ?? eps.length} endpoint${(s.endpointCount ?? eps.length) === 1 ? "" : "s"}${names ? ` (${names}${eps.length > 4 ? ", …" : ""})` : ""} returned as clean JSON through one API key. ${s.status === "byok" ? "Send your own provider key in the x-upstream-key header." : live ? `${live} endpoint${live === 1 ? " is" : "s are"} live now.` : "Not live on this server yet."} Call it over REST at ${apiUrl}/v1/${s.key}/{endpoint} or from Claude, ChatGPT and Cursor through the Apizie MCP server. Free plan: 600 requests a month.`;
+  return `${s.displayName} API on Apizie: ${s.endpointCount ?? eps.length} endpoint${(s.endpointCount ?? eps.length) === 1 ? "" : "s"}${names ? ` (${names}${eps.length > 4 ? ", …" : ""})` : ""} returned as clean JSON through one API key. ${s.status === "byok" ? "Send your own provider key in the x-upstream-key header." : live ? `${live} endpoint${live === 1 ? " is" : "s are"} live now.` : "Not live on this server yet."} Call it over REST at ${apiUrl}/v1/${s.key}/{endpoint} or from Claude, ChatGPT and Cursor through the Apizie MCP server. Free plan: 1,000 requests a month.`;
 }
 export function apiFaq(s, apiUrl) {
   const ep = (s.endpoints ?? [])[0];
   const example = ep ? `${apiUrl}/v1/${s.key}/${ep.slug}` : `${apiUrl}/v1/${s.key}/{endpoint}`;
   return [
     [`How do I call the ${s.displayName} API?`, `Create a free Apizie key, then send ${ep?.method ?? "GET"} ${example} with the header x-api-key. Every endpoint returns { project, data, timestamp }.`],
-    [`Is the ${s.displayName} API free on Apizie?`, `Yes. The Free plan includes 600 requests a month at 100 requests a minute, no credit card. ${s.status === "byok" ? `${s.displayName} itself also needs your own key from ${s.provider ?? "the provider"}.` : ""}`.trim()],
+    [`Is the ${s.displayName} API free on Apizie?`, `Yes. The Free plan includes 1,000 requests a month at 100 requests a minute, no credit card. ${s.status === "byok" ? `${s.displayName} itself also needs your own key from ${s.provider ?? "the provider"}.` : ""}`.trim()],
     [`Can AI agents use the ${s.displayName} API?`, `Yes. Add the Apizie MCP server (${apiUrl}/mcp) to Claude, ChatGPT, Cursor or VS Code, then ask in plain language. The agent calls run_scraper with project key ${s.key}.`],
     [`What is the status of the ${s.displayName} API?`, STATUS_TEXT[s.status] ?? s.status],
   ];

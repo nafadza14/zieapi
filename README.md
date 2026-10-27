@@ -86,14 +86,16 @@ All options are listed in [`.env.example`](.env.example).
 | Machine docs | `/openapi.json`, `/category/{slug}/openapi.json`, `/llms.txt`, `/llms-full.txt` |
 | MCP | `POST /mcp` with tools `search_scrapers`, `get_scraper_schema`, `list_categories`, `run_scraper`, `get_account`, `get_usage`, `bulk_submit`, `bulk_status` |
 
-Plans, in Rupiah, are defined in `src/core/plans.js`:
+Plans are defined in `src/core/plans.js`. List prices are in USD; `priceIdr` is the local bank-transfer amount. The research behind the numbers is in [`docs/PRICING.md`](docs/PRICING.md).
 
-| Plan | Price | Req/month | Req/min |
-|---|---|---|---|
-| Free | Rp0 | 600 | 100 |
-| Pro | Rp49.000 | 25,000 | 2,000 |
-| Ultra | Rp129.000 | 200,000 | 5,000 |
-| Max | Rp399.000 | 1,000,000 | 15,000 |
+| Plan | Price / month | Yearly (2 months free) | Req/month | Req/min |
+|---|---|---|---|---|
+| Free | $0 | - | 1,000 | 100 |
+| Pro | $9 (Rp149.000) | $90 | 25,000 | 2,000 |
+| Ultra | $29 (Rp479.000) | $290 | 200,000 | 5,000 |
+| Max | $99 (Rp1.599.000) | $990 | 1,000,000 | 15,000 |
+
+Pay-as-you-go above the quota: $0.40 per 1,000 requests (Rp6,6 per request) from a prepaid balance.
 
 ## Dashboard
 

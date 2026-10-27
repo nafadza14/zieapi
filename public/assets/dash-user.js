@@ -729,14 +729,14 @@
       c.root.innerHTML = `${b.bankConfigured ? "" : `<div class="ds-banner warn" role="status">Bank transfer details aren't set up yet, so invoices can't be paid. The site owner needs to set <code>APIZIE_BANK_INFO</code>.</div>`}
       <div class="grid-hero">
         <section class="ds-card hero-card plan-hero" aria-labelledby="cp-h">
-          <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>${idr(p.priceIdr)} / month</small></h2>
+          <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>$${p.priceUsd} / month</small></h2>
             <p class="meta">${b.planExpiresAt && p.id !== "free" ? `Active until ${c.day(b.planExpiresAt)}. Renew any time; time is added on top.` : "Free forever. Upgrade any time: one-time payment, no subscription."}</p>
             <div class="quota-block"><div class="row-between"><span>Monthly requests</span><b>${num(q.month.used)} / ${num(q.month.limit)}</b></div>${h.bar(q.month.used, q.month.limit)}</div></div>
           <div class="hero-right"><a class="btn btn-primary" href="#plans">${p.id === "max" ? "Renew" : "Upgrade"}</a></div>
         </section>
         <section class="ds-card" aria-labelledby="bal-h">
           <div class="card-top"><h2 id="bal-h">Pay-as-you-go balance</h2><button class="btn btn-primary btn-sm push" data-act="topupCustom">Top up</button></div>
-          <b class="hero-num sm">${idr(b.balance)}</b><p class="meta">≈ ${num(b.balanceRequests)} requests at Rp${b.payg.priceIdr.toLocaleString("id-ID")} per request</p>
+          <b class="hero-num sm">${idr(b.balance)}</b><p class="meta">≈ ${num(b.balanceRequests)} requests over your plan quota, at $${b.payg.usdPer1k.toFixed(2)} per 1,000</p>
           <label class="switch-row"><span><b>Use balance when the plan quota runs out</b><small>Your API keeps working past 100% instead of returning 429.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="payg" ${b.payg.enabled ? "checked" : ""}></label>
           <label class="switch-row"><span><b>Low-balance alert</b><small>Notify me (and send <code>balance.low</code>) below ${idr(b.payg.lowBalance)}.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="lowBalanceAlert" ${b.payg.lowBalanceAlert ? "checked" : ""}></label>
         </section>
@@ -747,7 +747,7 @@
       </section>
       <section class="ds-card" id="plans" aria-labelledby="pl-h"><div class="card-top"><h2 id="pl-h">Plans</h2><span class="meta">Each plan includes a monthly quota; your balance covers anything above it</span></div>
         <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? h.badge("current", "Current plan") : x.id === "free" ? "" : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">${p.id === x.id ? "Renew" : "Choose"}</button>`}</div>
-          <p class="plan-price">${idr(x.priceIdr)} <small>/ month</small></p>
+          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceIdr ? `<p class="meta">${idr(x.priceIdr)} by bank transfer</p>` : ""}
           <ul class="tips small"><li>${num(x.monthly)} requests / month</li><li>${num(x.perMinute)} requests / minute</li><li>${x.logDays}-day log history</li>${x.webhooks ? "<li>Webhooks and IP allowlists</li>" : ""}${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>${num(x.maxKeys)} active API keys</li></ul></div>`).join("")}</div>
       </section>
       <section class="ds-card" aria-labelledby="tx-h"><div class="card-top"><h2 id="tx-h">Transactions</h2>${h.seg("tab", [["all", "All"], ["plan", "Plans"], ["topup", "Top-ups"], ["usage", "Usage"]], tab)}</div>
@@ -808,7 +808,7 @@
         const plan = b.plans.find((x) => x.id === el.dataset.plan);
         const months = await c.openModal({
           title: `${c.cap(plan.id)} plan`,
-          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => `<option value="${m}">${m} month${m > 1 ? "s" : ""} · ${idr(plan.priceIdr * m)} + VAT</option>`).join("")}</select></label><p class="hint">You'll get an invoice to pay by bank transfer. The plan starts when the payment is confirmed${b.plan.id === plan.id ? " and the time is added to your current period" : ""}.</p>`,
+          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid} (${idr(plan.priceIdr * paid)}) + VAT</option>`; }).join("")}</select></label><p class="hint">You'll get an invoice to pay by bank transfer. The plan starts when the payment is confirmed${b.plan.id === plan.id ? " and the time is added to your current period" : ""}.</p>`,
           submit: "Create invoice",
           onSubmit: (form) => Number(form.months.value),
         });

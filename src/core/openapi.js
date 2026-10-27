@@ -101,7 +101,7 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   const lines = [
     category ? `# Apizie: ${category} APIs` : "# Apizie",
     "",
-    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): Indonesian sources, finance and crypto, news, research, developer tools and 1,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 600 requests/month, no credit card.`,
+    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools and 1,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card.`,
     "",
     "## Use it",
     `- Base URL: ${apiUrl}`,
@@ -115,7 +115,7 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
     "## Key pages",
     `- [MCP server setup](${publicUrl}/mcp): ${apiUrl}/mcp, Streamable HTTP, OAuth 2.1 or API key, 8 tools`,
     `- [Docs](${publicUrl}/docs) · [Quickstart](${publicUrl}/docs/quickstart) · [Errors](${publicUrl}/docs/errors) · [Bring your own key](${publicUrl}/docs/byok)`,
-    `- [Pricing](${publicUrl}/pricing): Free 600/month, Pro Rp49.000, Ultra Rp129.000, Max Rp399.000`,
+    `- [Pricing](${publicUrl}/pricing): Free 1,000/month, Pro $9, Ultra $29, Max $99 per month (2 months free yearly)`,
     `- [OpenAPI 3.1](${apiUrl}/openapi.json) · [Full catalog for LLMs](${publicUrl}/llms-full.txt)`,
     "- Any catalog or docs page has a Markdown twin: append `.md` (for example /api/search-tools/wikipedia.md)",
     "",

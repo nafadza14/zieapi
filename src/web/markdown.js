@@ -15,7 +15,7 @@ export function homeMd({ totals, categories, publicUrl, apiUrl, faq }) {
 - REST: \`GET ${apiUrl}/v1/{category}:{api}/{endpoint}?param=value\` with header \`x-api-key\`
 - Response: \`{ project, data, timestamp }\`; errors \`{ content, message, errors }\`
 - MCP: \`${apiUrl}/mcp\` (Streamable HTTP, OAuth 2.1 or API key) for Claude, ChatGPT, Cursor, VS Code, Gemini CLI
-- Free plan: 600 requests/month, 100/minute, no credit card. Paid: Pro, Ultra, Max (IDR)
+- Free plan: 1,000 requests/month, 100/minute, no credit card. Paid: Pro $9, Ultra $29, Max $99 per month (2 months free yearly)
 - OpenAPI: ${apiUrl}/openapi.json · llms.txt: ${publicUrl}/llms.txt
 
 ## How it works
@@ -68,7 +68,7 @@ export function apiMd({ s, category, publicUrl, apiUrl }) {
 }
 
 export function pricingMd({ faq, publicUrl }) {
-  const rows = Object.values(PLANS).map((p) => `| ${PLAN_COPY[p.id]?.name ?? p.id} | ${p.priceIdr ? "Rp" + p.priceIdr.toLocaleString("id-ID") + "/month" : "Free"} | ${n(p.monthly)} | ${n(p.perMinute)} | ${p.bulk ? `yes (${p.bulkCap})` : "no"} |`);
+  const rows = Object.values(PLANS).map((p) => `| ${PLAN_COPY[p.id]?.name ?? p.id} | ${p.priceUsd ? "$" + p.priceUsd + "/month" : "Free"} | ${n(p.monthly)} | ${n(p.perMinute)} | ${p.bulk ? `yes (${p.bulkCap})` : "no"} |`);
   return `# Apizie pricing
 
 | Plan | Price | Requests / month | Requests / minute | Bulk |

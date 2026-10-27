@@ -104,7 +104,7 @@ test("register → session → key → call API → logs/usage", async () => {
   const body = await run.json();
   assert.equal(run.status, 200);
   assert.equal(body.project, "dev-tools:hash");
-  assert.equal(run.headers.get("x-ratelimit-remaining-month"), "599");
+  assert.equal(run.headers.get("x-ratelimit-remaining-month"), "999");
 
   const logs = await c("/api/me/logs");
   assert.equal(logs.body.content.items[0].project, "dev-tools:hash");
@@ -165,9 +165,14 @@ test("plan gate, admin upgrade, invoices, bulk, webhooks", async () => {
 
   const inv = await c("/api/me/invoices", { method: "POST", body: { plan: "ultra", months: 1 } });
   assert.equal(inv.status, 201);
-  assert.equal(inv.body.content.subtotal, 129000);
-  assert.equal(inv.body.content.vat, 14190);
-  assert.ok(inv.body.content.amount > 143190 && inv.body.content.amount < 144190);
+  assert.equal(inv.body.content.subtotal, 479000);
+  assert.equal(inv.body.content.vat, 52690);
+  assert.equal(inv.body.content.priceUsd, 29);
+  assert.ok(inv.body.content.amount > 531690 && inv.body.content.amount < 532690);
+  const yearly = await c("/api/me/invoices", { method: "POST", body: { plan: "pro", months: 12 } });
+  assert.equal(yearly.body.content.subtotal, 149000 * 10, "12 months bills 10");
+  assert.equal(yearly.body.content.priceUsd, 90);
+  await c(`/api/me/invoices/${yearly.body.content.id}/cancel`, { method: "POST" });
   const conf = await c(`/api/me/invoices/${inv.body.content.id}/confirm`, { method: "POST", body: { reference: "BCA a.n. U" } });
   assert.equal(conf.body.content.status, "awaiting_review");
 

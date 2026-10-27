@@ -103,7 +103,7 @@ ${pageHead("Showcase", "Built with Apizie.", "Six things you can ship this week 
 <section class="wrap section-tight">
   <div class="sc-head"><h2 class="display-3">Example builds</h2><p class="muted">Made by the Apizie team to show what the API and the MCP server can do. Swap in your key and run them.</p></div>
   <div class="sc-grid">${SHOWCASE_EXAMPLES.map(example).join("")}</div>
-  <div class="sc-cta card"><div><h3>Want to build one of these?</h3><p class="muted">Free plan: 600 requests a month, no card. Your first key takes a few seconds.</p></div><div class="row-links"><a class="pill pill-white" href="${user ? "/dashboard/keys" : "/register"}">${user ? "Get your API key" : "Create a free account"}</a><a class="pill pill-outline" href="/docs/quickstart">Quickstart</a></div></div>
+  <div class="sc-cta card"><div><h3>Want to build one of these?</h3><p class="muted">Free plan: 1,000 requests a month, no card. Your first key takes a few seconds.</p></div><div class="row-links"><a class="pill pill-white" href="${user ? "/dashboard/keys" : "/register"}">${user ? "Get your API key" : "Create a free account"}</a><a class="pill pill-outline" href="/docs/quickstart">Quickstart</a></div></div>
 </section>
 <section class="wrap section-tight">
   <div class="sc-head"><h2 class="display-3">From the community</h2><p class="muted">Projects people have shipped on Apizie, reviewed by our team before they appear here.</p></div>
@@ -200,7 +200,7 @@ export function authPage({ mode, providers, next = "/dashboard", error = "", pla
 <section class="auth-card card">
   <a href="/" class="auth-logo" aria-label="Apizie home">${logo()}</a>
   <h1>${isReg ? "Create your account" : "Welcome back"}</h1>
-  <p class="muted">${isReg ? "600 free requests every month. No credit card." : "Sign in to continue."}</p>
+  <p class="muted">${isReg ? "1,000 free requests every month. No credit card." : "Sign in to continue."}</p>
   ${error ? `<p class="form-error" role="alert">${esc(error)}</p>` : ""}
   ${providers.length ? `<div class="oauth">${providers.map((p) => `<a class="pill pill-outline pill-block" href="/auth/${p.id}?next=${encodeURIComponent(next)}">${icons[p.id] ?? ""} Continue with ${p.label}</a>`).join("")}</div><div class="or"><span>or</span></div>` : ""}
   <form class="form stack" data-auth="${isReg ? "register" : "login"}" data-next="${esc(next)}" data-plan="${esc(plan)}">

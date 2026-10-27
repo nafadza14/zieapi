@@ -2,7 +2,7 @@
 // Every route the dashboard calls lives here; app.js only resolves the session and CSRF.
 
 import { E, HttpError, okContent } from "../core/envelope.js";
-import { PLANS, PAYG, getPlan, planAllows, requestsForRupiah } from "../core/plans.js";
+import { PLANS, PAYG, getPlan, planAllows, requestsForRupiah, billedMonths } from "../core/plans.js";
 import { RANGES, loadHours, summarize, systemStatus } from "../core/analytics.js";
 import { WEBHOOK_EVENTS, newWebhookSecret } from "../core/webhooks.js";
 import { ulid, monthKey, secondsToMonthReset } from "../core/util.js";
@@ -145,8 +145,8 @@ export function createAccountApi(d) {
       const target = PLANS[body?.plan];
       const months = Math.min(12, Math.max(1, Math.round(Number(body?.months) || 1)));
       if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
-      subtotal = target.priceIdr * months;
-      extra = { plan: target.id, months };
+      subtotal = target.priceIdr * billedMonths(months);
+      extra = { plan: target.id, months, priceUsd: target.priceUsd * billedMonths(months) };
     }
     const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
     if (open.length >= 5) throw E.invalidParams([{ path: "type", message: "You already have 5 open invoices. Pay or cancel one first" }]);
@@ -484,7 +484,7 @@ export function createAccountApi(d) {
         plans: Object.values(PLANS),
         balance: balance / 10,
         balanceRequests: Math.floor(balance / PAYG.priceTenths),
-        payg: { priceIdr: PAYG.priceTenths / 10, topups: PAYG.topups.map((a) => ({ amount: a, requests: requestsForRupiah(a) })), minTopup: PAYG.minTopup, lowBalance: PAYG.lowBalance, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
+        payg: { priceIdr: PAYG.priceTenths / 10, usdPer1k: PAYG.usdPer1k, topups: PAYG.topups.map((a) => ({ amount: a, requests: requestsForRupiah(a) })), minTopup: PAYG.minTopup, lowBalance: PAYG.lowBalance, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
         vatPercent,
         bank,
         bankConfigured: !!d.bankConfigured,

@@ -1,4 +1,5 @@
 import { SHOWCASE_EXAMPLES } from "../showcase-examples.js";
+import { LEGAL_DOCS, COMPANY, LEGAL_UPDATED } from "../legal.js";
 import { webPageLd, breadcrumb } from "../seo.js";
 import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
 
@@ -142,49 +143,32 @@ ${categories.map((c) => `<tr><td><a href="/category/${esc(c.slug)}">${esc(c.disp
 }
 
 // ---------- Legal ----------------------------------------------------------------
-const LEGAL = {
-  terms: ["Terms of Service", [
-    ["Agreement", "By creating an account or calling the Apizie API you agree to these terms. If you use Apizie for an organisation, you accept them on its behalf."],
-    ["The service", "Apizie provides programmatic access to publicly available data through a unified API, a web dashboard and an MCP server. Sources may change or become unavailable; we work to keep endpoints running but do not guarantee any particular source."],
-    ["Accounts and keys", "Keep your API keys secret. You are responsible for all activity on your keys. We may suspend keys that are leaked or abused."],
-    ["Plans and payment", "Paid plans are billed in Indonesian Rupiah for 30-day periods and activated once payment is verified. Quotas reset on the 1st of each month (UTC)."],
-    ["Acceptable use", "Your use must comply with the Acceptable Use Policy and applicable law, including Indonesia's Personal Data Protection Law (UU PDP No. 27/2022)."],
-    ["Liability", "The service is provided “as is”. To the maximum extent permitted by law, Apizie is not liable for indirect or consequential losses. Our total liability is limited to the fees you paid in the previous three months."],
-    ["Changes", "We may update these terms; material changes will be announced on the website at least 14 days in advance."],
-    ["Governing law", "These terms are governed by the laws of the Republic of Indonesia."],
-  ]],
-  privacy: ["Privacy Policy", [
-    ["What we collect", "Account data (name, email, avatar from your sign-in provider), API key hashes, request metadata (time, endpoint, status, latency, IP address) and billing records."],
-    ["Why", "To operate the service, enforce limits, show you usage and logs, prevent abuse and handle billing."],
-    ["Retention", "Request logs are kept according to your plan (7–90 days). Account data is kept while your account is active and deleted on request."],
-    ["Sharing", "We do not sell personal data. Infrastructure providers (hosting, database) process data on our behalf."],
-    ["Your rights", "Under UU PDP you may access, correct or delete your personal data. Email hello@zieads.com."],
-  ]],
-  cookies: ["Cookie Policy", [
-    ["Essential cookies", "apz_session keeps you signed in. apz_oauth protects the sign-in flow. They are strictly necessary and set only when you sign in."],
-    ["Preferences", "The website may store small preferences (like the API key you paste into the playground) in your browser's localStorage. It never leaves your device unless you send a request."],
-    ["Analytics", "Apizie does not set advertising or third-party analytics cookies."],
-  ]],
-  aup: ["Acceptable Use Policy", [
-    ["Allowed", "Building products, research and automation on the data Apizie returns, in line with each source's terms and the law."],
-    ["Not allowed", "Collecting personal data for harassment, stalking, doxxing or discrimination; spam; credential stuffing; attacking or overloading third-party systems; bypassing paywalls or access controls; reselling raw API access without permission."],
-    ["Personal data", "If you process personal data obtained through Apizie you are the data controller and must comply with UU PDP and other applicable laws."],
-    ["Enforcement", "We may throttle, suspend or terminate accounts that violate this policy."],
-  ]],
-  refund: ["Refund Policy", [
-    ["Failed requests", "Server-side failures (5xx) are never counted against your quota."],
-    ["Plan payments", "If you were charged and the plan was not activated, or you cancel within 3 days without significant usage (under 10% of the quota), contact us for a full refund."],
-    ["How", "Email hello@zieads.com with your invoice ID. Refunds are processed to the original bank account within 14 business days."],
-  ]],
-};
+const inline = (t) =>
+  esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\(((?:\/|https:\/\/|mailto:)[^)\s]*)\)/g, '<a href="$2">$1</a>');
+const legalBlock = (b) => (Array.isArray(b) ? `<ul>${b[1].map((li) => `<li>${inline(li)}</li>`).join("")}</ul>` : `<p>${inline(b)}</p>`);
+const slugify = (h) => h.toLowerCase().replace(/^\d+\.\s*/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export function legalPage({ user, slug }) {
-  const doc = LEGAL[slug];
+  const doc = LEGAL_DOCS[slug];
   if (!doc) return null;
-  const [title, sections] = doc;
-  const body = `<main>${pageHead("Legal", title, "Last updated 26 October 2026. This template is a starting point. Have it reviewed by a lawyer before launch.")}
-<article class="wrap narrow prose section-tight">${sections.map(([h, p]) => `<h2>${esc(h)}</h2><p>${esc(p)}</p>`).join("")}</article></main>`;
-  return layout({ title, user, body });
+  const toc = doc.sections.length > 6 ? `<nav class="legal-toc" aria-label="On this page"><b>On this page</b><ol>${doc.sections.map((s) => `<li><a href="#${slugify(s.h)}">${esc(s.h.replace(/^\d+\.\s*/, ""))}</a></li>`).join("")}</ol></nav>` : "";
+  const others = [["terms", "Terms"], ["privacy", "Privacy"], ["cookies", "Cookies"], ["aup", "Acceptable use"], ["refund", "Refunds"]].map(([k, l]) => `<a href="/${k}"${k === slug ? ' aria-current="page"' : ""}>${l}</a>`).join("");
+  const body = `<main>${pageHead("Legal", esc(doc.title), `Last updated ${LEGAL_UPDATED}. ${esc(COMPANY.product)} is operated by ${esc(COMPANY.name)}.`)}
+<div class="wrap section-tight legal-wrap">
+  <article class="prose legal">
+    <p class="lead">${inline(doc.lead)}</p>
+    ${toc}
+    ${doc.sections.map((s) => `<section id="${slugify(s.h)}"><h2>${esc(s.h)}</h2>${s.blocks.map(legalBlock).join("")}</section>`).join("")}
+  </article>
+  <aside class="legal-side">
+    <div class="card legal-co"><span class="muted small">Operated by</span><b>${esc(COMPANY.name)}</b><p class="small">${esc(COMPANY.office)}</p><a class="small" href="mailto:${esc(COMPANY.email)}">${esc(COMPANY.email)}</a></div>
+    <nav class="legal-links" aria-label="Legal documents">${others}</nav>
+  </aside>
+</div></main>`;
+  return layout({ title: doc.title, user, body, description: `${doc.title} for ${COMPANY.product}, operated by ${COMPANY.name}. ${doc.lead.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")}`.slice(0, 300) });
 }
 
 // ---------- Auth -----------------------------------------------------------------

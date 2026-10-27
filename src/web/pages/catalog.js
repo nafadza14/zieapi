@@ -33,10 +33,10 @@ ${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} APIs`, `${fmt(totals.e
 
 export function categoryPage({ user, category, items }) {
   const body = `<main>
-${pageHead(`<a href="/scrapers">Catalog</a> / ${esc(category.displayName)}`, esc(category.displayName), `${esc(category.description)} ${category.scrapers} scrapers · ${category.endpoints} endpoints.`)}
+${pageHead(`<a href="/scrapers">Catalog</a> / ${esc(category.displayName)}`, esc(category.displayName), `${esc(category.description)} ${category.scrapers.toLocaleString("en-US")} APIs · ${category.endpoints.toLocaleString("en-US")} endpoints.`)}
 <div class="wrap section-tight">
-  <div class="row-links"><a class="pill pill-outline pill-sm" href="/category/${esc(category.slug)}/openapi.json">OpenAPI</a><a class="pill pill-outline pill-sm" href="/category/${esc(category.slug)}/llms.txt">llms.txt</a></div>
   <div class="grid-3 scraper-grid">${items.map(scraperCard).join("")}</div>
+  <p class="muted small machine-note">For AI tools: <a href="/category/${esc(category.slug)}/openapi.json" rel="nofollow">OpenAPI spec</a> · <a href="/category/${esc(category.slug)}/llms.txt" rel="nofollow">llms.txt</a>. These are files for agents and code generators, not pages. <a href="/docs#machine-readable">What is this?</a></p>
 </div></main>`;
   const description = `${category.displayName} APIs on Apizie: ${category.scrapers} sources and ${category.endpoints} endpoints as clean JSON with one API key. ${category.description}`;
   const list = { "@type": "ItemList", itemListElement: items.slice(0, 50).map((i, n) => ({ "@type": "ListItem", position: n + 1, url: absUrl(`/api/${i.category}/${i.slug}`), name: `${i.displayName} API` })) };
@@ -80,7 +80,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
 <section class="wrap api-about" aria-labelledby="about-h">
   <h2 id="about-h" class="display-3">About the ${esc(s.displayName)} API</h2>
   <p class="lead">${esc(summary)}</p>
-  <div class="table-wrap"><table class="doc-table"><tr><th>Project key</th><td><code>${esc(s.key)}</code></td></tr><tr><th>Status</th><td>${statusBadge(s.status)}</td></tr><tr><th>Endpoints</th><td>${s.endpointCount}</td></tr><tr><th>Category</th><td><a href="/category/${esc(s.category)}">${esc(category?.displayName ?? s.category)}</a></td></tr>${s.sourceUrl ? `<tr><th>Source</th><td><a href="${esc(s.sourceUrl)}" rel="noopener nofollow">${esc(s.sourceUrl.replace(/^https?:\/\//, ""))}</a></td></tr>` : ""}<tr><th>Base URL</th><td><code>${esc(apiUrl)}/v1/${esc(s.key)}/{endpoint}</code></td></tr><tr><th>Machine-readable</th><td><a href="/api/${esc(s.category)}/${esc(s.slug)}/openapi.json">OpenAPI</a> · <a href="/api/${esc(s.category)}/${esc(s.slug)}.md">Markdown</a></td></tr></table></div>
+  <div class="table-wrap"><table class="doc-table"><tr><th>Project key</th><td><code>${esc(s.key)}</code></td></tr><tr><th>Status</th><td>${statusBadge(s.status)}</td></tr><tr><th>Endpoints</th><td>${s.endpointCount}</td></tr><tr><th>Category</th><td><a href="/category/${esc(s.category)}">${esc(category?.displayName ?? s.category)}</a></td></tr>${s.sourceUrl ? `<tr><th>Source</th><td><a href="${esc(s.sourceUrl)}" rel="noopener nofollow">${esc(s.sourceUrl.replace(/^https?:\/\//, ""))}</a></td></tr>` : ""}<tr><th>Base URL</th><td><code>${esc(apiUrl)}/v1/${esc(s.key)}/{endpoint}</code></td></tr><tr><th>For AI tools</th><td><a href="/api/${esc(s.category)}/${esc(s.slug)}/openapi.json" rel="nofollow">OpenAPI spec</a> · <a href="/api/${esc(s.category)}/${esc(s.slug)}.md" rel="nofollow">Markdown</a> <a class="muted" href="/docs#machine-readable">(what is this?)</a></td></tr></table></div>
   <h2 class="display-3 mt">${esc(s.displayName)} API FAQ</h2>
   <div class="faq">${faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>

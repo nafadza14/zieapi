@@ -18,7 +18,7 @@ export const DOCS = [
 <a class="card" href="/docs/mcp"><h3>MCP server</h3><p>Give AI agents the whole catalog as tools.</p></a>
 </div>
 <h2>Base URL</h2><p><code>${esc(api)}</code></p>
-<h2>Machine-readable</h2><ul><li><a href="/openapi.json">/openapi.json</a>: OpenAPI 3.1 for every endpoint (per category: <code>/category/{slug}/openapi.json</code>)</li><li><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a>: compact references for LLMs</li></ul>`,
+<h2 id="machine-readable">For AI tools and code generators</h2><p>These are plain-text and JSON files meant for software, not for reading in a browser. Point an AI assistant, an agent framework or an SDK generator at them and it learns every Apizie endpoint at once. People usually want the <a href="/scrapers">catalog</a> or the <a href="/mcp">MCP setup</a> instead.</p><ul><li><a href="/openapi.json">/openapi.json</a>: OpenAPI 3.1 for every endpoint (per category: <code>/category/{slug}/openapi.json</code>)</li><li><a href="/llms.txt">/llms.txt</a> and <a href="/llms-full.txt">/llms-full.txt</a>: a summary and the full catalog in the <a href="https://llmstxt.org" rel="noopener">llms.txt</a> format that AI assistants read</li></ul>`,
       },
       {
         slug: "quickstart",

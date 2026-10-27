@@ -96,10 +96,13 @@ function fieldSchema(f) {
   return sc;
 }
 
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const catName = (catalog, slug) => (Array.isArray(catalog.categories) ? catalog.categories : []).find((c) => c.slug === slug)?.displayName ?? slug;
+
 export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full = true }) {
   const t = catalog.totals();
   const lines = [
-    category ? `# Apizie: ${category} APIs` : "# Apizie",
+    category ? `# Apizie: ${catName(catalog, category)} APIs` : "# Apizie",
     "",
     `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools and 1,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card.`,
     "",
@@ -123,11 +126,11 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   ];
   for (const s of catalog.scrapers.filter((x) => !category || x.category === category)) {
     if (!full) {
-      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\`: ${s.lazy ? s._count : s.endpoints.length} endpoints${s.auth ? " (your key)" : ""}`);
+      lines.push(`- [${s.displayName}](${publicUrl}/api/${s.category}/${s.slug}) \`${s.key}\`: ${plural(s.lazy ? s._count : s.endpoints.length, "endpoint")}${s.auth ? " (your key)" : ""}`);
       continue;
     }
     if (s.lazy) {
-      lines.push(`- ${s.displayName} \`${s.key}\`: ${s._count} endpoints${s.auth ? " (your key)" : ""}. Spec: ${publicUrl}/api/${s.category}/${s.slug}/openapi.json`);
+      lines.push(`- ${s.displayName} \`${s.key}\`: ${plural(s._count, "endpoint")}${s.auth ? " (your key)" : ""}. Spec: ${publicUrl}/api/${s.category}/${s.slug}/openapi.json`);
       continue;
     }
     lines.push("", `### ${s.displayName} (\`${s.key}\`)`, s.description ?? "");

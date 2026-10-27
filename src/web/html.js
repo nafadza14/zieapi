@@ -37,12 +37,12 @@ export function footer() {
     <div class="footer-brand">${logo()}<p>One key, one response shape. We keep the scrapers working.</p></div>
     <div class="footer-cols">
       <div><h4>Product</h4><a href="/scrapers">Scrapers</a><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/mcp">MCP server</a><a href="/showcase">Showcase</a><a href="/status">Status</a></div>
-      <div><h4>Developers</h4><a href="/docs/quickstart">Quickstart</a><a href="/openapi.json">OpenAPI spec</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/nafadza14/zieapi" rel="noopener">GitHub</a></div>
-      <div><h4>Support</h4><a href="/report">Report an issue</a><a href="/docs/errors">Error codes</a><a href="mailto:hello@zieads.com">Contact</a></div>
+      <div><h4>Developers</h4><a href="/docs/quickstart">Quickstart</a><a href="/mcp">MCP for AI agents</a><a href="/docs#machine-readable">For AI tools</a><a href="https://github.com/nafadza14/zieapi" rel="noopener">GitHub</a></div>
+      <div><h4>Support</h4><a href="/report">Report an issue</a><a href="/docs/errors">Error codes</a><a href="mailto:support@zieads.com">Contact</a></div>
       <div><h4>Legal</h4><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/aup">Acceptable use</a><a href="/refund">Refunds</a></div>
     </div>
   </div>
-  <div class="footer-bottom"><span>© ${new Date().getFullYear()} Apizie · Zieads</span><span>Built for developers and AI agents</span></div>
+  <div class="footer-bottom"><span>© ${new Date().getFullYear()} Ziera Technology · Apizie</span><span>Built for developers and AI agents</span></div>
 </footer>`;
 }
 

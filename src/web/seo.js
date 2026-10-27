@@ -10,7 +10,7 @@ import { PLANS, PLAN_COPY } from "../core/plans.js";
 
 export const BRAND = {
   name: "Apizie",
-  legalName: "Zieads",
+  legalName: "Ziera Technology",
   tagline: "One API key for every public data source",
   description:
     "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests a month.",
@@ -48,7 +48,8 @@ export function siteGraph() {
     alternateName: ["Apizie API", "apizie"],
     url: base,
     logo: { "@type": "ImageObject", url: absUrl("/assets/icon-512.png"), width: 512, height: 512 },
-    parentOrganization: { "@type": "Organization", name: BRAND.legalName },
+    legalName: BRAND.legalName,
+    parentOrganization: { "@type": "Organization", name: BRAND.legalName, address: { "@type": "PostalAddress", streetAddress: "Ziera HQ, Somodaran, Kalasan", addressLocality: "Sleman", addressRegion: "DI Yogyakarta", postalCode: "55571", addressCountry: "ID" } },
     sameAs: [BRAND.repo],
     contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: BRAND.email, availableLanguage: ["English", "Indonesian"] },
   };

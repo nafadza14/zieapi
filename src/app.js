@@ -250,6 +250,11 @@ export function createApp(opts = {}) {
       const st = signState(`${mm[1]}|${verifier}|${safeNext(q.next)}`);
       return redirect(supabaseAuthorizeUrl(sbAuth, { provider: mm[1], redirectTo: `${publicUrl}/auth/supabase/callback`, challenge }), { "Set-Cookie": cookie("apz_sb", st, { maxAge: 600, secure: isHttps(req) }) });
     }
+    // Supabase falls back to its Site URL ("/?code=...") when our callback is missing from its Redirect URLs list.
+    // If that Site URL is this site, finish the sign-in anyway instead of dropping the user on the home page.
+    if (p === "/" && m === "GET" && q.code && parseCookies(req.headers.cookie).apz_sb) {
+      return redirect("/auth/supabase/callback?" + new URLSearchParams(q).toString());
+    }
     if (p === "/auth/supabase/callback" && m === "GET") {
       const raw = checkState(parseCookies(req.headers.cookie).apz_sb);
       const [provider, verifier, ...rest] = raw ? raw.split("|") : [];

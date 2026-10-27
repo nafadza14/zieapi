@@ -70,6 +70,18 @@ test("Google sign-in through Supabase Auth (PKCE)", async () => {
   assert.match(decodeURIComponent(err.headers.get("location")), /User cancelled/);
 });
 
+test("Supabase Site URL fallback (/?code=...) still completes the sign-in", async () => {
+  const start = await get("/auth/google?next=/dashboard");
+  const cookie = start.headers.get("set-cookie").split(";")[0];
+  const landed = await get("/?code=good-code", { cookie });
+  assert.equal(landed.status, 302);
+  assert.equal(landed.headers.get("location"), "/auth/supabase/callback?code=good-code");
+  const cb = await get(landed.headers.get("location"), { cookie });
+  assert.equal(cb.headers.get("location"), "/dashboard");
+  const plain = await get("/?code=whatever");
+  assert.notEqual(plain.status, 302, "without the sign-in cookie the home page renders normally");
+});
+
 test("OAuth discovery metadata for MCP clients", async () => {
   const pr = await (await get("/.well-known/oauth-protected-resource/mcp")).json();
   assert.equal(pr.resource, "http://api.test/mcp");

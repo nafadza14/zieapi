@@ -102,6 +102,7 @@ export class Catalog {
     sc.tags = [...new Set([...(sc.tags ?? []), ...(def.tags ?? [])])];
     sc.minPlan = def.minPlan ?? sc.minPlan;
     if (def.iconUrl) sc.iconUrl = def.iconUrl;
+    if (def.sourceUrl) sc.sourceUrl = def.sourceUrl;
     if (def.indonesian) sc.indonesian = true;
     for (const ep of def.endpoints) {
       const built = this._endpoint(key, ep, ep.handler);

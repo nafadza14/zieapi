@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // Build the global API directory from the APIs.guru OpenAPI Directory (CC0 / fair use),
-// as packaged by the `openapi-directory` npm package (MIT).
+// as packaged by the `openapi-directory` npm package (MIT), plus extra directories of OpenAPI 3
+// specs published by the providers themselves (see docs/API-SOURCES.md for the list and URLs).
 //
 //   npm i --no-save openapi-directory@1.3.17
-//   node scripts/import-openapi.js node_modules/openapi-directory/api
+//   node scripts/import-openapi.js node_modules/openapi-directory/api [extra-spec-dir ...]
+//
+// An extra spec whose server URL matches an APIs.guru entry replaces it and keeps its key,
+// so existing catalog URLs stay the same while the operations come from the newer spec.
 //
 // Writes:
 //   src/catalog/openapi/index.json        one compact summary per API (loaded at start-up)
@@ -13,6 +17,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, rmSync, 
 import { join, relative } from "node:path";
 
 const ROOT = process.argv[2];
+const EXTRA = process.argv.slice(3).filter((d) => existsSync(d));
 if (!ROOT || !existsSync(ROOT)) {
   console.error("usage: node scripts/import-openapi.js <path-to-openapi-directory/api>");
   process.exit(1);
@@ -20,8 +25,15 @@ if (!ROOT || !existsSync(ROOT)) {
 const OUT = new URL("../src/catalog/openapi/", import.meta.url).pathname;
 const MAX_OPS = 300;
 
-// Infrastructure control planes and private deployments are not data APIs; skip them.
-const EXCLUDE_PROVIDERS = new Set(["azure.com", "amazonaws.com", "microsoft.com", "kubernetes.io", "autotask.net", "windows.net"]);
+// Private deployments and infrastructure control planes are not data APIs; skip them.
+// AWS needs SigV4 request signing, which the bring-your-own-key connector cannot do.
+// Microsoft (Graph, Cognitive Services) and Azure data-plane APIs are kept; Azure Resource Manager is not.
+const EXCLUDE_PROVIDERS = new Set(["amazonaws.com", "kubernetes.io", "autotask.net", "windows.net"]);
+const isControlPlane = (base) => /^https:\/\/management\.(azure|core\.windows)\./.test(base) || /\.azurestack\.external(\/|$)/.test(base);
+// Provider specs that do not declare their auth scheme (checked by hand against each provider's docs).
+const AUTH_OVERRIDE = { "docusign": { t: "bearer" }, "docusign-click": { t: "bearer" }, "docusign-rooms": { t: "bearer" } };
+// Mailchimp Transactional takes its key inside the JSON body, which the connector does not support yet.
+const SKIP_SOURCES = new Set(["mailchimp-tx"]);
 const OK_AUTH = new Set(["apiKey:header", "apiKey:query", "http:basic", "http:bearer", "oauth2:", "openIdConnect:"]);
 
 const CATEGORY_MAP = {
@@ -121,12 +133,14 @@ function fieldFrom(spec, p) {
 const index = [];
 const used = new Set();
 const skipped = {};
-const files = walk(ROOT);
+const byBase = new Map(); // base URL -> index position, so a provider's own spec can replace an older copy
+const files = [...walk(ROOT).sort().map((f) => [ROOT, f]), ...EXTRA.flatMap((d) => walk(d).sort().map((f) => [d, f]))];
 if (existsSync(OUT)) rmSync(OUT, { recursive: true });
 mkdirSync(join(OUT, "apis"), { recursive: true });
 
-for (const file of files.sort()) {
-  const id = relative(ROOT, file).replace(/\.json$/, "");
+for (const [root, file] of files) {
+  const extra = root !== ROOT;
+  const id = relative(root, file).replace(/\.json$/, "");
   let spec;
   try {
     spec = JSON.parse(readFileSync(file, "utf8"));
@@ -136,12 +150,16 @@ for (const file of files.sort()) {
   const info = spec.info ?? {};
   const provider = info["x-providerName"] ?? id.split("/")[0];
   const skip = (why) => (skipped[why] = (skipped[why] ?? 0) + 1);
-  if (EXCLUDE_PROVIDERS.has(provider) || provider.endsWith(".local") || provider.includes("azure")) { skip("infra/private provider"); continue; }
+  if (EXCLUDE_PROVIDERS.has(provider) || provider.endsWith(".local")) { skip("infra/private provider"); continue; }
   if (provider === "github.com" && !id.endsWith("api.github.com")) { skip("github enterprise variant"); continue; }
   const base = serverUrl(spec);
   if (!base) { skip("no absolute server"); continue; }
   if (privateHost(base)) { skip("private server"); continue; }
-  const { auth, ok } = pickAuth(spec);
+  if (isControlPlane(base)) { skip("cloud control plane"); continue; }
+  if (SKIP_SOURCES.has(info["x-apizie-source"])) { skip("key in request body"); continue; }
+  const picked = pickAuth(spec);
+  const auth = AUTH_OVERRIDE[info["x-apizie-source"]] ?? picked.auth;
+  const ok = picked.ok || !!AUTH_OVERRIDE[info["x-apizie-source"]];
   if (!ok) { skip("unsupported auth"); continue; }
 
   const ops = [];
@@ -180,14 +198,18 @@ for (const file of files.sort()) {
   const cats = info["x-apisguru-categories"] ?? [];
   const category = CATEGORY_MAP[cats[0]] ?? "open-data";
   let key;
-  let base0 = slug(id.replace(/^www\./, "").replace(/\.(com|org|net|io|dev|co|gov|ai|app)(?=\/|:|$)/g, "").replace(/[/:]/g, "-"), 64);
-  key = `${category}:${base0}`;
-  for (let i = 2; used.has(key); i++) key = `${category}:${base0}-${i}`;
-  used.add(key);
+  const replaces = extra && byBase.has(base) ? byBase.get(base) : null;
+  if (replaces !== null) key = index[replaces].k;
+  else {
+    const base0 = slug(id.replace(/^www\./, "").replace(/\.(com|org|net|io|dev|co|gov|ai|app)(?=\/|:|$)/g, "").replace(/[/:]/g, "-"), 64);
+    key = `${category}:${base0}`;
+    for (let i = 2; used.has(key); i++) key = `${category}:${base0}-${i}`;
+    used.add(key);
+  }
 
   const fileId = slug(key.replace(":", "--"), 90);
   writeFileSync(join(OUT, "apis", `${fileId}.json`), JSON.stringify({ base, auth, ops }));
-  index.push({
+  const entry = {
     k: key,
     f: fileId,
     n: clip(info.title ?? provider, 70),
@@ -198,10 +220,19 @@ for (const file of files.sort()) {
     g: (cats ?? []).slice(0, 3),
     w: info.contact?.url && /^https?:/.test(info.contact.url) ? info.contact.url : `https://${provider}`,
     v: info.version ? String(info.version).slice(0, 20) : null,
-  });
+    ...(extra ? { s: "provider" } : {}),
+  };
+  if (replaces !== null) {
+    if (index[replaces].f !== fileId) rmSync(join(OUT, "apis", `${index[replaces].f}.json`), { force: true });
+    index[replaces] = entry;
+    skip("replaced by provider spec");
+  } else {
+    if (!byBase.has(base)) byBase.set(base, index.length);
+    index.push(entry);
+  }
 }
 
-writeFileSync(join(OUT, "index.json"), JSON.stringify({ source: "APIs.guru OpenAPI Directory via openapi-directory@1.3.17", generatedAt: new Date().toISOString(), apis: index }));
+writeFileSync(join(OUT, "index.json"), JSON.stringify({ source: `APIs.guru OpenAPI Directory via openapi-directory@1.3.17${EXTRA.length ? " + provider-published OpenAPI specs" : ""}`, generatedAt: new Date().toISOString(), apis: index }));
 const totalOps = index.reduce((n, a) => n + a.o, 0);
 console.log(`wrote ${index.length} APIs, ${totalOps} operations (${index.filter((a) => !a.a).length} keyless)`);
 console.log("skipped:", skipped);

@@ -313,3 +313,22 @@ Bukti E42-E45; detail dan sumber di [`SEO-GEO.md`](SEO-GEO.md). Hero baru ("One 
 - `npm test`: 165 tes lulus di MemoryKV dan di Postgres 16 lokal dengan migration Supabase yang sama (lewat shim PostgREST). Suite baru `test/account.test.js` menguji seluruh API dashboard.
 - Klik-tembus Playwright (`45/45 PASS`) di desktop 1440px dan mobile 390px: setiap tombol, modal, filter, ekspor CSV, unduhan JSON, alur invoice sampai disetujui admin, webhook ke penerima lokal (gagal lalu dikirim ulang), referral, hapus akun. Tidak ada error JavaScript; satu-satunya error konsol adalah 400 yang memang diuji (validasi) dan aset CDN yang diblokir sandbox.
 - Belum terverifikasi: Supabase produksi. Dashboard akan tetap kosong di Vercel sampai migration dijalankan dan `SUPABASE_SECRET_KEY` + `APIZIE_SESSION_SECRET` diset. Halaman `/admin/setup` menunjukkan apa yang masih kurang.
+
+---
+
+# Iterasi 8: Perluasan katalog API
+
+## A. Observations baru
+- Riset sumber: APIs.guru openapi-directory 1.3.17, spec OpenAPI resmi dari repo GitHub provider, dan daftar API publik tanpa key yang dokumentasinya resmi.
+
+## B. Inferensi
+- Jalur tercepat menambah API secara jujur: impor spec resmi (BYOK untuk yang butuh key) dan modul live untuk API publik tanpa key.
+
+## C. Rekonstruksi di Apizie
+- `scripts/import-openapi.js` menerima folder spec tambahan, spec provider menggantikan entri APIs.guru dengan base URL sama; AWS, Azure control plane, Azure Stack admin dan Mailchimp Transactional dikecualikan.
+- `public-apis.js` (90 API / 208 endpoint) dan `public-apis-2.js` (63 API / 110 endpoint), semua tanpa key.
+- Total katalog: 1.679 → 1.901 API, 40.078 → 47.141 endpoint, endpoint live 9.147 → 9.898. Detail di [`API-SOURCES.md`](API-SOURCES.md).
+
+## D. Verifikasi
+- `npm test`: 168 lulus. `test/public-apis.test.js` memanggil setiap endpoint tanpa key secara offline (mock fetch) dan memastikan satu URL publik valid.
+- Belum terverifikasi: respons nyata dari upstream (sandbox tidak punya akses jaringan ke host tersebut).

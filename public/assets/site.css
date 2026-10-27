@@ -468,3 +468,36 @@ h2.display-2.mt { margin: 64px 0 18px; }
 .api-about h2.display-3 { margin: 0 0 14px; }
 .api-about h2.display-3.mt { margin-top: 40px; }
 .api-about .lead { max-width: 820px; }
+
+/* ---------- showcase: example builds ---------- */
+.sc-head { display: grid; gap: 6px; margin-bottom: 22px; }
+.sc-head p { margin: 0; max-width: 680px; }
+.sc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.sc-ex { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.sc-ex h3 { margin: 0; font: 400 21px/1.25 var(--display); letter-spacing: -0.01em; }
+.sc-ex > p { margin: 0; color: var(--muted); font-size: 14px; }
+.sc-ex-top { display: flex; align-items: center; justify-content: space-between; }
+.sc-ex-n { font: 500 12px var(--mono); color: var(--dim); }
+.sc-ex-kind { font-size: 12px; color: var(--lilac); border: 1px solid rgba(183, 164, 255, 0.35); border-radius: 999px; padding: 2px 10px; }
+.sc-ex-who { font-size: 13px !important; }
+.sc-ex-who span, .sc-ex-uses > span { color: var(--dim); font-size: 12px; margin-right: 6px; }
+.sc-ex-uses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sc-ex-uses a code { font-size: 11.5px; color: var(--text); }
+.sc-ex-uses a:hover code { border-color: var(--line-2); color: #fff; }
+.sc-ex-code { border-top: 1px solid var(--line); padding-top: 10px; }
+.sc-ex-code summary { cursor: pointer; font-size: 13.5px; color: var(--text); list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 32px; }
+.sc-ex-code summary::-webkit-details-marker { display: none; }
+.sc-ex-code summary::after { content: "+"; color: var(--dim); font-size: 18px; }
+.sc-ex-code[open] summary::after { content: "−"; }
+.sc-ex-code summary span { margin-left: auto; margin-right: 10px; color: var(--dim); font-size: 12px; }
+.sc-ex-code .code-card.sm { margin: 10px 0 0; }
+.sc-ex-code .code-tabs { justify-content: space-between; align-items: center; padding: 6px 8px 6px 14px; font-size: 12px; color: var(--dim); }
+.sc-ex-code pre.code { font-size: 12px; max-height: 340px; overflow: auto; }
+.sc-cta { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.sc-cta h3 { margin: 0 0 4px; font: 400 20px var(--display); }
+.sc-cta p { margin: 0; }
+@media (max-width: 1020px) { .sc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .sc-grid { grid-template-columns: minmax(0, 1fr); } }
+.sc-cta .row-links { margin: 0; flex-wrap: wrap; }
+.sc-ex > * { min-width: 0; }
+.sc-ex-code pre.code { white-space: pre-wrap; overflow-wrap: anywhere; }

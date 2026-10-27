@@ -1,3 +1,4 @@
+import { SHOWCASE_EXAMPLES } from "../showcase-examples.js";
 import { webPageLd, breadcrumb } from "../seo.js";
 import { layout, esc, fmt, pageHead, logo, json } from "../html.js";
 
@@ -85,16 +86,34 @@ export function oauthErrorPage({ user, message }) {
 
 // ---------- Showcase -----------------------------------------------------------
 export function showcasePage({ user, items }) {
+  const apiHref = (key, ep) => `/api/${esc(key.replace(":", "/"))}?endpoint=${encodeURIComponent(ep)}`;
+  const example = (x, i) => `<article class="card sc-ex" id="${esc(x.slug)}">
+    <div class="sc-ex-top"><span class="sc-ex-n">${String(i + 1).padStart(2, "0")}</span><span class="sc-ex-kind">${esc(x.kind)}</span></div>
+    <h3>${esc(x.title)}</h3>
+    <p>${esc(x.summary)}</p>
+    <p class="sc-ex-who"><span>For</span> ${esc(x.who)}</p>
+    <div class="sc-ex-uses"><span>Uses</span>${x.uses.map(([key, ep]) => `<a href="${apiHref(key, ep)}"><code>${esc(key)}/${esc(ep)}</code></a>`).join("")}</div>
+    <details class="sc-ex-code"><summary>See the code <span>${esc(x.lang)}</span></summary><div class="code-card sm"><div class="code-tabs"><span>${esc(x.lang)}</span><button class="copy" data-copy-code type="button">Copy</button></div><pre class="code"><code>${esc(x.code)}</code></pre></div></details>
+  </article>`;
+  const community = items.length
+    ? `<div class="grid-3">${items.map((p) => `<a class="card show-card" href="${esc(p.url)}" rel="noopener nofollow" target="_blank"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><span class="muted small">${esc(new URL(p.url).hostname)}</span></a>`).join("")}</div>`
+    : `<p class="muted">No community projects yet. Ship one of the ideas above, or your own, and it could be the first one here.</p>`;
   const body = `<main>
-${pageHead("Showcase", "Built with Apizie.", "Bots, research pipelines and tools people have shipped on Apizie.")}
+${pageHead("Showcase", "Built with Apizie.", "Six things you can ship this week with one Apizie key. Each one is a working example from our team with the real endpoints and the code to copy.")}
 <section class="wrap section-tight">
-  ${items.length ? `<div class="grid-3">${items.map((p) => `<a class="card show-card" href="${esc(p.url)}" rel="noopener nofollow" target="_blank"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><span class="muted small">${esc(new URL(p.url).hostname)}</span></a>`).join("")}</div>` : `<div class="empty card"><h3>No projects here yet.</h3><p>Shipped something on Apizie? Yours could be the first one.</p></div>`}
+  <div class="sc-head"><h2 class="display-3">Example builds</h2><p class="muted">Made by the Apizie team to show what the API and the MCP server can do. Swap in your key and run them.</p></div>
+  <div class="sc-grid">${SHOWCASE_EXAMPLES.map(example).join("")}</div>
+  <div class="sc-cta card"><div><h3>Want to build one of these?</h3><p class="muted">Free plan: 600 requests a month, no card. Your first key takes a few seconds.</p></div><div class="row-links"><a class="pill pill-white" href="${user ? "/dashboard/keys" : "/register"}">${user ? "Get your API key" : "Create a free account"}</a><a class="pill pill-outline" href="/docs/quickstart">Quickstart</a></div></div>
+</section>
+<section class="wrap section-tight">
+  <div class="sc-head"><h2 class="display-3">From the community</h2><p class="muted">Projects people have shipped on Apizie, reviewed by our team before they appear here.</p></div>
+  ${community}
   <div class="card mt submit-card">
     <h2>Submit your project</h2>
     ${user ? `<form class="form" data-form="/api/showcase" data-success="Thanks! We'll review it shortly."><label>Project name<input name="name" required maxlength="80"></label><label>URL<input name="url" type="url" required placeholder="https://"></label><label class="full">What does it do?<textarea name="description" required maxlength="280" rows="3"></textarea></label><button class="pill pill-white">Submit</button><p class="form-msg" role="status"></p></form>` : `<p><a href="/login?next=/showcase">Sign in</a> to submit your project. Ultra and Max plans get their logo on the “Built with Apizie” strip.</p>`}
   </div>
 </section></main>`;
-  return layout({ title: "Showcase", active: "showcase", user, body });
+  return layout({ title: "Showcase: example builds", description: "Six example projects built on Apizie: an earthquake alert bot, crypto prices in rupiah, a research agent for Claude, prayer times, a news digest and a checkout address picker, with code.", active: "showcase", user, body });
 }
 
 // ---------- Report -------------------------------------------------------------

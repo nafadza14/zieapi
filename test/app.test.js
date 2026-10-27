@@ -316,3 +316,22 @@ test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", asy
   const login = await (await fetch(base + "/login")).text();
   assert.match(login, /noindex/);
 });
+
+test("showcase: six example builds that only reference real endpoints", async () => {
+  const { SHOWCASE_EXAMPLES } = await import("../src/web/showcase-examples.js");
+  assert.equal(SHOWCASE_EXAMPLES.length, 6);
+  const full = createApp({ logger: null, quiet: true, env: {}, kv: new MemoryKV() }).catalog; // the real live scrapers
+  for (const x of SHOWCASE_EXAMPLES) {
+    for (const [key, ep] of x.uses) {
+      const s = full.find(key);
+      assert.ok(s, `${x.slug}: ${key} is in the catalog`);
+      assert.equal(s.status, "live", `${x.slug}: ${key} is live`);
+      assert.ok(s.endpoints.some((e) => e.slug === ep), `${x.slug}: ${key}/${ep} exists`);
+      assert.ok(x.code.includes(key) || x.slug === "research-agent", `${x.slug}: the code calls ${key}`);
+    }
+    assert.doesNotMatch(x.code + x.summary, /—/);
+  }
+  const page = await (await fetch(`${base}/showcase`)).text();
+  assert.equal((page.match(/class="card sc-ex"/g) ?? []).length, 6);
+  assert.match(page, /Made by the Apizie team/);
+});

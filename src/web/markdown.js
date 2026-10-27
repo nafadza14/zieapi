@@ -23,6 +23,14 @@ export function homeMd({ totals, categories, publicUrl, apiUrl, faq }) {
 2. Pick an API at ${publicUrl}/scrapers
 3. Call it and get JSON. Same URL pattern and envelope for every source.
 
+## Why Apizie
+- One key, one format: every source answers with the same envelope.
+- Built for AI agents: native MCP server for Claude, ChatGPT, Cursor and VS Code.
+- Official sources only: official APIs, open data and publisher feeds.
+- Your keys stay yours: provider keys in \`x-upstream-key\` are never stored or logged.
+- See every call: request logs, latency, errors, usage alerts and webhooks.
+- Start free: 1,000 requests a month, paid plans from $9, pay-as-you-go above quota.
+
 ## Example
 \`\`\`
 curl "${apiUrl}/v1/search-tools:wikipedia/search?query=Eiffel%20Tower" -H "x-api-key: $APIZIE_KEY"

@@ -499,3 +499,15 @@ h2.display-2.mt { margin: 64px 0 18px; }
 .sc-cta .row-links { margin: 0; flex-wrap: wrap; }
 .sc-ex > * { min-width: 0; }
 .sc-ex-code pre.code { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Why Apizie (under How it works) */
+.why { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; margin-top: 72px; padding-top: 56px; border-top: 1px solid var(--line); }
+.why-head .display-3 { font-size: clamp(26px, 3vw, 34px); line-height: 1.15; margin-bottom: 14px; }
+.why-head p { color: var(--muted); margin: 0; max-width: 42ch; }
+.why-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 32px; }
+.why-list li { padding-left: 18px; position: relative; }
+.why-list li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--grad); }
+.why-list b { display: block; font-weight: 500; margin-bottom: 4px; }
+.why-list span { color: var(--muted); font-size: 15px; line-height: 1.55; }
+.why-list code { font-size: 13px; white-space: nowrap; }
+@media (max-width: 860px) { .why { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 48px; padding-top: 40px; } .why-list { grid-template-columns: minmax(0, 1fr); gap: 20px; } }

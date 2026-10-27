@@ -3,6 +3,17 @@ import { PLANS, PLAN_COPY } from "../../core/plans.js";
 import { HERO_BRANDS } from "../brands.js";
 import { webPageLd, faqLd } from "../seo.js";
 
+
+// "Why Apizie" reasons under How it works. Keep every claim true to what the product does today.
+const WHY = [
+  ["One key, one format", "Sign up once. Every source answers with the same envelope, so you parse one shape instead of fifty."],
+  ["Built for AI agents", "A native MCP server lets Claude, ChatGPT, Cursor and VS Code call any endpoint as a tool, with no glue code."],
+  ["Official sources only", "Built on official APIs, open data and publisher feeds. No scraping around bot protection, no grey areas."],
+  ["Your keys stay yours", "Provider keys you send in <code>x-upstream-key</code> pass straight through and are never stored or logged."],
+  ["See every call", "A dashboard with request logs, latency, errors, usage alerts and webhooks, so problems show up before users notice."],
+  ["Start free, grow on demand", "1,000 requests a month free with no card. Paid plans from $9, plus pay-as-you-go so you are never cut off."],
+];
+
 export const HOME_FAQ = [
   ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
   ["How do I use Apizie with Claude, ChatGPT or Cursor?", "Add the Apizie MCP server URL (/mcp) to your app. Claude.ai, Claude Desktop and ChatGPT connect with one click through OAuth; Cursor, VS Code and Gemini CLI use an API key header. The agent can then search the catalog and call any API as a tool."],
@@ -58,6 +69,10 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
     <article class="card step"><span class="step-n">01</span><h3>Get a free API key</h3><p>Sign up with Google, GitHub, Discord or email. Your first key is ready in seconds. No card needed.</p></article>
     <article class="card step"><span class="step-n">02</span><h3>Pick a scraper</h3><p>Search ${fmt(totals.scrapers)} sources across ${totals.categories} categories. Every endpoint documents its parameters.</p></article>
     <article class="card step"><span class="step-n">03</span><h3>Call it, get JSON</h3><p>Same URL pattern, same envelope, every source: <code>{ project, data, timestamp }</code>.</p></article>
+  </div>
+  <div class="why" id="why">
+    <div class="why-head"><span class="eyebrow">Why Apizie</span><h3 class="display-3">Less plumbing, more product.</h3><p>Every data source you add usually means another signup, another key, another response format and another set of limits to learn. Apizie turns that into one integration.</p></div>
+    <ul class="why-list">${WHY.map(([t, d]) => `<li><b>${t}</b><span>${d}</span></li>`).join("")}</ul>
   </div>
 </section>`;
 

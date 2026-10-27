@@ -49,7 +49,25 @@ export class Catalog {
     for (const def of live) this._addLive(def);
     for (const s of this.map.values()) s.status = s.endpoints.some((e) => e.status === "live") ? "live" : upstream ? "upstream" : "planned";
     if (directory) for (const entry of loadDirectoryIndex()) this._addDirectory(entry);
-    this.scrapers = [...this.map.values()];
+    // Planned sources and endpoints (listed for the roadmap, not callable) are kept for the admin dashboard only:
+    // `all` has everything, `scrapers` and every public read model leave them out so users never see them.
+    this.all = [...this.map.values()];
+    let plannedEndpoints = 0;
+    for (const s of this.all) {
+      if (s.lazy) continue;
+      if (s.status === "planned") {
+        plannedEndpoints += s.endpoints.length;
+        continue;
+      }
+      const hidden = s.endpoints.filter((e) => e.status === "planned");
+      if (hidden.length) {
+        s.plannedEndpoints = hidden;
+        s.endpoints = s.endpoints.filter((e) => e.status !== "planned");
+        plannedEndpoints += hidden.length;
+      }
+    }
+    this.scrapers = this.all.filter((s) => s.status !== "planned");
+    this.planned = { scrapers: this.all.length - this.scrapers.length, endpoints: plannedEndpoints };
     this.overrides = {}; // admin-set logo URLs, refreshed per request by the app
   }
 
@@ -133,10 +151,14 @@ export class Catalog {
     };
   }
 
-  find(ref) {
+  /** Public lookup: planned sources are invisible unless { all: true } (admin). */
+  find(ref, { all = false } = {}) {
     if (!ref) return null;
-    if (ref.includes(":")) return this.map.get(ref) ?? null;
-    return this.scrapers.find((s) => s.slug === ref) ?? null;
+    if (ref.includes(":")) {
+      const s = this.map.get(ref) ?? null;
+      return s && (all || s.status !== "planned") ? s : null;
+    }
+    return (all ? this.all : this.scrapers).find((s) => s.slug === ref) ?? null;
   }
 
   resolve(projectKey, endpointSlug) {
@@ -266,6 +288,8 @@ export class Catalog {
       usableEndpoints: liveEndpoints + byokEndpoints,
       directoryApis: directory,
       categories: this.categoryList().length,
+      plannedScrapers: this.planned.scrapers,
+      plannedEndpoints: this.planned.endpoints,
     });
   }
 }

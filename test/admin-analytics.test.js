@@ -71,3 +71,32 @@ test("admin pages render for every monitoring section", async () => {
     assert.match(html, /"logDays":90/, "admins get every range");
   }
 });
+
+test("planned sources are hidden from users everywhere and listed for admins only", async () => {
+  const planned = app.catalog.all.find((s) => s.status === "planned");
+  assert.ok(planned, "fixture: the seed catalog has planned sources");
+  const list = (await (await fetch(`${base}/api/scrapers/list?limit=2000`)).json()).content;
+  assert.equal(list.items.filter((i) => i.status === "planned").length, 0);
+  assert.equal(list.total, app.catalog.all.length - app.catalog.planned.scrapers);
+  assert.equal((await fetch(`${base}/api/${planned.category}/${planned.slug}`)).status, 404);
+  for (const p of ["/llms-full.txt", "/openapi.json", "/sitemap.xml", "/scrapers"]) assert.ok(!(await (await fetch(base + p)).text()).includes(`/${planned.category}/${planned.slug}`), p);
+  assert.ok(!(await (await fetch(`${base}/llms-full.txt`)).text()).includes(planned.key));
+  const key = (await app.repo.createKey(cust.id, { name: "m" })).secret;
+  const mcp = async (name, args) => (await (await fetch(`${base}/mcp`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": key }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) })).json()).result;
+  const found = await mcp("search_scrapers", { query: planned.displayName, limit: 50 });
+  assert.ok(!found.structuredContent.items.some((i) => i.key === planned.key));
+  assert.equal((await mcp("get_scraper_schema", { scraper: planned.key })).isError, true);
+  const t = app.catalog.totals();
+  assert.equal(t.scrapers, app.catalog.scrapers.length);
+  assert.equal(t.plannedScrapers, app.catalog.planned.scrapers);
+  // admins still see them, with their status
+  const admin = (await (await get("/api/admin/scrapers", adminCookie)).json()).content;
+  assert.equal(admin.length, app.catalog.all.length);
+  assert.equal(admin.find((s) => s.key === planned.key).status, "planned");
+  // live sources never expose their planned endpoints to users
+  const mixed = app.catalog.scrapers.find((s) => s.plannedEndpoints?.length);
+  if (mixed) {
+    const d = (await mcp("get_scraper_schema", { scraper: mixed.key, limit: 200 })).structuredContent;
+    assert.ok(d.endpoints.every((e) => e.status !== "planned"));
+  }
+});

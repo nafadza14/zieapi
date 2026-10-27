@@ -521,12 +521,16 @@ export function createApp(opts = {}) {
     if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, bankConfigured, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
     if (p === "/api/admin/scrapers" && m === "GET") {
       const off = await repo.disabledScrapers();
-      const st = await statsFor(catalog.scrapers);
-      return json(200, okContent(catalog.scrapers.map((s) => ({ key: s.key, displayName: s.displayName, iconUrl: catalog.overrides[s.key] || s.iconUrl, sourceUrl: s.sourceUrl, status: s.status, enabled: !off.has(s.key), endpoints: s.endpoints.length, live: s.endpoints.filter((e) => e.status === "live").length, requests: st[s.id].requests, successRate: st[s.id].requests ? Math.round((st[s.id].success / st[s.id].requests) * 1000) / 10 : null }))));
+      const st = await statsFor(catalog.all);
+      return json(200, okContent(catalog.all.map((s) => {
+        const eps = s.lazy ? s._count : s.endpoints.length + (s.plannedEndpoints?.length ?? 0);
+        const live = s.lazy ? (s.status === "live" ? s._count : 0) : s.endpoints.filter((e) => e.status === "live").length;
+        return { key: s.key, displayName: s.displayName, category: s.category, iconUrl: catalog.overrides[s.key] || s.iconUrl, sourceUrl: s.sourceUrl, status: s.status, origin: s.origin ?? "native", enabled: !off.has(s.key), endpoints: eps, live, plannedEndpoints: s.lazy ? 0 : (s.status === "planned" ? s.endpoints.length : s.plannedEndpoints?.length ?? 0), requests: st[s.id].requests, successRate: st[s.id].requests ? Math.round((st[s.id].success / st[s.id].requests) * 1000) / 10 : null };
+      })));
     }
     if ((mm = /^\/api\/admin\/scrapers\/([^/]+)\/icon$/.exec(p)) && m === "POST") {
       const key = decodeURIComponent(mm[1]);
-      if (!catalog.find(key)) throw E.notFound("Scraper not found");
+      if (!catalog.find(key, { all: true })) throw E.notFound("Scraper not found");
       const raw = String(body?.url ?? "").trim();
       if (raw && !/^(https:\/\/|\/assets\/|data:image\/(png|svg\+xml|webp|jpeg);base64,)/.test(raw)) throw E.invalidParams([{ path: "url", message: "Use an https:// image URL or a data:image URL" }]);
       if (raw.length > 200_000) throw E.invalidParams([{ path: "url", message: "Image too large (max ~150 KB)" }]);
@@ -535,7 +539,7 @@ export function createApp(opts = {}) {
     }
     if ((mm = /^\/api\/admin\/scrapers\/([^/]+)$/.exec(p)) && m === "POST") {
       const key = decodeURIComponent(mm[1]);
-      if (!catalog.find(key)) throw E.notFound("Scraper not found");
+      if (!catalog.find(key, { all: true })) throw E.notFound("Scraper not found");
       await repo.setScraperEnabled(key, !!body?.enabled);
       return json(200, okContent({ key, enabled: !!body?.enabled }));
     }

@@ -103,7 +103,7 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
 
       // source health: sources with traffic, worst first
       const sources = Object.entries(x.proj)
-        .map(([project, requests]) => ({ project, name: catalog.find(project)?.displayName ?? project, requests, errors: x.perr[project] ?? 0, serverErrors: x.p5[project] ?? 0, disabled: disabled.has(project) }))
+        .map(([project, requests]) => ({ project, name: catalog.find(project, { all: true })?.displayName ?? project, iconUrl: catalog.overrides?.[project] || catalog.find(project, { all: true })?.iconUrl || null, status: catalog.find(project, { all: true })?.status ?? null, requests, errors: x.perr[project] ?? 0, serverErrors: x.p5[project] ?? 0, disabled: disabled.has(project) }))
         .map((s) => ({ ...s, errorRate: s.requests ? s.errors / s.requests : 0 }))
         .sort((a, b) => b.serverErrors - a.serverErrors || b.errorRate - a.errorRate || b.requests - a.requests);
       const failing = sources.filter((s) => s.requests >= 5 && s.serverErrors / s.requests >= 0.2);
@@ -157,7 +157,7 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
           failingSources: failing.length,
           disabledSources: disabled.size,
         },
-        sources: { top: sources.slice(0, 12), failing: failing.slice(0, 10), withTraffic: sources.length },
+        sources: { top: sources.slice(0, 12), failing: failing.slice(0, 10), withTraffic: sources.length, all: sources.map(({ project, requests, errors, serverErrors }) => ({ project, requests, errors, serverErrors })) },
         system: { ...status, storage: storage.backend, serverless: !!storage.serverless, version, region: env.VERCEL_REGION ?? null, catalog: catalog.totals() },
       };
     });

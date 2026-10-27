@@ -16,13 +16,13 @@ export const MCP_TOOLS = [
     name: "search_scrapers",
     title: "Search the catalog",
     annotations: { title: "Search the catalog", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Find APIs by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key, planned = listed but not callable yet) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
+    description: "Find APIs by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
     inputSchema: {
       type: "object",
       properties: {
         query: s("string", "Free-text search, e.g. 'weather', 'github', 'bitcoin'. Omit to list everything."),
         category: s("string", "Category slug filter, e.g. 'finance' (see list_categories)"),
-        status: s("string", "Only items with this status", { enum: ["live", "byok", "planned"] }),
+        status: s("string", "Only items with this status", { enum: ["live", "byok"] }),
         limit: s("integer", "Max results per page (1-50)", { minimum: 1, maximum: 50, default: 10 }),
         cursor: s("string", "nextCursor from the previous page"),
       },

@@ -572,3 +572,12 @@ div.kv span { font-size: 12px; color: var(--dim); text-transform: capitalize; }
 .row-bad td { background: rgba(248, 113, 113, 0.05); }
 .ds-body .mono { font-family: var(--mono); font-size: 12.5px; }
 @media (max-width: 900px) { .ds-body .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+/* source logos in admin tables */
+.src-cell img, .src-mono { width: 28px; height: 28px; border-radius: 7px; flex: none; }
+.src-cell img { background: #fff; object-fit: contain; padding: 3px; }
+.src-mono { display: inline-grid; place-items: center; font: 600 11px var(--body); color: #fff; background: hsl(var(--hue, 260) 45% 32%); letter-spacing: 0.02em; }
+.src-txt { display: grid; min-width: 0; }
+.src-txt b, .src-txt a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-txt .muted-sm { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-planned { color: var(--dim) !important; border-color: var(--line-2) !important; border-style: dashed !important; }
+.tbl tr.off td { opacity: 0.6; }

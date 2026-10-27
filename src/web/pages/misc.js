@@ -137,7 +137,7 @@ export function statusPage({ user, categories, totals, uptimeSec, requests }) {
   const body = `<main>
 ${pageHead("Status", "All systems operational.", `Gateway up for ${Math.floor(uptimeSec / 3600)}h ${Math.floor((uptimeSec % 3600) / 60)}m on this instance · ${fmt(requests)} requests served.`)}
 <section class="wrap section-tight"><div class="table-wrap"><table class="doc-table status-table"><thead><tr><th>Category</th><th>Scrapers</th><th>Live</th><th>Endpoints</th><th>Status</th></tr></thead><tbody>
-${categories.map((c) => `<tr><td><a href="/category/${esc(c.slug)}">${esc(c.displayName)}</a></td><td>${c.scrapers}</td><td>${c.live}</td><td>${c.endpoints}</td><td>${c.live ? '<span class="badge badge-live">Operational</span>' : '<span class="badge badge-planned">Planned</span>'}</td></tr>`).join("")}
+${categories.map((c) => `<tr><td><a href="/category/${esc(c.slug)}">${esc(c.displayName)}</a></td><td>${c.scrapers}</td><td>${c.live}</td><td>${c.endpoints}</td><td>${c.live ? '<span class="badge badge-live">Operational</span>' : '<span class="badge badge-byok">Your key</span>'}</td></tr>`).join("")}
 </tbody></table></div><p class="muted small">${totals.liveEndpoints} of ${totals.endpoints} endpoints are live on this deployment.</p></section></main>`;
   return layout({ title: "Status", user, body });
 }

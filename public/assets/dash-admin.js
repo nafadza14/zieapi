@@ -36,11 +36,25 @@
     const s = o.system;
     sub.innerHTML = `<span class="sys">${s.state === "operational" ? '<span class="pulse ok" aria-hidden="true"></span>All systems operational' : '<span class="pulse warn" aria-hidden="true"></span>Elevated server errors in the last hour'}</span><span aria-hidden="true">·</span><span>${c.esc(s.storage)}${s.region ? ` · ${c.esc(s.region)}` : ""}</span><span aria-hidden="true">·</span><span>Updated ${c.time(o.generatedAt)}</span>`;
   };
+  /** Source logo (or a lettered tile when the source has none) + name + key. */
+  const mono = (name) => (String(name).replace(/[^A-Za-z0-9 ]/g, " ").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2) || "?").toUpperCase();
+  const hue = (k) => [...String(k)].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) % 360, 7);
+  const srcCell = (c, x, { link = true } = {}) => {
+    const key = x.key ?? x.project;
+    const name = x.displayName || x.name || key;
+    const logo = x.iconUrl
+      ? `<img src="${c.esc(x.iconUrl)}" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'src-mono',textContent:'${mono(name)}'}))">`
+      : `<span class="src-mono" style="--hue:${hue(key)}" aria-hidden="true">${c.esc(mono(name))}</span>`;
+    const title = link && x.status !== "planned" ? `<a href="/api/${c.esc(key.replace(":", "/"))}"><b>${c.esc(name)}</b></a>` : `<b>${c.esc(name)}</b>`;
+    return `<span class="src-cell">${logo}<span class="src-txt">${title}<span class="muted-sm mono">${c.esc(key)}</span></span></span>`;
+  };
+  const STATUS_LABEL = { live: "Live", byok: "BYOK", planned: "Planned", upstream: "Upstream", disabled: "Off" };
+  const statusBadge = (c, s) => (s.enabled === false || s.disabled ? c.h.badge("disabled", "Off") : c.h.badge(s.status ?? "live", STATUS_LABEL[s.status] ?? s.status));
   const customerCell = (c, x) => `${x.email ? `<a href="/admin/users?q=${encodeURIComponent(x.email)}"><b>${c.esc(x.name ?? x.email)}</b></a><br><span class="muted-sm">${c.esc(x.email)}</span>` : `<b>${c.esc(x.name ?? "Unknown")}</b>`}`;
   const sourceRows = (c, list) =>
     list.map(
       (x) => `<tr>
-        <td><a href="/api/${c.esc(x.project.replace(":", "/"))}"><b>${c.esc(x.name)}</b></a><br><span class="muted-sm mono">${c.esc(x.project)}</span></td>
+        <td>${srcCell(c, x)}</td>
         <td class="num">${c.num(x.requests)}</td>
         <td class="num">${c.num(x.errors)}</td>
         <td class="num">${x.serverErrors ? `<b class="t-bad">${c.num(x.serverErrors)}</b>` : "0"}</td>
@@ -225,39 +239,91 @@
 
   // ===== Source health ======================================================================
   A.health = async (c) => {
-    const { h, num } = c;
+    const { h, num, esc } = c;
     const range = c.rangeControl(() => load());
-    let show = "problems";
-    let o = null;
+    let show = "all", q = "", page = 0;
+    let o = null, rows = [];
+    const counts = () => ({
+      all: rows.length,
+      problems: rows.filter((x) => x.errors > 0 || !x.enabled).length,
+      live: rows.filter((x) => x.status === "live" && x.enabled).length,
+      byok: rows.filter((x) => x.status === "byok" && x.enabled).length,
+      planned: rows.filter((x) => x.status === "planned").length,
+      off: rows.filter((x) => !x.enabled).length,
+    });
+    const seg = () => {
+      const n = counts();
+      return h.seg("show", [["all", `All ${num(n.all)}`], ["problems", `Problems ${num(n.problems)}`], ["live", `Live ${num(n.live)}`], ["byok", `BYOK ${num(n.byok)}`], ["planned", `Planned ${num(n.planned)}`], ["off", `Off ${num(n.off)}`]], show);
+    };
+    const health = (x) => {
+      if (!x.enabled) return h.badge("disabled", "switched off");
+      if (x.status === "planned") return h.badge("pending", "not built");
+      if (!x.requests) return `<span class="muted-sm">no traffic</span>`;
+      if (x.requests >= 5 && x.serverErrors / x.requests >= 0.2) return h.badge("failed", "failing");
+      if (x.serverErrors) return h.badge("pending", "some 5xx");
+      return h.badge("ok", "healthy");
+    };
     const draw = () => {
-      const list = show === "problems" ? o.sources.top.filter((x) => x.errors || x.disabled) : o.sources.top;
-      c.$("[data-list]", c.root).innerHTML = list.length ? h.table(["Source", "Requests", "Errors", "5xx", "Error rate", ""], sourceRows(c, list)) : h.empty(show === "problems" ? "No source errors in this range" : "No source traffic yet", show === "problems" ? "Every source that was called answered without errors." : "");
+      const list = rows.filter((x) =>
+        (show === "all" || (show === "problems" ? x.errors > 0 || !x.enabled : show === "off" ? !x.enabled : x.status === show && (show === "planned" || x.enabled))) &&
+        (!q || `${x.key} ${x.displayName} ${x.category}`.toLowerCase().includes(q))
+      );
+      const pageRows = list.slice(page * PAGE, (page + 1) * PAGE).map((x) => `<tr class="${!x.enabled ? "off" : x.requests >= 5 && x.serverErrors / x.requests >= 0.2 ? "row-bad" : ""}">
+          <td>${srcCell(c, x)}</td>
+          <td>${statusBadge(c, x)}</td>
+          <td class="num hide-sm">${x.status === "planned" ? `<span class="muted-sm">${num(x.endpoints)} planned</span>` : `${num(x.live)}/${num(x.endpoints)}`}</td>
+          <td class="num">${num(x.requests)}</td>
+          <td class="num">${num(x.errors)}</td>
+          <td class="num">${x.serverErrors ? `<b class="t-bad">${num(x.serverErrors)}</b>` : "0"}</td>
+          <td class="num">${x.requests ? c.pct(Math.round((x.errors / x.requests) * 1000) / 10) : "–"}</td>
+          <td>${health(x)}</td>
+        </tr>`);
+      c.$("[data-seg]", c.root).innerHTML = seg();
+      c.$("[data-list]", c.root).innerHTML = list.length
+        ? `${h.table(["Source", "Status", '<span class="hide-sm">Endpoints</span>', "Requests", "Errors", "5xx", "Error rate", "Health"], pageRows)}${list.length > PAGE ? `<div class="pager"><button class="btn btn-ghost btn-sm" data-act="prev"${page ? "" : " disabled"}>Previous</button><span>${page * PAGE + 1}–${Math.min(list.length, (page + 1) * PAGE)} of ${num(list.length)}</span><button class="btn btn-ghost btn-sm" data-act="next"${(page + 1) * PAGE < list.length ? "" : " disabled"}>Next</button></div>` : ""}`
+        : h.empty("No sources match", show === "problems" ? "No source returned errors in this range." : "Clear the search or pick another filter.");
     };
     const load = async () => {
       setActions(range.html);
       c.root.innerHTML = h.skeleton(5);
-      o = await c.api(`/api/admin/analytics?range=${c.state.range}&tz=${c.tz}&full=1`).then((r) => r.content);
+      const [an, { content: all }] = await Promise.all([loadAnalytics(c), c.api("/api/admin/scrapers")]);
+      o = an;
       sysLine(c, o);
+      const traffic = new Map(o.sources.all.map((x) => [x.project, x]));
+      rows = all
+        .map((s) => { const t = traffic.get(s.key); return { ...s, requests: t?.requests ?? 0, errors: t?.errors ?? 0, serverErrors: t?.serverErrors ?? 0 }; })
+        .sort((a, b) => b.serverErrors - a.serverErrors || b.requests - a.requests || (a.status === "planned") - (b.status === "planned") || a.displayName.localeCompare(b.displayName));
+      const n = counts();
       const cat = o.system.catalog;
       c.root.innerHTML = `
         <section class="ds-card kpis">
           <div class="kpi kpi-lead"><span class="stat-label">System</span><b class="stat-value">${o.system.state === "operational" ? '<span class="pulse ok" aria-hidden="true"></span> Operational' : '<span class="pulse warn" aria-hidden="true"></span> Degraded'}</b><span class="stat-sub">${c.plural(o.system.requests, "request")}, ${c.plural(o.system.serverErrors, "server error")} in the last hour</span></div>
           <div class="kpi"><span class="stat-label">Failing sources</span><b class="stat-value">${num(o.sources.failing.length)}</b><span class="stat-sub">≥20% server errors · ${RW[o.range]}</span></div>
-          <div class="kpi"><span class="stat-label">Sources called</span><b class="stat-value">${num(o.sources.withTraffic)}</b><span class="stat-sub">of ${num(cat.scrapers)} in the catalog</span></div>
-          <div class="kpi"><span class="stat-label">Switched off</span><b class="stat-value">${num(o.attention.disabledSources)}</b><span class="stat-sub"><a href="/admin/scrapers">Manage catalog</a></span></div>
-          <div class="kpi"><span class="stat-label">Catalog</span><b class="stat-value">${c.compact(cat.endpoints)}</b><span class="stat-sub">endpoints · ${num(cat.liveScrapers)} live, ${num(cat.byokScrapers)} BYOK</span></div>
+          <div class="kpi"><span class="stat-label">Visible to users</span><b class="stat-value">${num(cat.scrapers)}</b><span class="stat-sub">${num(n.live)} live · ${num(n.byok)} BYOK</span></div>
+          <div class="kpi"><span class="stat-label">Planned (admin only)</span><b class="stat-value">${num(cat.plannedScrapers)}</b><span class="stat-sub">${num(cat.plannedEndpoints)} endpoints hidden from users</span></div>
+          <div class="kpi"><span class="stat-label">Switched off</span><b class="stat-value">${num(n.off)}</b><span class="stat-sub"><a href="/admin/scrapers">Manage catalog</a></span></div>
         </section>
-        <section class="ds-card"><div class="card-top"><h2>Sources</h2><div class="push">${h.seg("show", [["problems", "With errors"], ["all", "All called"]], show)}</div></div><div data-list></div>
-          <p class="muted-sm">4xx errors are usually bad input from the caller; 5xx means the source itself failed or timed out. Switch a source off in <a href="/admin/scrapers">Catalog</a> while it is broken.</p></section>
+        <section class="ds-card">
+          <div class="filterbar"><label class="search-box"><span class="visually-hidden">Search sources</span><input type="search" placeholder="Search name, key or category" data-input="search" aria-label="Search sources" value="${esc(q)}"></label><div data-seg></div></div>
+          <div data-list></div>
+          <p class="muted-sm">Every source in the catalog, ${RW[o.range]}. 4xx errors are usually bad input from the caller; 5xx means the source failed or timed out. Planned sources are listed here only: users never see them in the catalog, docs, search or MCP.</p>
+        </section>
         <section class="ds-card"><div class="card-top"><h2>Platform</h2></div><div class="grid-4">
-          <div class="kv"><span>Storage</span><b>${c.esc(o.system.storage)}</b></div>
-          <div class="kv"><span>Region</span><b>${c.esc(o.system.region ?? "local")}</b></div>
-          <div class="kv"><span>Version</span><b>${c.esc(o.system.version)}</b></div>
+          <div class="kv"><span>Storage</span><b>${esc(o.system.storage)}</b></div>
+          <div class="kv"><span>Region</span><b>${esc(o.system.region ?? "local")}</b></div>
+          <div class="kv"><span>Version</span><b>${esc(o.system.version)}</b></div>
           <div class="kv"><span>Setup checks</span><b><a href="/admin/setup">Open</a></b></div>
         </div></section>`;
       draw();
     };
-    setHandlers({ range: range.handler, retry: load, show: (el) => { show = el.dataset.v; c.$$('[data-act="show"]', c.root).forEach((b) => b.classList.toggle("on", b === el)); draw(); } });
+    setHandlers({
+      range: range.handler,
+      retry: load,
+      show: (el) => { show = el.dataset.v; page = 0; draw(); },
+      search: (el) => { q = el.value.trim().toLowerCase(); page = 0; draw(); },
+      prev: () => { page--; draw(); },
+      next: () => { page++; draw(); },
+    });
     await load();
   };
 
@@ -532,8 +598,8 @@
       const list = all.filter((s) => (only === "all" || (only === "off" ? !s.enabled : s.status === only)) && (!q || `${s.key} ${s.displayName}`.toLowerCase().includes(q)));
       const rows = list.slice(page * PAGE, (page + 1) * PAGE).map(
         (s) => `<tr class="${s.enabled ? "" : "off"}">
-          <td><span class="src-cell">${s.iconUrl ? `<img src="${esc(s.iconUrl)}" alt="" width="24" height="24" loading="lazy" referrerpolicy="no-referrer">` : '<span class="src-ph" aria-hidden="true"></span>'}<span><b>${esc(s.displayName)}</b><br><span class="muted-sm">${esc(s.key)}</span></span></span></td>
-          <td>${h.badge(s.status)}</td>
+          <td>${srcCell(c, s)}</td>
+          <td>${statusBadge(c, { ...s, enabled: true })}</td>
           <td class="num hide-sm">${num(s.live)}/${num(s.endpoints)}</td>
           <td class="num">${num(s.requests)}<br><span class="muted-sm">${s.successRate === null ? "no traffic" : pct(s.successRate) + " ok"}</span></td>
           <td><label class="toggle"><input type="checkbox" data-change="toggle" data-key="${esc(s.key)}"${s.enabled ? " checked" : ""}><span>${s.enabled ? "On" : "Off"}</span></label></td>
@@ -549,7 +615,7 @@
       all = (await api("/api/admin/scrapers")).content.sort((a, b) => b.requests - a.requests || a.displayName.localeCompare(b.displayName));
       draw();
     };
-    c.root.innerHTML = `<div class="filterbar"><label class="search-box"><span class="visually-hidden">Search sources</span><input type="search" placeholder="Search sources" data-input="search" aria-label="Search sources"></label><div data-seg>${h.seg("only", [["all", "All"], ["live", "Live"], ["beta", "Beta"], ["off", "Disabled"]], only)}</div></div><div data-list></div>`;
+    c.root.innerHTML = `<div class="filterbar"><label class="search-box"><span class="visually-hidden">Search sources</span><input type="search" placeholder="Search sources" data-input="search" aria-label="Search sources"></label><div data-seg>${h.seg("only", [["all", "All"], ["live", "Live"], ["byok", "BYOK"], ["planned", "Planned"], ["off", "Disabled"]], only)}</div></div><div data-list></div>`;
     const $list = c.$("[data-list]", c.root);
     const $seg = c.$("[data-seg]", c.root);
     setActions("");
@@ -563,7 +629,7 @@
       only: (el) => {
         only = el.dataset.v;
         page = 0;
-        $seg.innerHTML = h.seg("only", [["all", "All"], ["live", "Live"], ["beta", "Beta"], ["off", "Disabled"]], only);
+        $seg.innerHTML = h.seg("only", [["all", "All"], ["live", "Live"], ["byok", "BYOK"], ["planned", "Planned"], ["off", "Disabled"]], only);
         draw();
       },
       prev: () => {

@@ -96,7 +96,7 @@
     const totalReq = series.reduce((n, p) => n + p.requests, 0);
     const totalErr = series.reduce((n, p) => n + p.errors, 0);
     return `<figure class="chart-fig"><svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img" aria-label="${plural(totalReq, "request")} and ${plural(totalErr, "error")} over the selected range">
-      <defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9ecf" stop-opacity=".38"/><stop offset="1" stop-color="#b7a4ff" stop-opacity="0"/></linearGradient></defs>
+      <defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9ecf" stop-opacity=".18"/><stop offset="1" stop-color="#ff9ecf" stop-opacity="0"/></linearGradient></defs>
       ${ticks.map((v) => `<g class="grid"><line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}"/><text x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text></g>`).join("")}
       <path d="${area}" fill="url(#chart-fill)"/>
       <path d="${line}" class="ln-req"/>
@@ -206,7 +206,7 @@
       await navigator.clipboard.writeText(b.dataset.copy);
       toast("Copied");
     } catch {
-      toast("Copy failed. Select the text and copy it manually.");
+      toast("Your browser blocked copying. Select the text and copy it by hand.");
     }
   });
 
@@ -271,37 +271,66 @@
     };
   }
 
-  // ---- shell: mobile drawer, notifications, search palette -----------------------------------
-  const side = $("#ds-side");
-  const scrim = $(".ds-scrim");
-  const setSide = (open) => {
-    side?.classList.toggle("open", open);
-    if (scrim) scrim.hidden = !open;
-    $("[data-side-open]")?.setAttribute("aria-expanded", String(open));
-    if (open) $("a,button", side)?.focus();
+  // ---- shell: popovers (notifications, account menu), mobile sheet ----------------------------
+  const pops = [];
+  const closeAll = (except) => {
+    for (const p of pops) if (p !== except) p.close();
   };
-  $$("[data-side-open]").forEach((b) => b.addEventListener("click", () => setSide(true)));
-  $$("[data-side-close]").forEach((b) => b.addEventListener("click", () => setSide(false)));
+  function popover(btn, panel, onOpen) {
+    if (!btn || !panel) return null;
+    const p = {
+      open() {
+        closeAll(p);
+        panel.hidden = false;
+        btn.setAttribute("aria-expanded", "true");
+        onOpen?.(panel);
+      },
+      close() {
+        if (panel.hidden) return;
+        panel.hidden = true;
+        btn.setAttribute("aria-expanded", "false");
+      },
+      get isOpen() {
+        return !panel.hidden;
+      },
+    };
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      p.isOpen ? p.close() : p.open();
+    });
+    panel.addEventListener("click", (e) => e.stopPropagation());
+    pops.push(p);
+    return p;
+  }
+  document.addEventListener("click", () => closeAll());
   addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && side?.classList.contains("open")) setSide(false);
+    if (e.key !== "Escape") return;
+    const open = pops.find((p) => p.isOpen);
+    if (open) {
+      open.close();
+      open === sheet ? $("[data-sheet-btn]")?.focus() : null;
+    }
   });
 
-  $("[data-bell]")?.addEventListener("click", async () => {
+  popover($("[data-menu-btn]"), $("[data-menu]"), (panel) => $("a,button", panel)?.focus());
+  const sheet = popover($("[data-sheet-btn]"), $("[data-sheet]"), (panel) => $("a", panel)?.focus());
+
+  popover($("[data-bell]"), $("[data-bell-pop]"), async (panel) => {
+    panel.innerHTML = `<div class="ap-pop-head">Notifications</div><p class="ap-pop-empty">Loading…</p>`;
     try {
       const { content: n } = await api("/api/me/notifications");
-      openModal({
-        title: "Notifications",
-        cancel: "Close",
-        body: n.items.length
-          ? `<ul class="notes">${n.items.map((x) => `<li class="${x.read || n.unread === 0 ? "" : "unread"}"><b>${esc(x.title)}</b><p>${esc(x.text ?? "")}</p><time datetime="${esc(x.at)}">${ago(x.at)}</time></li>`).join("")}</ul>`
-          : h.empty("No notifications yet", "Quota alerts, payments and referral updates show up here."),
-      });
+      panel.innerHTML = `<div class="ap-pop-head">Notifications</div>${
+        n.items.length
+          ? `<ul class="ap-notes">${n.items.map((x) => `<li class="${x.read || n.unread === 0 ? "" : "unread"}"><b>${esc(x.title)}</b>${x.text ? `<p>${esc(x.text)}</p>` : ""}<time datetime="${esc(x.at)}">${ago(x.at)}</time></li>`).join("")}</ul>`
+          : `<p class="ap-pop-empty">Nothing yet. Quota alerts, payments and referral updates show up here.</p>`
+      }`;
       if (n.unread) {
         await api("/api/me/notifications/read", { method: "POST" });
         $(".ds-dot")?.remove();
+        $("[data-bell]")?.setAttribute("aria-label", "Notifications");
       }
     } catch (err) {
-      toast(err.message);
+      panel.innerHTML = `<div class="ap-pop-head">Notifications</div><p class="ap-pop-empty">${esc(err.message)}</p>`;
     }
   });
 

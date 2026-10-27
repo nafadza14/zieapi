@@ -33,56 +33,65 @@
     const keySel = () => c.keyControl(keys, load);
     const header = () => setActions(`${range.html}${keySel().html}<a class="btn btn-ghost" href="/docs">Docs</a><button class="btn btn-primary" data-act="newKey">New key</button>`);
 
+    let breakdown = "endpoints";
+    let last = null;
+    const eyeIcon = `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const copyIcon = `<svg viewBox="0 0 24 24" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`;
+    const breakdownHtml = (s) => {
+      if (breakdown === "categories") return c.hbars(s.categories.slice(0, 8), { total: s.total, href: (x) => `/category/${encodeURIComponent(x.name)}`, empty: "No requests in this range." });
+      if (breakdown === "errors") return c.hbars(s.statuses.map((x) => ({ name: String(x.status), count: x.count })), { total: s.errors, href: (x) => `/dashboard/logs?status=error&q=${x.name}&range=${c.state.range}`, empty: "No errors in this range." });
+      return c.hbars(s.endpoints.slice(0, 8), { total: s.total, href: (x) => `/api/${x.name.split("/")[0].replace(":", "/")}?endpoint=${encodeURIComponent(x.name.split("/")[1] ?? "")}`, empty: `No endpoint calls in this range. <a href="/scrapers">Browse APIs</a>` });
+    };
     const render = (o) => {
+      last = o;
       const rangeWord = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days", "90d": "last 90 days" }[c.state.range];
       const s = o.summary;
       const q = o.quota;
-      const sys = o.system.state === "operational" ? `<span class="pulse ok" aria-hidden="true"></span>All systems operational` : `<span class="pulse warn" aria-hidden="true"></span>Some sources are returning errors`;
-      const proj = q.projectedPercent !== null ? ` · projected ${q.projectedPercent}% by ${new Date(q.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}` : "";
+      const sub = c.$("[data-sub]");
+      if (sub) sub.innerHTML = `<span>Welcome back, ${esc(firstName(D.user.name))}</span><span aria-hidden="true">·</span><span class="sys">${o.system.state === "operational" ? '<span class="pulse ok" aria-hidden="true"></span>All systems operational' : '<span class="pulse warn" aria-hidden="true"></span>Some sources are returning errors'}</span>`;
+      const resets = new Date(q.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+      const usedPct = q.month.limit ? Math.round((q.month.used / q.month.limit) * 100) : 0;
       const k = o.key;
       c.root.innerHTML = `
-      <div class="grid-hero">
-        <section class="ds-card hero-card" aria-labelledby="welcome">
-          <div class="hero-left">
-            <h2 id="welcome">Welcome back, ${esc(firstName(D.user.name))}</h2>
-            <p class="sys">${sys}</p>
-            <b class="hero-num">${c.compact(s.total)}</b>
-            <p class="hero-sub">${s.total === 1 ? "request" : "requests"} · ${rangeWord}${c.state.key !== "all" ? " · one key" : ""}</p>
-          </div>
-          <div class="hero-right"><p class="card-label">Traffic by hour</p>${c.heatmap(s.heatmap)}</div>
-        </section>
-        <section class="ds-card key-card" aria-labelledby="key-h">
-          <div class="card-top"><h2 id="key-h">API key</h2>${k ? h.badge("live", "Live") : ""}<a class="link-sm" href="/dashboard/keys">${o.activeKeys} active →</a></div>
-          ${
-            k
-              ? `<div class="secret-row"><code data-secret data-id="${esc(k.id)}">${esc(k.preview)}</code>${k.canReveal ? `<button class="ds-icon-btn" data-act="reveal" data-id="${esc(k.id)}" aria-label="Show key" aria-pressed="false"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>` : ""}<button class="ds-icon-btn" data-act="copyKey" data-id="${esc(k.id)}" aria-label="Copy key"><svg viewBox="0 0 24 24" class="ico" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button></div>
-                 <p class="meta">${esc(k.name)} · created ${c.day(k.createdAt)} · ${k.lastUsedAt ? `used ${c.ago(k.lastUsedAt)}` : "never used"}</p>`
-              : h.empty("No active key", "Create one to start calling APIs.", `<button class="btn btn-primary btn-sm" data-act="newKey">Create key</button>`)
-          }
-          <div class="quota-block"><div class="row-between"><span>Monthly quota</span><b>${num(q.month.used)} / ${num(q.month.limit)}</b></div>${h.bar(q.month.used, q.month.limit)}<p class="meta">${Math.round((q.month.used / q.month.limit) * 100)}% used${proj} · ${c.cap(q.plan.id)} plan${o.balance > 0 ? ` · balance ${c.idr(o.balance)}` : ""}</p></div>
-        </section>
+      <section class="ds-card kpis" aria-label="Key numbers, ${rangeWord}">
+        <div class="kpi kpi-lead"><span class="stat-label">Requests · ${rangeWord}${c.state.key !== "all" ? " · one key" : ""}</span><b class="hero-num">${c.compact(s.total)}</b></div>
+        <div class="kpi"><span class="stat-label">Today</span><b class="stat-value">${num(o.today)}</b><span class="stat-sub">since midnight, your time</span></div>
+        <div class="kpi"><span class="stat-label">Success rate</span><b class="stat-value">${c.pct(s.successRate)}</b><span class="stat-sub">${s.total ? `${num(s.success)} of ${num(s.total)}` : "no requests yet"}</span></div>
+        <div class="kpi"><span class="stat-label">Latency p95</span><b class="stat-value">${s.p95Ms === null ? "–" : `≤ ${c.ms(s.p95Ms)}`}</b><span class="stat-sub">${s.avgMs !== null ? `average ${c.ms(s.avgMs)}` : "no requests yet"}</span></div>
+        <div class="kpi"><span class="stat-label">Errors · 24h</span><b class="stat-value">${num(o.errors24h)}</b><span class="stat-sub">${o.errors24h ? `<a href="/dashboard/logs?status=error&range=24h">See them in logs</a>` : "4xx and 5xx responses"}</span></div>
+      </section>
+      <div class="ov-row">
+        <section class="ds-card" aria-labelledby="ot-h"><div class="card-top"><h2 id="ot-h">Requests over time</h2><span class="meta push">${s.granularity === "hour" ? "Hourly" : "Daily"}</span></div>${s.total ? c.lineChart(s.series, { gran: s.granularity }) : h.empty("No requests in this range", "Make your first call and this chart fills in within seconds.", `<a class="btn btn-primary btn-sm" href="/scrapers">Try an API</a>`)}</section>
+        <div class="stack">
+          <section class="ds-card key-card" aria-labelledby="key-h">
+            <div class="card-top"><h2 id="key-h">API key</h2>${k ? `<span class="meta">${esc(k.name)}</span>` : ""}<a class="link-sm" href="/dashboard/keys">${o.activeKeys} active</a></div>
+            ${
+              k
+                ? `<div class="secret-row"><code data-secret data-id="${esc(k.id)}">${esc(k.preview)}</code>${k.canReveal ? `<button class="ds-icon-btn" data-act="reveal" data-id="${esc(k.id)}" aria-label="Show key" aria-pressed="false">${eyeIcon}</button>` : ""}<button class="ds-icon-btn" data-act="copyKey" data-id="${esc(k.id)}" aria-label="Copy key">${copyIcon}</button></div>
+                   <p class="meta">Created ${c.day(k.createdAt)} · ${k.lastUsedAt ? `used ${c.ago(k.lastUsedAt)}` : "never used"}</p>`
+                : h.empty("No active key", "Create one to start calling APIs.", `<button class="btn btn-primary btn-sm" data-act="newKey">Create key</button>`)
+            }
+          </section>
+          <section class="ds-card" aria-labelledby="q-h">
+            <div class="card-top"><h2 id="q-h">Monthly quota</h2><span class="meta push">${c.cap(q.plan.id)} plan</span></div>
+            <div class="row-between"><b class="stat-value">${usedPct}%</b><span class="meta">${num(q.month.used)} / ${num(q.month.limit)}</span></div>
+            ${h.bar(q.month.used, q.month.limit)}
+            <p class="meta">Resets ${resets}${q.projectedPercent !== null ? ` · on pace for ${q.projectedPercent}%` : ""}${o.balance > 0 ? ` · balance ${c.idr(o.balance)}` : ""}</p>
+            ${usedPct >= 80 ? `<a class="btn btn-ghost btn-sm" href="/dashboard/billing#plans">Raise your limit</a>` : ""}
+          </section>
+        </div>
       </div>
-      <div class="grid-4">
-        ${h.stat("Requests today", num(o.today), "since midnight, your time")}
-        ${h.stat("Success rate", c.pct(s.successRate), s.total ? `${num(s.success)} of ${num(s.total)}` : "no requests yet")}
-        ${h.stat("Latency p95", s.p95Ms === null ? "–" : `≤ ${c.ms(s.p95Ms)}`, s.avgMs !== null ? `average ${c.ms(s.avgMs)}` : "no requests yet")}
-        ${h.stat("Errors · 24h", num(o.errors24h), o.errors24h ? `<a href="/dashboard/logs?status=error&range=24h">See them in logs</a>` : "4xx and 5xx responses")}
-      </div>
-      <div class="grid-main">
-        <section class="ds-card" aria-labelledby="ot-h"><div class="card-top"><h2 id="ot-h">Requests over time</h2><span class="meta">${s.granularity === "hour" ? "Hourly" : "Daily"} · ${rangeWord}</span></div>${s.total ? c.lineChart(s.series, { gran: s.granularity }) : h.empty("No requests in this range", "Make your first call and this chart fills in within seconds.", `<a class="btn btn-primary btn-sm" href="/scrapers">Try an API</a>`)}</section>
-        <section class="ds-card" aria-labelledby="rr-h"><div class="card-top"><h2 id="rr-h">Recent requests</h2><a class="link-sm" href="/dashboard/logs">View logs →</a></div>
+      <div class="ov-row">
+        <section class="ds-card" aria-labelledby="rr-h"><div class="card-top"><h2 id="rr-h">Recent requests</h2><a class="link-sm" href="/dashboard/logs">All logs</a></div>
           ${
             o.recent.length
               ? `<ul class="recent">${o.recent.map((l) => `<li><a href="/dashboard/logs?q=${encodeURIComponent(l.id ?? "")}&range=7d">${h.status(l.status)}<span class="rc-ep">${esc(l.project)}/${esc(l.endpoint)}</span><span class="rc-meta">${c.ms(l.ms)} · ${c.ago(l.at)}</span></a></li>`).join("")}</ul>`
               : `<p class="muted-sm">No requests yet. Try this with your key:</p>${h.code(`curl "${sampleUrl(c)}" \\\n  -H "x-api-key: ${k ? k.preview : "YOUR_KEY"}"`, "cURL")}`
           }
         </section>
+        <section class="ds-card" aria-labelledby="bd-h"><div class="card-top"><h2 id="bd-h">Breakdown</h2><div class="push">${h.seg("breakdown", [["endpoints", "Endpoints"], ["categories", "Categories"], ["errors", "Errors"]], breakdown)}</div></div><div data-breakdown>${breakdownHtml(s)}</div></section>
       </div>
-      <div class="grid-3">
-        <section class="ds-card" aria-labelledby="te-h"><div class="card-top"><h2 id="te-h">Top endpoints</h2><span class="meta">top 5</span></div>${c.hbars(s.endpoints.slice(0, 5), { total: s.total, href: (x) => `/api/${x.name.split("/")[0].replace(":", "/")}?endpoint=${encodeURIComponent(x.name.split("/")[1] ?? "")}`, empty: `No endpoint calls in this range. <a href="/scrapers">Browse APIs</a>` })}</section>
-        <section class="ds-card" aria-labelledby="tc-h"><div class="card-top"><h2 id="tc-h">Traffic by category</h2></div>${c.hbars(s.categories.slice(0, 6), { total: s.total, href: (x) => `/category/${encodeURIComponent(x.name)}`, empty: "No requests in this range." })}</section>
-        <section class="ds-card" aria-labelledby="es-h"><div class="card-top"><h2 id="es-h">Errors by status</h2></div>${c.hbars(s.statuses.map((x) => ({ name: String(x.status), count: x.count })), { total: s.errors, href: (x) => `/dashboard/logs?status=error&q=${x.name}&range=${c.state.range}`, empty: "No errors in this range." })}</section>
-      </div>`;
+      <section class="ds-card" aria-labelledby="hm-h"><div class="card-top"><h2 id="hm-h">When you call</h2><span class="meta push">Requests by weekday and hour, your timezone</span></div>${c.heatmap(s.heatmap)}</section>`;
     };
 
     setHandlers({
@@ -91,6 +100,14 @@
       newKey: () => newKeyFlow(c, load),
       reveal: (el) => revealKey(c, el),
       copyKey: (el) => copyKey(c, el),
+      breakdown: (el) => {
+        breakdown = el.dataset.v;
+        c.$$('[data-act="breakdown"]', c.root).forEach((b) => {
+          b.classList.toggle("on", b === el);
+          b.setAttribute("aria-pressed", String(b === el));
+        });
+        c.$("[data-breakdown]", c.root).innerHTML = breakdownHtml(last.summary);
+      },
       retry: load,
     });
     await load();
@@ -120,7 +137,7 @@
       await navigator.clipboard.writeText(content.key);
       c.toast("Key copied");
     } catch (err) {
-      c.toast(err.status === 409 ? "This older key can't be shown again. Create a new key to copy it." : err.message);
+      c.toast(err.status === 409 ? "This older key can't be shown again. Create a new key to copy it." : err.status ? err.message : "Your browser blocked copying. Show the key and copy it by hand.");
     }
   }
   async function newKeyFlow(c, after) {
@@ -962,7 +979,7 @@
         err.hidden = true;
         try {
           const { content } = await api("/api/me", { method: "PATCH", body: { name: e.target.name.value } });
-          const side = document.querySelector(".ds-user-text b");
+          const side = document.querySelector("[data-user-name]");
           if (side) side.textContent = content.user.name;
           c.D.user.name = content.user.name;
           c.toast("Profile saved");

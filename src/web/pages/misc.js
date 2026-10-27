@@ -227,65 +227,67 @@ const I = {
 export const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${I[name] ?? ""}</svg>`;
 
 export const DASH_SECTIONS = [
-  { group: "Overview", items: [["", "dashboard", "Dashboard", "Your API usage at a glance"], ["usage", "usage", "Usage", "Traffic, errors and quota across every key"], ["logs", "logs", "Logs", "Request history across your keys. Metadata only, never payloads"]] },
+  { group: "Overview", items: [["", "dashboard", "Overview", "Your API usage at a glance"], ["usage", "usage", "Usage", "Traffic, errors and quota across every key"], ["logs", "logs", "Logs", "Request history across your keys. Metadata only, never payloads"]] },
   { group: "API", items: [["keys", "keys", "API keys", "One key per environment. Keep them secret, rotate any time"], ["bulk", "bulk", "Bulk jobs", "Run one endpoint over many inputs in a single request"], ["webhooks", "webhooks", "Webhooks", "Get notified when quota runs low, keys change or requests fail"]] },
   { group: "Account", items: [["billing", "billing", "Billing", "Plan, pay-as-you-go balance and invoices"], ["affiliate", "affiliate", "Affiliate", "Earn a share of what the people you refer pay"], ["showcase", "showcase", "Showcase", "Show what you built with Apizie"], ["settings", "settings", "Settings", "Profile, security, notifications and sessions"], ["support", "support", "Support", "Get help and send us what you're seeing"]] },
 ];
 const SECTION_LIST = DASH_SECTIONS.flatMap((g) => g.items);
 export const DASH_SLUGS = SECTION_LIST.map((x) => x[0]);
 
-export function dashboardPage({ user, section, plan, apiUrl, publicUrl, storage, quota, keyCount, unread }) {
-  const me = SECTION_LIST.find((x) => x[0] === section) ?? SECTION_LIST[0];
-  const lock = { bulk: !plan.bulk ? "Ultra" : "", webhooks: !plan.webhooks ? "Pro" : "" };
-  const nav = DASH_SECTIONS.map(
-    (g) => `<div class="ds-group"><p class="ds-group-label">${g.group}</p>${g.items
-      .map(([slug, ic, label]) => {
-        const on = slug === me[0];
-        const tag = slug === "keys" ? `<span class="ds-count" aria-label="${keyCount} keys">${keyCount}</span>` : lock[slug] ? `<span class="ds-lock">${lock[slug]}</span>` : "";
-        return `<a href="/dashboard${slug ? "/" + slug : ""}" class="ds-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>${icon(ic)}<span>${label}</span>${tag}</a>`;
-      })
-      .join("")}</div>`
-  ).join("");
-  const pct = quota.month.limit ? Math.min(100, (quota.month.used / quota.month.limit) * 100) : 0;
-  const segs = Array.from({ length: 12 }, (_, i) => `<i class="${pct >= ((i + 1) / 12) * 100 - 0.01 ? "full" : pct > (i / 12) * 100 ? "part" : ""}"></i>`).join("");
-  const resets = new Date(quota.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-  const handle = (user.email ?? "").split("@")[0];
-  const storageBanner = storage.persistent ? "" : `<div class="ds-banner" role="alert"><b>Storage is not connected.</b> Accounts, keys and usage on this server are kept in memory and will be lost. ${user.role === "admin" ? '<a href="/admin/setup">Open setup checks</a>' : "Tell the site owner."}</div>`;
-  const body = `<div class="ds" data-ds>
-<aside class="ds-side" id="ds-side" aria-label="Dashboard navigation">
-  <div class="ds-brand"><a href="/" aria-label="Apizie home">${logo()}</a><button class="ds-icon-btn ds-close" data-side-close aria-label="Close menu">${icon("menu")}</button></div>
-  <nav class="ds-nav">${nav}</nav>
-  <div class="ds-tools">
-    <button class="ds-link" data-palette-open>${icon("search")}<span>Search</span><kbd>Ctrl K</kbd></button>
-    <a class="ds-link" href="/scrapers">${icon("browse")}<span>Browse APIs</span></a>
-    ${user.role === "admin" ? `<a class="ds-link" href="/admin">${icon("admin")}<span>Admin</span></a>` : ""}
+// Top bar: the six API pages are tabs, the account pages share one "Account" tab with their own sub-tabs.
+const ACCOUNT_SLUGS = ["billing", "affiliate", "showcase", "settings", "support"];
+const TOP_TABS = [["", "Overview"], ["usage", "Usage"], ["logs", "Logs"], ["keys", "API keys"], ["bulk", "Bulk"], ["webhooks", "Webhooks"], ["billing", "Account"]];
+
+function shell({ user, title, subtitle, navHtml, sheetHtml, menuHtml, quotaHtml = "", notice = "", subnav = "", bodyAttr, bell = true, unread = 0, data = "" }) {
+  return `<header class="ap-top">
+<div class="ap-top-in">
+  <a class="ap-logo" href="/" aria-label="Apizie home">${logo()}</a>
+  <nav class="ap-nav" aria-label="Main">${navHtml}</nav>
+  <div class="ap-tools">
+    <button class="ap-search" type="button" data-palette-open aria-label="Search pages and APIs">${icon("search")}<span>Search</span><kbd>Ctrl K</kbd></button>
+    ${quotaHtml}
+    ${bell ? `<div class="ap-pop-wrap"><button class="ds-icon-btn" type="button" data-bell aria-haspopup="true" aria-expanded="false" aria-label="Notifications${unread ? `, ${unread} unread` : ""}">${icon("bell")}${unread ? '<span class="ds-dot" aria-hidden="true"></span>' : ""}</button><div class="ap-pop" data-bell-pop hidden></div></div>` : ""}
+    <div class="ap-pop-wrap"><button class="ds-icon-btn" type="button" data-menu-btn aria-haspopup="true" aria-expanded="false" aria-label="Account menu"><span class="ap-avatar" aria-hidden="true">${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">` : esc((user.name?.[0] ?? "?").toUpperCase())}</span></button>
+      <div class="ap-pop ap-menu" data-menu hidden>${menuHtml}</div></div>
+    <button class="ds-icon-btn ap-burger" type="button" data-sheet-btn aria-expanded="false" aria-controls="ap-sheet" aria-label="Open menu">${icon("menu")}</button>
   </div>
-  <a class="ds-quota" href="/dashboard/usage" aria-label="Monthly quota ${Math.round(pct)} percent used">
-    <span class="ds-quota-top"><span>Quota</span><b>${Math.round(pct)}%</b></span>
-    <span class="ds-segs" aria-hidden="true">${segs}</span>
-    <span class="ds-quota-sub">${quota.month.used.toLocaleString("en-US")} / ${quota.month.limit.toLocaleString("en-US")} · resets ${resets}</span>
-  </a>
-  <div class="ds-user">
-    ${user.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer" width="34" height="34">` : `<span class="ds-avatar" aria-hidden="true">${esc((user.name?.[0] ?? "?").toUpperCase())}</span>`}
-    <span class="ds-user-text"><b>${esc(user.name)}</b><small>@${esc(handle)} · ${esc(plan.id)}</small></span>
-    <button class="ds-icon-btn" data-logout aria-label="Sign out" title="Sign out">${icon("logout")}</button>
-  </div>
-</aside>
-<div class="ds-scrim" data-side-close hidden></div>
-<main class="ds-main" id="main">
-  <header class="ds-head">
-    <button class="ds-icon-btn ds-menu" data-side-open aria-label="Open menu" aria-controls="ds-side">${icon("menu")}</button>
-    <div class="ds-title"><h1>${me[2]}</h1><p>${me[3]}</p></div>
-    <div class="ds-actions" data-actions></div>
-    <button class="ds-icon-btn ds-bell" data-bell aria-label="Notifications${unread ? `, ${unread} unread` : ""}" aria-haspopup="dialog">${icon("bell")}${unread ? `<span class="ds-dot" aria-hidden="true">${unread > 9 ? "9+" : unread}</span>` : ""}</button>
-  </header>
-  ${storageBanner}
-  <section class="ds-body" data-dash="${esc(me[1])}" aria-live="polite"><div class="ds-loading" role="status"><span class="spinner" aria-hidden="true"></span> Loading…</div></section>
-</main>
 </div>
+</header>
+<div class="ap-sheet" id="ap-sheet" data-sheet hidden>${sheetHtml}</div>
+${notice}
+<main class="ap-main" id="main">
+  <div class="ap-head"><div class="ap-head-text"><h1>${title}</h1><p data-sub>${subtitle}</p></div><div class="ds-actions" data-actions></div></div>
+  ${subnav}
+  <section class="ds-body" ${bodyAttr} aria-live="polite"><div class="ds-loading" role="status"><span class="spinner" aria-hidden="true"></span> Loading…</div></section>
+</main>
 <dialog class="ds-modal" data-modal aria-labelledby="modal-title"></dialog>
 <dialog class="ds-palette" data-palette aria-label="Search"><div class="pal-box"><label class="pal-input">${icon("search")}<input data-pal-q placeholder="Jump to a page or search APIs" autocomplete="off" aria-label="Search pages and APIs"></label><ul class="pal-list" data-pal-list role="listbox"></ul><p class="pal-hint">Enter to open · Esc to close</p></div></dialog>
-<script type="application/json" id="dash-data">${json({ section: me[1], apiUrl, publicUrl, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar ?? null }, plan, storage, sections: SECTION_LIST.map(([slug, ic, label]) => ({ slug, label })) })}</script>`;
+${data}`;
+}
+
+export function dashboardPage({ user, section, plan, apiUrl, publicUrl, storage, quota, keyCount, unread }) {
+  const me = SECTION_LIST.find((x) => x[0] === section) ?? SECTION_LIST[0];
+  const inAccount = ACCOUNT_SLUGS.includes(me[0]);
+  const lock = { bulk: !plan.bulk ? "Ultra" : "", webhooks: !plan.webhooks ? "Pro" : "" };
+  const tag = (slug) => (slug === "keys" ? ` <span class="ap-count" aria-label="${keyCount} active">${keyCount}</span>` : lock[slug] ? ` <span class="ds-lock">${lock[slug]}</span>` : "");
+  const href = (slug) => `/dashboard${slug ? "/" + slug : ""}`;
+  const isOn = (slug) => (slug === "billing" ? inAccount : slug === me[0]);
+  const navHtml = TOP_TABS.map(([slug, label]) => `<a href="${href(slug)}"${isOn(slug) ? ' class="on" aria-current="page"' : ""}>${label}${tag(slug)}</a>`).join("");
+  const pct = quota.month.limit ? Math.min(100, (quota.month.used / quota.month.limit) * 100) : 0;
+  const resets = new Date(quota.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  const quotaText = `${quota.month.used.toLocaleString("en-US")} of ${quota.month.limit.toLocaleString("en-US")} requests used this month, resets ${resets}`;
+  const quotaHtml = `<a class="ap-quota" href="/dashboard/usage" title="${quotaText}" aria-label="${quotaText}"><span><b>${Math.round(pct)}%</b> of quota</span><span class="ap-quota-bar${pct >= 90 ? " hot" : ""}" aria-hidden="true"><i style="width:${pct.toFixed(1)}%"></i></span></a>`;
+  const handle = (user.email ?? "").split("@")[0];
+  const menuHtml = `<div class="ap-menu-user"><b data-user-name>${esc(user.name)}</b><small>${esc(user.email ?? "@" + handle)} · ${esc(plan.id)} plan</small></div>
+    ${ACCOUNT_SLUGS.map((slug) => `<a href="${href(slug)}"${slug === me[0] ? ' class="on"' : ""}>${icon(slug)}${SECTION_LIST.find((x) => x[0] === slug)[2]}</a>`).join("")}
+    <hr><a href="/scrapers">${icon("browse")}Browse APIs</a><a href="/docs">${icon("logs")}Docs</a>${user.role === "admin" ? `<a href="/admin">${icon("admin")}Admin</a>` : ""}
+    <hr><button type="button" data-logout>${icon("logout")}Sign out</button>`;
+  const sheetHtml = DASH_SECTIONS.map((g) => `<div class="ap-sheet-group"><p>${g.group}</p>${g.items.map(([slug, ic, label]) => `<a href="${href(slug)}"${slug === me[0] ? ' class="on" aria-current="page"' : ""}>${icon(ic)}${label}${tag(slug)}</a>`).join("")}</div>`).join("") +
+    `<div class="ap-sheet-group"><p>Quota</p><a href="/dashboard/usage">${icon("usage")}${Math.round(pct)}% used · resets ${resets}</a><a href="/scrapers">${icon("browse")}Browse APIs</a>${user.role === "admin" ? `<a href="/admin">${icon("admin")}Admin</a>` : ""}<button type="button" data-logout>${icon("logout")}Sign out (${esc(user.name)})</button></div>`;
+  const notice = storage.persistent ? "" : `<div class="ap-notice" role="status"><div class="ap-notice-in"><b>Storage is not connected.</b><span>Accounts, keys and usage on this server are kept in memory and will be lost.</span>${user.role === "admin" ? '<a href="/admin/setup">Open setup checks</a>' : "<span>Tell the site owner.</span>"}</div></div>`;
+  const subnav = inAccount ? `<nav class="ap-subnav" aria-label="Account">${ACCOUNT_SLUGS.map((slug) => `<a href="${href(slug)}"${slug === me[0] ? ' class="on" aria-current="page"' : ""}>${SECTION_LIST.find((x) => x[0] === slug)[2]}</a>`).join("")}</nav>` : "";
+  const data = `<script type="application/json" id="dash-data">${json({ section: me[1], apiUrl, publicUrl, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar ?? null }, plan, storage, sections: SECTION_LIST.map(([slug, ic, label]) => ({ slug, label })) })}</script>`;
+  const body = shell({ user, title: me[2], subtitle: me[3], navHtml, sheetHtml, menuHtml, quotaHtml, notice, subnav, bodyAttr: `data-dash="${esc(me[1])}"`, unread, data });
   return layout({ title: me[2], user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-user.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }
 
@@ -293,15 +295,10 @@ const ADMIN_NAV = [["", "Overview"], ["setup", "Setup checks"], ["users", "Users
 export const ADMIN_SLUGS = ADMIN_NAV.map((x) => x[0]);
 export function adminPage({ user, section }) {
   const cur = ADMIN_NAV.find((x) => x[0] === section) ?? ADMIN_NAV[0];
-  const side = ADMIN_NAV.map(([s, label]) => `<a href="/admin${s ? "/" + s : ""}" class="ds-link${s === cur[0] ? " on" : ""}"${s === cur[0] ? ' aria-current="page"' : ""}><span>${label}</span></a>`).join("");
-  const body = `<div class="ds">
-<aside class="ds-side" id="ds-side" aria-label="Admin navigation"><div class="ds-brand"><a href="/" aria-label="Apizie home">${logo()}</a><button class="ds-icon-btn ds-close" data-side-close aria-label="Close menu">${icon("menu")}</button></div>
-<nav class="ds-nav"><div class="ds-group"><p class="ds-group-label">Admin</p>${side}</div></nav>
-<div class="ds-tools"><a class="ds-link" href="/dashboard">${icon("dashboard")}<span>Back to dashboard</span></a></div>
-<div class="ds-user"><span class="ds-avatar" aria-hidden="true">A</span><span class="ds-user-text"><b>Admin</b><small>${esc(user.email ?? "")}</small></span><button class="ds-icon-btn" data-logout aria-label="Sign out">${icon("logout")}</button></div></aside>
-<div class="ds-scrim" data-side-close hidden></div>
-<main class="ds-main" id="main"><header class="ds-head"><button class="ds-icon-btn ds-menu" data-side-open aria-label="Open menu" aria-controls="ds-side">${icon("menu")}</button><div class="ds-title"><h1>${cur[1]}</h1><p>Operate Apizie: customers, payments and sources</p></div><div class="ds-actions" data-actions></div></header>
-<section class="ds-body" data-admin="${esc(cur[0] || "overview")}" aria-live="polite"><div class="ds-loading" role="status"><span class="spinner" aria-hidden="true"></span> Loading…</div></section></main></div>
-<dialog class="ds-modal" data-modal aria-labelledby="modal-title"></dialog>`;
+  const href = (s) => `/admin${s ? "/" + s : ""}`;
+  const navHtml = ADMIN_NAV.map(([s, label]) => `<a href="${href(s)}"${s === cur[0] ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("");
+  const menuHtml = `<div class="ap-menu-user"><b>Admin</b><small>${esc(user.email ?? "")}</small></div><a href="/dashboard">${icon("dashboard")}Back to dashboard</a><hr><button type="button" data-logout>${icon("logout")}Sign out</button>`;
+  const sheetHtml = `<div class="ap-sheet-group"><p>Admin</p>${ADMIN_NAV.map(([s, label]) => `<a href="${href(s)}"${s === cur[0] ? ' class="on" aria-current="page"' : ""}>${label}</a>`).join("")}</div><div class="ap-sheet-group"><a href="/dashboard">${icon("dashboard")}Back to dashboard</a><button type="button" data-logout>${icon("logout")}Sign out</button></div>`;
+  const body = shell({ user: { ...user, name: "Admin" }, title: cur[1], subtitle: "Operate Apizie: customers, payments and sources", navHtml, sheetHtml, menuHtml, bodyAttr: `data-admin="${esc(cur[0] || "overview")}"`, bell: false });
   return layout({ title: "Admin", user, body, scripts: ["/assets/site.js", "/assets/dash.js", "/assets/dash-admin.js"], noindex: true, bare: true, bodyClass: "ds-body-page", head: '<link rel="stylesheet" href="/assets/dash.css">' });
 }

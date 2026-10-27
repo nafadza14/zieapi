@@ -82,6 +82,17 @@ test("Supabase Site URL fallback (/?code=...) still completes the sign-in", asyn
   assert.notEqual(plain.status, 302, "without the sign-in cookie the home page renders normally");
 });
 
+test("public URL with a path is reduced to its origin; a doubled callback path still signs in", async () => {
+  const a2 = createApp({ logger: null, quiet: true, env: { ZIE_PUBLIC_URL: "https://x.example/auth/supabase/callback" }, kv: new MemoryKV(), scrapers: [], supabaseAuth: { url: "https://proj.supabase.test", key: "k", providers: ["google"] } });
+  assert.equal(a2.publicUrl, "https://x.example");
+  const start = await get("/auth/google?next=/dashboard");
+  const cookie = start.headers.get("set-cookie").split(";")[0];
+  const doubled = await get("/auth/supabase/callback/auth/supabase/callback?code=good-code", { cookie });
+  assert.equal(doubled.headers.get("location"), "/auth/supabase/callback?code=good-code");
+  const cb = await get(doubled.headers.get("location"), { cookie });
+  assert.equal(cb.headers.get("location"), "/dashboard");
+});
+
 test("OAuth discovery metadata for MCP clients", async () => {
   const pr = await (await get("/.well-known/oauth-protected-resource/mcp")).json();
   assert.equal(pr.resource, "http://api.test/mcp");

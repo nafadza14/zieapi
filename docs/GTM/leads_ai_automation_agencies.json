@@ -1,0 +1,110 @@
+[
+  {
+    "nama_agensi": "TrueHorizon AI",
+    "website": "https://truehorizon.ai/",
+    "founder_kontak": "Milan Tahliani (CEO dan Cofounder), Kirill Zhadovich (CTO), thai@truehorizon.ai",
+    "lokasi": "Global dan Amerika Serikat",
+    "spesialisasi": "Enterprise AI agents dan agentic workflows berbasis n8n, automasi dokumen, voice agents, serta sistem riset korporat terukur.",
+    "tech_stack": "n8n, Python, LLM orchestration, custom UI",
+    "potensi_use_case_apizie": "TrueHorizon merancang agen riset dan intelijen pasar untuk klien korporat berskala besar seperti Avalara. Melalui Apizie MCP Server, agen n8n mereka dapat langsung memanggil 1600+ endpoint data publik seperti berita terverifikasi, data finansial pasar, dan entitas bisnis hanya dengan satu API key tanpa kerumitan berlangganan banyak vendor data eksternal."
+  },
+  {
+    "nama_agensi": "Morningside AI",
+    "website": "https://morningside.ai/",
+    "founder_kontak": "Liam Ottley (Founder), info@morningside.ai",
+    "lokasi": "Selandia Baru dan Global",
+    "spesialisasi": "Pengembangan AI kustom, strategi implementasi LLM korporat, multi agent systems, dan otomasi alur kerja tingkat lanjut.",
+    "tech_stack": "LangChain, LlamaIndex, Python, n8n, Make, Flowise",
+    "potensi_use_case_apizie": "Morningside AI memproduksi agen otonom tingkat tinggi yang membutuhkan validasi fakta waktu nyata dari berbagai basis data publik. Apizie menyederhanakan akses ke beragam sumber data eksternal melalui REST API dan protokol MCP, memangkas siklus pengembangan Proof of Concept bagi klien tanpa beban pengelolaan akun API terpisah."
+  },
+  {
+    "nama_agensi": "PulpSense",
+    "website": "https://www.pulpsense.com/",
+    "founder_kontak": "contact@pulpsense.com",
+    "lokasi": "Global",
+    "spesialisasi": "AI agents dan automasi alur kerja tim B2B penjualan, pengayaan data prospek, perutean otomatis, serta integrasi CRM.",
+    "tech_stack": "n8n, Make, CRM integrations, AI agent routing",
+    "potensi_use_case_apizie": "PulpSense berfokus pada pengayaan profil prospek B2B secara otomatis. Apizie menyediakan kumpulan endpoint data publik seperti profil teknologi GitHub, direktori korporat, dan tren industri yang dapat langsung diekstraksi oleh agen alur kerja n8n atau Make untuk melengkapi data prospek klien."
+  },
+  {
+    "nama_agensi": "Avanai",
+    "website": "https://www.avanai.io/",
+    "founder_kontak": "Christian Voigt (Founder dan Managing Director), hello@avanai.io",
+    "lokasi": "Jerman dan Uni Eropa",
+    "spesialisasi": "Sovereign agentic operations, perancangan dan operasional agen AI enterprise dengan kepatuhan tata kelola ketat, n8n Elite Partner.",
+    "tech_stack": "n8n self hosted, AgentOps, secure enterprise infrastructure",
+    "potensi_use_case_apizie": "Avanai membangun sistem agen mandiri bagi perusahaan besar dengan persyaratan tata kelola data yang ketat. Format data terstandarisasi dari Apizie mempermudah audit kepatuhan dan manajemen kuota terpusat saat agen AI n8n memanggil aneka data eksternal."
+  },
+  {
+    "nama_agensi": "Ovidius AI",
+    "website": "https://ovidius.ai/",
+    "founder_kontak": "Maciej Kaczor dan Jason Reynolds, info@ovidius.ai",
+    "lokasi": "Amerika Serikat dan Global",
+    "spesialisasi": "Production AI agents, context aware conversational workflows (obrolan teks dan suara) untuk korporat, penyedia MSP, dan agensi pemasaran.",
+    "tech_stack": "n8n, Conversational AI, Voice AI, custom agent orchestration",
+    "potensi_use_case_apizie": "Agen percakapan dan agen riset Ovidius membutuhkan informasi faktual dunia nyata secara tepat waktu. Apizie MCP Server memberikan landasan pengetahuan instan dari ribuan basis data publik sehingga respon agen AI lebih akurat serta bebas dari risiko halusinasi data."
+  },
+  {
+    "nama_agensi": "Forward Deployed Engineer",
+    "website": "https://forward.deployed.engineer/",
+    "founder_kontak": "Viraj Patel (Founder, mantan Commercial Lead n8n)",
+    "lokasi": "Inggris dan Global",
+    "spesialisasi": "Forward Deployed Engineers tersemat dan arsitek automasi AI enterprise spesialis n8n untuk industri telekomunikasi, keuangan, dan sektor publik.",
+    "tech_stack": "n8n, Python, Enterprise middleware, Cloud VPC",
+    "potensi_use_case_apizie": "Sebagai arsitek teknis tingkat lanjut untuk korporat dengan regulasi ketat, tim ini dapat merekomendasikan Apizie sebagai gerbang data terpadu guna memotong birokrasi pengadaan lisensi API dari puluhan vendor data eksternal."
+  },
+  {
+    "nama_agensi": "Hyperstack Studio",
+    "website": "https://www.hyperstack.studio/",
+    "founder_kontak": "hello@hyperstack.studio",
+    "lokasi": "Prancis dan Amerika Serikat",
+    "spesialisasi": "Studio no code, arsitektur data, dan implementasi agen AI untuk mengotomatiskan alur operasional bisnis bertumbuh cepat.",
+    "tech_stack": "n8n, Make, Airtable, Glide, Xano, BigQuery",
+    "potensi_use_case_apizie": "Hyperstack menghubungkan tumpukan data internal klien dengan otomasi n8n dan Make. Apizie dapat berperan sebagai gerbang pemasok data eksternal yang bersih ke dalam basis data Airtable atau Xano klien mereka tanpa pembuatan pipa integrasi rumit."
+  },
+  {
+    "nama_agensi": "2V Automation",
+    "website": "https://2vautomation.ai/",
+    "founder_kontak": "weare@2vmdls.com",
+    "lokasi": "Global",
+    "spesialisasi": "Pembangunan sistem otomasi produksi dan orkestrasi agen AI untuk perusahaan dengan pendapatan di atas 1 juta dollar.",
+    "tech_stack": "n8n, Custom Code, AI integrations",
+    "potensi_use_case_apizie": "Klien bisnis berkembang membutuhkan intelijen kompetitor dan pemantauan tren pasar otomatis secara hemat biaya. 2V Automation dapat menanamkan endpoint Apizie ke alur kerja n8n untuk menyediakan data pasar secara terukur dengan satu langganan ringkas."
+  },
+  {
+    "nama_agensi": "Symplytics",
+    "website": "https://www.symplytics.com/",
+    "founder_kontak": "hello@symplytics.com",
+    "lokasi": "Kanada dan Amerika Serikat",
+    "spesialisasi": "Mitra resmi n8n Expert Partner, orkestrasi alur kerja low code, pemrosesan dokumen bertenaga AI, serta integrasi API modern.",
+    "tech_stack": "n8n, AI models, modern APIs, Cloud data integration",
+    "potensi_use_case_apizie": "Symplytics merancang alur kerja Business Intelligence dan pemrosesan dokumen otomatis. Standarisasi JSON dari ribuan endpoint Apizie memudahkan orkestrasi data eksternal ke dalam dashboard analitik klien tanpa perlu merancang skrip konektor khusus."
+  },
+  {
+    "nama_agensi": "DataFix BV",
+    "website": "https://datafix.nl/",
+    "founder_kontak": "info@datafix.nl, LinkedIn datafixbv",
+    "lokasi": "Belanda",
+    "spesialisasi": "Spesialis integrasi data dan otomasi n8n bersertifikat sejak 2021, program pendampingan otomasi mandiri, dan orkestrasi alur data korporat.",
+    "tech_stack": "n8n, Data Pipelines, API integrations",
+    "potensi_use_case_apizie": "DataFix membangun integrasi data bagi pelaku usaha di kawasan Eropa. Dengan memanfaatkan Apizie, tim teknis DataFix dapat segera menyalurkan data referensi publik seperti statistik, cuaca, dan indikator ekonomi ke alur kerja n8n klien tanpa registrasi akun individual di tiap penyedia data."
+  },
+  {
+    "nama_agensi": "InfoGrab",
+    "website": "https://insight.infograb.net/",
+    "founder_kontak": "support@infograb.net",
+    "lokasi": "Korea Selatan",
+    "spesialisasi": "Agensi otomasi AI native dan AI DevOps, n8n Enterprise Partner untuk perancangan platform automasi internal mandiri bagi tim rekayasa perangkat lunak.",
+    "tech_stack": "n8n self hosted enterprise, AI DevOps, internal platform integration",
+    "potensi_use_case_apizie": "InfoGrab membangun platform agen AI operasional internal korporat. Antarmuka Apizie MCP Server memungkinkan agen AI mandiri di dalam klaster privat n8n untuk menjalankan fungsi tool calling ke ribuan data publik dunia secara aman dan konsisten."
+  },
+  {
+    "nama_agensi": "Bitovi",
+    "website": "https://www.bitovi.com/",
+    "founder_kontak": "Justin Meyer (CEO), contact@bitovi.com",
+    "lokasi": "Amerika Serikat dan Global",
+    "spesialisasi": "Konsultasi rekayasa perangkat lunak, perancangan arsitektur n8n tingkat lanjut, integrasi AI, DevOps, dan automasi proses bisnis korporat.",
+    "tech_stack": "n8n, Node.js, Python, Cloud DevOps, AI agents",
+    "potensi_use_case_apizie": "Bitovi merancang aplikasi web dan agen AI skala besar yang menghubungkan berbagai sistem eksternal. Integrasi Apizie MCP Server ke dalam alur n8n dan arsitektur backend Bitovi mempercepat validasi data publik dan integrasi pihak ketiga secara instan."
+  }
+]

@@ -33,6 +33,9 @@ export const PAYG = {
   usdPer1k: 0.4,
   priceTenths: 66,
   topups: [80000, 160000, 400000, 800000],
+  // Card top-ups (Dodo Payments) are chosen in US dollars and credited at the same per-request price.
+  topupsUsd: [5, 10, 25, 50],
+  minTopupUsd: 5,
   minTopup: 80000,
   lowBalance: 80000,
 };

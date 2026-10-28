@@ -7,7 +7,8 @@ const FAQ = [
   ["What happens when I hit the quota?", "Requests return HTTP 429 with a clear message, the limit you hit and a Retry-After header. Nothing is charged unless you switch on pay-as-you-go, which bills extra requests at $0.40 per 1,000 from a prepaid balance. Otherwise upgrade or wait for the reset on the 1st (UTC)."],
   ["Do failed requests use up my quota?", "Server-side failures (5xx) are refunded automatically. Client errors (4xx such as invalid parameters) are counted, because the work was done."],
   ["Which tier do I need?", "Start on Free while you build. Move to Pro when real users arrive, Ultra when you need bulk jobs or always-fresh data, and Max for heavy pipelines."],
-  ["How do I pay?", "Prices are in US dollars. Create an invoice from Billing, pay it and submit the reference. Your plan is activated as soon as the payment is verified. Paying for 12 months up front gets you 2 months free."],
+  ["How do I pay?", "Prices are in US dollars. Choose a plan and you go straight to a secure checkout by Dodo Payments, our merchant of record: pay by card, Apple Pay or Google Pay and the plan is active right away. Sales tax or VAT is added at checkout where it applies. Paying for 12 months up front gets you 2 months free."],
+  ["Will I be charged automatically?", "No. Each payment covers the months you choose. The end date is shown in your dashboard; renew only if you want to, otherwise the account goes back to Free."],
   ["Is there a yearly discount?", "Yes. Pay for 10 months and get 12: Pro is $90 a year, Ultra $290 and Max $990."],
   ["How is Apizie different from a scraping framework?", "You don't run browsers, proxies or parsers. You call an endpoint and get stable JSON. We maintain the integrations; you maintain your product."],
   ["What about the legality of accessing public data?", "Apizie focuses on official APIs, open data and publicly published feeds. You remain responsible for how you use the data. See the Acceptable Use Policy."],
@@ -54,6 +55,7 @@ export function pricingPage({ user }) {
     })
     .join("")}
 </section>
+<p class="wrap pay-note muted">Secure checkout by Dodo Payments · Card, Apple Pay and Google Pay · No auto-renewal · Cancel any time</p>
 <section class="section wrap">
   <div class="section-head"><h2 class="display-2">Every plan, side by side.</h2></div>
   <div class="table-wrap"><table class="compare"><thead><tr><th></th>${plans.map((p) => `<th>${PLAN_COPY[p.id].name}</th>`).join("")}</tr></thead><tbody>${rows.map(([label, fn]) => `<tr><th scope="row">${label}</th>${plans.map((p) => `<td>${fn(p)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>

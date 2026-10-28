@@ -526,3 +526,4 @@ h2.display-2.mt { margin: 64px 0 18px; }
 .legal-links a[aria-current="page"] { color: #fff; background: rgba(255, 255, 255, 0.07); }
 @media (max-width: 900px) { .legal-wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; } .legal-side { position: static; order: -1; } .legal-links { grid-auto-flow: column; overflow-x: auto; } .legal-links a { white-space: nowrap; } .legal-toc ol { columns: 1; } }
 .machine-note { margin-top: 28px; }
+.pay-note { text-align: center; font-size: 14px; margin: 18px auto 0; }

@@ -136,7 +136,14 @@ export function createAccountApi(d) {
     const type = body?.type === "topup" ? "topup" : "plan";
     let subtotal;
     let extra;
-    if (type === "topup") {
+    if (type === "topup" && body?.method === "card" && body?.usd !== undefined) {
+      // Card top-up chosen in dollars: requests at $0.40 per 1,000, credited in rupiah at the same per-request price.
+      const usd = Math.round(Number(body.usd) * 100) / 100;
+      if (!Number.isFinite(usd) || usd < PAYG.minTopupUsd || usd > 5000) throw E.invalidParams([{ path: "usd", message: `Top-up must be between $${PAYG.minTopupUsd} and $5,000` }]);
+      const requests = Math.floor((usd * 1000) / PAYG.usdPer1k);
+      subtotal = Math.round((requests * PAYG.priceTenths) / 10);
+      extra = { requests, usd };
+    } else if (type === "topup") {
       const amount = Math.round(Number(body?.amount));
       if (!Number.isFinite(amount) || amount < PAYG.minTopup || amount > 100_000_000) throw E.invalidParams([{ path: "amount", message: `Top-up must be between Rp${PAYG.minTopup.toLocaleString("id-ID")} and Rp100.000.000` }]);
       subtotal = amount;
@@ -153,7 +160,7 @@ export function createAccountApi(d) {
     if (body?.method === "card") {
       // Card / Apple Pay / Google Pay through Dodo Payments (merchant of record: it adds the right sales tax itself).
       if (!d.dodo?.enabled) throw E.invalidParams([{ path: "method", message: "Card payments are not available yet. Use bank transfer." }]);
-      const cents = type === "topup" ? Math.max(100, Math.round((extra.requests * PAYG.usdPer1k * 100) / 1000)) : Math.round(extra.priceUsd * 100);
+      const cents = type === "topup" ? (extra.usd ? Math.round(extra.usd * 100) : Math.max(100, Math.round((extra.requests * PAYG.usdPer1k * 100) / 1000))) : Math.round(extra.priceUsd * 100);
       const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal: cents, vatPercent: 0, vat: 0, base: cents, amount: cents, currency: "USD", subtotalIdr: subtotal, ...(type === "topup" ? { creditIdr: subtotal } : {}), method: "card", provider: "dodo", status: "pending", reference: null, createdAt: new Date().toISOString() };
       await repo.put("invoice", inv, user.id);
       return startCheckout(user, inv);
@@ -514,7 +521,7 @@ export function createAccountApi(d) {
         plans: Object.values(PLANS),
         balance: balance / 10,
         balanceRequests: Math.floor(balance / PAYG.priceTenths),
-        payg: { priceIdr: PAYG.priceTenths / 10, usdPer1k: PAYG.usdPer1k, topups: PAYG.topups.map((a) => ({ amount: a, requests: requestsForRupiah(a) })), minTopup: PAYG.minTopup, lowBalance: PAYG.lowBalance, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
+        payg: { priceIdr: PAYG.priceTenths / 10, usdPer1k: PAYG.usdPer1k, topups: PAYG.topups.map((a) => ({ amount: a, requests: requestsForRupiah(a) })), topupsUsd: PAYG.topupsUsd.map((usd) => ({ usd, requests: Math.floor((usd * 1000) / PAYG.usdPer1k) })), minTopupUsd: PAYG.minTopupUsd, minTopup: PAYG.minTopup, lowBalance: PAYG.lowBalance, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
         vatPercent,
         bank,
         bankConfigured: !!d.bankConfigured,

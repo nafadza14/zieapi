@@ -129,3 +129,14 @@ test("without Dodo settings card payment is off and bank transfer still works", 
     await new Promise((r) => plain.server.close(r));
   }
 });
+
+test("card top-up in dollars: $10 buys 25,000 requests, credited at the same per-request price", async () => {
+  const inv = (await me("/api/me/invoices", { type: "topup", usd: 10, method: "card" })).json.content;
+  assert.equal(inv.amount, 1000);
+  assert.equal(inv.requests, 25000);
+  assert.equal(inv.creditIdr, 165000);
+  assert.equal(calls.at(-1).body.product_cart[0].amount, 1000);
+  assert.equal((await me("/api/me/invoices", { type: "topup", usd: 1, method: "card" })).status, 400, "minimum $5");
+  const billing = (await me("/api/me/billing")).json.content;
+  assert.deepEqual(billing.payg.topupsUsd.map((t) => t.usd), [5, 10, 25, 50]);
+});

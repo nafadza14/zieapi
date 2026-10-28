@@ -21,20 +21,36 @@ Untuk menerima kartu kredit internasional, Apple Pay, dan Google Pay:
    - Account Number: 0374827720
    - Account Holder Name: Ghilman Nafadza Hakim
 
-## 3. Pembuatan Produk Langganan di Dodo Payments
-Buat 3 produk subscription di dashboard Dodo Payments:
-1. Apizie Pro Plan
-   - Price: $9 USD / month
-   - Quota: 25.000 requests/month
-2. Apizie Ultra Plan
-   - Price: $29 USD / month
-   - Quota: 200.000 requests/month, bulk jobs, always-fresh cache
-3. Apizie Max Plan
-   - Price: $99 USD / month
-   - Quota: 1.000.000 requests/month, 50 API keys
+## 3. Produk di Dodo Payments (cara yang dipakai kode)
+Kode memakai **satu produk "Pay What You Want"**, bukan produk per plan. Nominal tiap invoice dikirim saat checkout, jadi semua plan (bulanan, 3/6 bulan, tahunan dengan harga 10 bulan) dan top-up saldo memakai produk yang sama.
+1. Dashboard Dodo → Products → Create product → One-time payment.
+2. Nama: `Apizie payment`, mata uang **USD**, aktifkan **Pay What You Want**, harga minimum **$1**, kategori pajak: SaaS / digital products.
+3. Salin product id (`pdt_...`) ke `DODO_PAYMENTS_PRODUCT_ID`.
 
-## 4. Parameter Environment Variables (Vercel)
-Setelah akun Dodo Payments aktif, masukkan variabel berikut ke Vercel Settings:
-• `DODO_PAYMENTS_API_KEY`: API Key dari Dodo Payments (test/live mode)
-• `DODO_WEBHOOK_SECRET`: Secret key webhook untuk verifikasi signature
-• `APIZIE_BANK_INFO`: BCA 0374827720 a.n. Ghilman Nafadza Hakim
+Plan tidak diperpanjang otomatis (sama seperti bank transfer): pelanggan bayar lagi untuk menambah masa aktif.
+
+## 4. Webhook
+Dashboard Dodo → Developer → Webhooks → Add endpoint:
+- URL: `https://<domain-kamu>/webhooks/dodo`
+- Event: `payment.succeeded`, `payment.failed`, `payment.cancelled`
+- Salin signing secret (`whsec_...`) ke `DODO_PAYMENTS_WEBHOOK_SECRET`.
+
+Tanpa webhook, pembayaran tetap tercatat saat pelanggan kembali ke halaman billing (server mengecek status checkout ke Dodo), tapi webhook membuat aktivasi tidak bergantung pada itu.
+
+## 5. Environment variables (Vercel → Settings → Environment Variables)
+- `DODO_PAYMENTS_API_KEY`: API key dari Dodo (Developer → API Keys). Jangan pernah ditulis di kode, repo atau chat.
+- `DODO_PAYMENTS_PRODUCT_ID`: id produk Pay What You Want di atas.
+- `DODO_PAYMENTS_WEBHOOK_SECRET`: signing secret webhook.
+- `DODO_PAYMENTS_ENVIRONMENT`: `live_mode` (default) atau `test_mode`. Key test hanya jalan di test mode, key live hanya di live mode.
+- `APIZIE_BANK_INFO`: rekening untuk bank transfer (opsional, tetap tersedia berdampingan dengan kartu).
+
+Setelah redeploy, buka `/admin/setup`: baris "Card payments (Dodo Payments)" harus hijau.
+
+## 6. Alur yang berjalan
+1. Pelanggan memilih plan atau top-up di `/dashboard/billing`, lalu memilih "Card, Apple Pay or Google Pay".
+2. Server membuat invoice dalam USD (sen) dan sesi checkout Dodo (`POST /checkouts`) dengan `metadata.invoice_id`, lalu pelanggan diarahkan ke halaman checkout Dodo.
+3. Setelah bayar, Dodo mengirim `payment.succeeded`. Server memverifikasi tanda tangan (Standard Webhooks), mencocokkan invoice, mata uang USD, nominal dan pemilik, lalu mengaktifkan plan atau menambah saldo. Event yang sama tidak diproses dua kali.
+4. Saat pelanggan kembali ke `/dashboard/billing?invoice=...&checkout=done`, server juga menanyakan status ke Dodo; mana pun yang lebih dulu, aktivasi hanya terjadi sekali.
+5. Pendapatan kartu muncul di `/admin` (dihitung dengan harga rupiah plan) dan invoice kartu ditandai "Card via Dodo Payments". Invoice kartu tidak bisa ditandai lunas manual.
+
+Uji dulu dengan `DODO_PAYMENTS_ENVIRONMENT=test_mode` dan key test, pakai kartu uji Dodo, baru pindah ke live.

@@ -150,10 +150,39 @@ export function createAccountApi(d) {
     }
     const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
     if (open.length >= 5) throw E.invalidParams([{ path: "type", message: "You already have 5 open invoices. Pay or cancel one first" }]);
+    if (body?.method === "card") {
+      // Card / Apple Pay / Google Pay through Dodo Payments (merchant of record: it adds the right sales tax itself).
+      if (!d.dodo?.enabled) throw E.invalidParams([{ path: "method", message: "Card payments are not available yet. Use bank transfer." }]);
+      const cents = type === "topup" ? Math.max(100, Math.round((extra.requests * PAYG.usdPer1k * 100) / 1000)) : Math.round(extra.priceUsd * 100);
+      const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal: cents, vatPercent: 0, vat: 0, base: cents, amount: cents, currency: "USD", subtotalIdr: subtotal, ...(type === "topup" ? { creditIdr: subtotal } : {}), method: "card", provider: "dodo", status: "pending", reference: null, createdAt: new Date().toISOString() };
+      await repo.put("invoice", inv, user.id);
+      return startCheckout(user, inv);
+    }
     const vat = Math.round((subtotal * vatPercent) / 100);
     const uniqueCode = 1 + Math.floor(Math.random() * 999);
     const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal, vatPercent, vat, uniqueCode, base: subtotal, amount: subtotal + vat + uniqueCode, currency: "IDR", method: "bank_transfer", status: "pending", reference: null, createdAt: new Date().toISOString() };
     return repo.put("invoice", inv, user.id);
+  }
+
+  async function startCheckout(user, inv) {
+    const back = `${publicUrl}/dashboard/billing?invoice=${encodeURIComponent(inv.id)}`;
+    let session;
+    try {
+      session = await d.dodo.createCheckout({ invoice: inv, user, returnUrl: `${back}&checkout=done`, cancelUrl: `${back}&checkout=cancelled` });
+    } catch (e) {
+      throw new HttpError(e.status ?? 502, { content: null, message: e.message, errors: [] });
+    }
+    const updated = await repo.patchItem("invoice", inv.id, { checkoutSessionId: session.sessionId, checkoutAt: new Date().toISOString() });
+    return { ...updated, checkoutUrl: session.checkoutUrl };
+  }
+
+  /** Return page: ask Dodo whether the checkout was paid (the webhook does the same; whichever comes first wins). */
+  async function syncCard(user, inv) {
+    if (inv.provider !== "dodo" || inv.status !== "pending" || !inv.checkoutSessionId || !d.dodo?.enabled) return inv;
+    const { paymentId, paymentStatus } = await d.dodo.getCheckout(inv.checkoutSessionId).catch(() => ({}));
+    if (paymentStatus === "succeeded" && paymentId) return (await d.fulfill(inv, { via: "dodo", paymentId })).invoice;
+    if (paymentStatus === "failed") return repo.patchItem("invoice", inv.id, { lastPaymentStatus: "failed" });
+    return inv;
   }
 
   async function transactions(user) {
@@ -162,7 +191,8 @@ export function createAccountApi(d) {
       kind: i.type === "topup" ? "topup" : "plan",
       date: i.createdAt,
       item: i.type === "topup" ? `Balance top-up (≈ ${(i.requests ?? requestsForRupiah(i.subtotal ?? i.base)).toLocaleString("en-US")} requests)` : `${cap(i.plan)} plan · ${i.months} month${i.months > 1 ? "s" : ""}`,
-      method: "Bank transfer",
+      method: i.method === "card" ? "Card (Dodo Payments)" : "Bank transfer",
+      currency: i.currency ?? "IDR",
       subtotal: i.subtotal ?? i.base,
       vat: i.vat ?? 0,
       total: i.amount,
@@ -488,16 +518,30 @@ export function createAccountApi(d) {
         vatPercent,
         bank,
         bankConfigured: !!d.bankConfigured,
+        cardEnabled: !!d.dodo?.enabled,
         invoices: await repo.listItems("invoice", user.id),
         transactions: tx,
       });
     }
     if (p === "/api/me/invoices" && m === "POST") return json(201, okContent(await invoiceFor(user, body)));
+    if ((mm = /^\/api\/me\/invoices\/([^/]+)\/(checkout|sync)$/.exec(p)) && m === "POST") {
+      const inv = await repo.getItem("invoice", mm[1]);
+      if (!inv || inv.userId !== user.id) throw E.notFound("Invoice not found");
+      if (inv.provider !== "dodo") throw E.invalidParams([{ path: "method", message: "This invoice is paid by bank transfer" }]);
+      if (mm[2] === "sync") return ok(await syncCard(user, inv));
+      const synced = await syncCard(user, inv); // never open a second checkout for an invoice that was just paid
+      if (synced.status !== "pending") throw E.invalidParams([{ path: "status", message: `Invoice is ${synced.status}` }]);
+      return ok(await startCheckout(user, synced));
+    }
     if ((mm = /^\/api\/me\/invoices\/([^/]+)\/(confirm|cancel)$/.exec(p)) && m === "POST") {
       const inv = await repo.getItem("invoice", mm[1]);
       if (!inv || inv.userId !== user.id) throw E.notFound("Invoice not found");
+      if (mm[2] === "confirm" && inv.provider === "dodo") throw E.invalidParams([{ path: "method", message: "Card invoices are confirmed automatically" }]);
       if (inv.status !== "pending") throw E.invalidParams([{ path: "status", message: `Invoice is ${inv.status}` }]);
-      if (mm[2] === "cancel") return ok(await repo.patchItem("invoice", inv.id, { status: "cancelled" }));
+      if (mm[2] === "cancel") {
+        if (inv.provider === "dodo" && (await syncCard(user, inv)).status === "paid") throw E.invalidParams([{ path: "status", message: "This invoice was just paid" }]);
+        return ok(await repo.patchItem("invoice", inv.id, { status: "cancelled" }));
+      }
       const reference = String(body?.reference ?? "").trim().slice(0, 200);
       if (!reference) throw E.invalidParams([{ path: "reference", message: "Enter the transfer reference or sender name" }]);
       return ok(await repo.patchItem("invoice", inv.id, { status: "awaiting_review", reference, confirmedAt: new Date().toISOString() }));

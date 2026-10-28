@@ -129,7 +129,7 @@
               <ul class="mini-list">${cu.recent.slice(0, 5).map((u) => `<li><a href="/admin/users?q=${encodeURIComponent(u.email ?? "")}"><span>${esc(u.email ?? u.name)}</span>${h.badge(u.plan)}<small>${c.ago(u.createdAt)}</small></a></li>`).join("") || '<li class="muted-sm">No customers yet.</li>'}</ul>
             </section>
             <section class="ds-card"><div class="card-top"><h2>Latest payments</h2><a class="link-sm push" href="/admin/revenue">Revenue</a></div>${
-              rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.slice(0, 5).map((i) => `<li><span>${esc(i.email ?? i.id)}</span><b>${idr(i.amount)}</b><small>${c.ago(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
+              rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.slice(0, 5).map((i) => `<li><span>${esc(i.email ?? i.id)}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.ago(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
             }</section>
           </div>
         </div>
@@ -355,10 +355,10 @@
         </div>
         <div class="grid-2">
           <section class="ds-card"><div class="card-top"><h2>Waiting for your confirmation</h2><a class="link-sm push" href="/admin/invoices">Review</a></div>${
-            rv.awaitingReview.length ? `<ul class="mini-list">${rv.awaitingReview.map((i) => `<li><a href="/admin/invoices"><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : `${c.cap(i.plan)} × ${i.months} mo`}</span><b>${idr(i.amount)}</b><small>${c.ago(i.createdAt)}</small></a></li>`).join("")}</ul>` : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing to confirm.</p>`
+            rv.awaitingReview.length ? `<ul class="mini-list">${rv.awaitingReview.map((i) => `<li><a href="/admin/invoices"><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : `${c.cap(i.plan)} × ${i.months} mo`}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.ago(i.createdAt)}</small></a></li>`).join("")}</ul>` : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing to confirm.</p>`
           }</section>
           <section class="ds-card"><div class="card-top"><h2>Latest payments</h2></div>${
-            rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.map((i) => `<li><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : c.cap(i.plan ?? "plan")}</span><b>${idr(i.amount)}</b><small>${c.day(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
+            rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.map((i) => `<li><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : c.cap(i.plan ?? "plan")}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.day(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
           }</section>
         </div>`;
     };
@@ -470,7 +470,7 @@
     let filter = "awaiting_review";
     const draw = () => {
       const list = all.filter((i) => filter === "all" || i.status === filter || (filter === "awaiting_review" && i.status === "pending"));
-      const what = (i) => (i.type === "topup" ? `Top-up ${idr(i.subtotal)}` : `${c.cap(i.plan)} × ${i.months} mo`);
+      const what = (i) => (i.type === "topup" ? `Top-up ${c.money(i.subtotal, i.currency)}` : `${c.cap(i.plan)} × ${i.months} mo`);
       $list.innerHTML = list.length
         ? h.table(
             ["Invoice", "Customer", "For", "Amount", "Status", ""],
@@ -479,9 +479,9 @@
                 <td><b>${esc(i.id)}</b><br><span class="muted-sm">${dt(i.createdAt)}</span></td>
                 <td>${esc(i.email ?? i.userId)}</td>
                 <td>${what(i)}</td>
-                <td class="num"><b>${idr(i.amount)}</b><br><span class="muted-sm">${idr(i.subtotal ?? i.base)} + VAT ${idr(i.vat ?? 0)} + code ${i.uniqueCode ?? 0}</span></td>
+                <td class="num"><b>${c.money(i.amount, i.currency)}</b><br><span class="muted-sm">${i.provider === "dodo" ? `Card via Dodo Payments${i.paymentId ? ` · ${esc(i.paymentId)}` : ""}` : `${idr(i.subtotal ?? i.base)} + VAT ${idr(i.vat ?? 0)} + code ${i.uniqueCode ?? 0}`}</span></td>
                 <td>${h.badge(i.status)}${i.reference ? `<br><span class="muted-sm">Ref: ${esc(i.reference)}</span>` : ""}</td>
-                <td>${["pending", "awaiting_review"].includes(i.status) ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="approve" data-id="${esc(i.id)}">Mark paid</button><button class="btn btn-danger-ghost btn-sm" data-act="reject" data-id="${esc(i.id)}">Reject</button></div>` : ""}</td>
+                <td>${["pending", "awaiting_review"].includes(i.status) && i.provider !== "dodo" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="approve" data-id="${esc(i.id)}">Mark paid</button><button class="btn btn-danger-ghost btn-sm" data-act="reject" data-id="${esc(i.id)}">Reject</button></div>` : ""}</td>
               </tr>`
             )
           )

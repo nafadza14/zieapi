@@ -712,7 +712,9 @@
     const { h, esc, num, api, idr } = c;
     let b;
     let tab = "all";
-    const want = new URLSearchParams(location.search).get("plan");
+    const qs = new URLSearchParams(location.search);
+    const want = qs.get("plan");
+    const returned = qs.get("invoice") && qs.get("checkout") ? { id: qs.get("invoice"), result: qs.get("checkout") } : null;
     const load = async () => {
       try {
         b = (await api("/api/me/billing")).content;
@@ -721,12 +723,12 @@
         c.root.innerHTML = h.error(err);
       }
     };
-    const statusTag = (s) => h.badge(s, { pending: "Waiting for payment", awaiting_review: "Checking payment", paid: "Paid", cancelled: "Cancelled", rejected: "Rejected", settled: "Settled" }[s] ?? s);
+    const statusTag = (s) => h.badge(s, { failed: "Payment failed", pending: "Waiting for payment", awaiting_review: "Checking payment", paid: "Paid", cancelled: "Cancelled", rejected: "Rejected", settled: "Settled" }[s] ?? s);
     const render = () => {
       const p = b.plan;
       const q = b.quota;
       const rows = b.transactions.filter((t) => tab === "all" || t.kind === tab);
-      c.root.innerHTML = `${b.bankConfigured ? "" : `<div class="ds-banner warn" role="status">Bank transfer details aren't set up yet, so invoices can't be paid. The site owner needs to set <code>APIZIE_BANK_INFO</code>.</div>`}
+      c.root.innerHTML = `${b.bankConfigured || b.cardEnabled ? "" : `<div class="ds-banner warn" role="status">Payments aren't set up yet, so invoices can't be paid. The site owner needs to set <code>APIZIE_BANK_INFO</code> or Dodo Payments.</div>`}
       <div class="grid-hero">
         <section class="ds-card hero-card plan-hero" aria-labelledby="cp-h">
           <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>$${p.priceUsd} / month</small></h2>
@@ -741,21 +743,27 @@
           <label class="switch-row"><span><b>Low-balance alert</b><small>Notify me (and send <code>balance.low</code>) below ${idr(b.payg.lowBalance)}.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="lowBalanceAlert" ${b.payg.lowBalanceAlert ? "checked" : ""}></label>
         </section>
       </div>
-      <section class="ds-card" aria-labelledby="tu-h"><div class="card-top"><h2 id="tu-h">Top up balance</h2><span class="meta">Bank transfer · VAT ${b.vatPercent}% added on the invoice</span></div>
+      <section class="ds-card" aria-labelledby="tu-h"><div class="card-top"><h2 id="tu-h">Top up balance</h2><span class="meta">${b.cardEnabled ? "Card, Apple Pay or Google Pay (USD) or bank transfer (IDR)" : `Bank transfer · VAT ${b.vatPercent}% added on the invoice`}</span></div>
         <div class="topups">${b.payg.topups.map((t) => `<div class="topup"><b>${idr(t.amount)}</b><span class="meta">≈ ${num(t.requests)} requests</span><button class="btn btn-ghost btn-sm" data-act="topup" data-amount="${t.amount}">Top up ${idr(t.amount)}</button></div>`).join("")}
           <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in rupiah</label><input id="tu-amt" name="amount" type="number" inputmode="numeric" min="${b.payg.minTopup}" step="1000" placeholder="Rp"><span class="meta">min ${idr(b.payg.minTopup)}</span><button class="btn btn-ghost btn-sm" data-act="topupForm">Top up</button></form></div>
       </section>
       <section class="ds-card" id="plans" aria-labelledby="pl-h"><div class="card-top"><h2 id="pl-h">Plans</h2><span class="meta">Each plan includes a monthly quota; your balance covers anything above it</span></div>
         <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? h.badge("current", "Current plan") : x.id === "free" ? "" : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">${p.id === x.id ? "Renew" : "Choose"}</button>`}</div>
-          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceIdr ? `<p class="meta">${idr(x.priceIdr)} by bank transfer</p>` : ""}
+          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceIdr ? `<p class="meta">${b.cardEnabled ? "Card in USD, or " : ""}${idr(x.priceIdr)} by bank transfer</p>` : ""}
           <ul class="tips small"><li>${num(x.monthly)} requests / month</li><li>${num(x.perMinute)} requests / minute</li><li>${x.logDays}-day log history</li>${x.webhooks ? "<li>Webhooks and IP allowlists</li>" : ""}${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>${num(x.maxKeys)} active API keys</li></ul></div>`).join("")}</div>
       </section>
       <section class="ds-card" aria-labelledby="tx-h"><div class="card-top"><h2 id="tx-h">Transactions</h2>${h.seg("tab", [["all", "All"], ["plan", "Plans"], ["topup", "Top-ups"], ["usage", "Usage"]], tab)}</div>
-        ${rows.length ? h.table(["Order ID", "Date", "Item", "Method", "Subtotal", `VAT ${b.vatPercent}%`, "Total", "Status", ""], rows.map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${c.day(t.date)}</td><td>${esc(t.item)}</td><td>${esc(t.method)}</td><td>${idr(t.subtotal)}</td><td>${t.kind === "usage" ? "–" : idr(t.vat)}</td><td><b>${idr(t.total)}</b></td><td>${statusTag(t.status)}${t.reference ? `<div class="meta">Ref: ${esc(t.reference)}</div>` : ""}</td><td>${t.status === "pending" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="pay" data-id="${esc(t.id)}">Pay</button><button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${esc(t.id)}">Cancel</button></div>` : ""}</td></tr>`)) : h.empty("No transactions yet", "Invoices for plans and top-ups, and pay-as-you-go usage, show up here.")}
+        ${rows.length ? h.table(["Order ID", "Date", "Item", "Method", "Subtotal", `VAT ${b.vatPercent}%`, "Total", "Status", ""], rows.map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${c.day(t.date)}</td><td>${esc(t.item)}</td><td>${esc(t.method)}</td><td>${c.money(t.subtotal, t.currency)}</td><td>${t.kind === "usage" ? "–" : t.currency === "USD" ? `<span class="meta">at checkout</span>` : idr(t.vat)}</td><td><b>${c.money(t.total, t.currency)}</b></td><td>${statusTag(t.status)}${t.reference ? `<div class="meta">Ref: ${esc(t.reference)}</div>` : ""}</td><td>${t.status === "pending" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="pay" data-id="${esc(t.id)}">Pay</button><button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${esc(t.id)}">Cancel</button></div>` : ""}</td></tr>`)) : h.empty("No transactions yet", "Invoices for plans and top-ups, and pay-as-you-go usage, show up here.")}
       </section>`;
       if (want) document.getElementById("plans")?.scrollIntoView({ block: "start" });
     };
+    const goCheckout = async (inv) => {
+      const url = inv.checkoutUrl ?? (await api(`/api/me/invoices/${inv.id}/checkout`, { method: "POST" })).content.checkoutUrl;
+      c.toast("Opening secure checkout…");
+      location.assign(url);
+    };
     const payModal = (inv) =>
+      inv.provider === "dodo" ? goCheckout(inv) :
       c.openModal({
         title: `Pay invoice ${esc(inv.id)}`,
         wide: true,
@@ -774,8 +782,24 @@
           return true;
         },
       });
-    const createInvoice = async (body) => {
+    const chooseMethod = async (body) => {
+      if (!b.cardEnabled) return "bank_transfer";
+      const usd = body.type === "topup" ? Math.max(1, (Math.floor((body.amount * 10) / Math.round(b.payg.priceIdr * 10)) * b.payg.usdPer1k) / 1000).toFixed(2) : null;
+      return c.openModal({
+        title: "How do you want to pay?",
+        body: `<fieldset class="field"><legend class="visually-hidden">Payment method</legend>
+          <label class="radio-row"><input type="radio" name="pay" value="card" checked> <span><b>Card, Apple Pay or Google Pay</b><small>${usd ? `$${usd} USD` : "In USD"}, active right after payment. Processed by Dodo Payments, our merchant of record; local sales tax is added at checkout where it applies.</small></span></label>
+          <label class="radio-row"><input type="radio" name="pay" value="bank_transfer"${b.bankConfigured ? "" : " disabled"}> <span><b>Bank transfer (IDR)</b><small>${b.bankConfigured ? `VAT ${b.vatPercent}% added. Active after we confirm the transfer.` : "Not available right now."}</small></span></label></fieldset>`,
+        submit: "Continue",
+        onSubmit: (form) => form.elements.pay.value,
+      });
+    };
+    const createInvoice = async (body0) => {
+      const method = await chooseMethod(body0);
+      if (!method) return;
+      const body = { ...body0, method };
       const { content: inv } = await api("/api/me/invoices", { method: "POST", body });
+      if (inv.checkoutUrl) return goCheckout(inv);
       await load();
       await payModal(inv);
       await load();
@@ -808,7 +832,7 @@
         const plan = b.plans.find((x) => x.id === el.dataset.plan);
         const months = await c.openModal({
           title: `${c.cap(plan.id)} plan`,
-          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid} (${idr(plan.priceIdr * paid)}) + VAT</option>`; }).join("")}</select></label><p class="hint">You'll get an invoice to pay by bank transfer. The plan starts when the payment is confirmed${b.plan.id === plan.id ? " and the time is added to your current period" : ""}.</p>`,
+          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid} (${idr(plan.priceIdr * paid)})</option>`; }).join("")}</select></label><p class="hint">${b.cardEnabled ? "Pay by card for instant activation, or by bank transfer." : "You'll get an invoice to pay by bank transfer."} The plan starts when the payment is confirmed${b.plan.id === plan.id ? " and the time is added to your current period" : ""}.</p>`,
           submit: "Create invoice",
           onSubmit: (form) => Number(form.months.value),
         });
@@ -834,6 +858,18 @@
       }
     });
     c.root.innerHTML = h.skeleton(4);
+    if (returned) {
+      // Back from Dodo checkout: ask the server to check the payment now (the webhook may still be on its way).
+      history.replaceState(null, "", location.pathname);
+      if (returned.result === "done") {
+        try {
+          const { content: inv } = await api(`/api/me/invoices/${encodeURIComponent(returned.id)}/sync`, { method: "POST" });
+          c.toast(inv.status === "paid" ? (inv.type === "topup" ? "Payment received. Your balance is topped up" : "Payment received. Your plan is active") : "Payment is being processed. This page updates once it's confirmed");
+        } catch (err) {
+          c.toast(err.message);
+        }
+      } else c.toast("Checkout cancelled. The invoice stays open if you want to pay later");
+    }
     await load();
   };
 

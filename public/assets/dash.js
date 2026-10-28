@@ -15,6 +15,8 @@
     return v >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + "M" : v >= 1e4 ? (v / 1e3).toFixed(v >= 1e5 ? 0 : 1) + "K" : num(v);
   };
   const idr = (n) => "Rp" + Math.round(Number(n ?? 0)).toLocaleString("id-ID");
+  // Invoice amounts: card invoices (Dodo Payments) are in US cents, bank transfer invoices in rupiah.
+  const money = (n, currency) => (currency === "USD" ? "$" + (Number(n ?? 0) / 100).toFixed(2) : idr(n));
   const pct = (v) => (v === null || v === undefined ? "–" : `${Number.isInteger(Number(v)) ? Number(v) : Number(v).toFixed(1)}%`);
   const ms = (v) => (v === null || v === undefined ? "–" : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`);
   const ago = (iso) => {
@@ -419,7 +421,7 @@
   }
 
   // ---- router --------------------------------------------------------------------------------
-  const ctx = { D, root, actionsBar, state, h, num, compact, idr, pct, ms, ago, dt, day, time, cap, plural, tz, lineChart, heatmap, hbars, spark, openModal, confirmModal, upgradePrompt, rangeControl, keyControl, rangeAllowed, api, esc, toast, $, $$, store };
+  const ctx = { D, root, actionsBar, state, h, num, compact, idr, money, pct, ms, ago, dt, day, time, cap, plural, tz, lineChart, heatmap, hbars, spark, openModal, confirmModal, upgradePrompt, rangeControl, keyControl, rangeAllowed, api, esc, toast, $, $$, store };
   const setHandlers = (map) => {
     handlers = map;
   };

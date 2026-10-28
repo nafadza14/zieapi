@@ -1,0 +1,44 @@
+// Turns a paid invoice into what the customer bought (plan time or pay-as-you-go balance), once.
+// Used by the admin "approve" action (bank transfer) and by Dodo Payments (webhook or return-page check).
+
+export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
+  return async function fulfill(inv, opts = {}) {
+    // One winner per invoice even if the webhook and the return page arrive at the same moment.
+    const lockKey = `lock:fulfill:${inv.id}`;
+    if ((await kv.incrby(lockKey, 1, 3600)) !== 1) return { invoice: await repo.getItem("invoice", inv.id), already: true };
+    try {
+      return await apply(inv, opts);
+    } catch (e) {
+      await kv.del(lockKey).catch(() => {}); // let the next webhook retry or admin action try again
+      throw e;
+    }
+  };
+
+  async function apply(inv, { via, paymentId = null }) {
+    const fresh = await repo.getItem("invoice", inv.id);
+    if (!fresh || fresh.status === "paid") return { invoice: fresh, already: true };
+    const u = await repo.getUser(inv.userId);
+    if (!u) throw Object.assign(new Error("Customer account no longer exists"), { status: 404 });
+    // Amounts in rupiah for balance and commission (card invoices are in USD and carry the rupiah equivalent).
+    const subtotalIdr = inv.currency === "USD" ? inv.subtotalIdr ?? 0 : inv.subtotal ?? inv.base;
+    if (inv.type === "topup") {
+      const creditIdr = inv.currency === "USD" ? inv.creditIdr ?? subtotalIdr : subtotalIdr;
+      await repo.creditBalance(u.id, creditIdr * 10);
+      notify(u.id, "balance", "Balance topped up", `Rp${creditIdr.toLocaleString("id-ID")} was added to your pay-as-you-go balance.`);
+    } else {
+      const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
+      const until = new Date(base + inv.months * 30 * 86400000).toISOString();
+      await repo.updateUser(u.id, { plan: inv.plan, planExpiresAt: until });
+      webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
+      notify(u.id, null, `${inv.plan[0].toUpperCase() + inv.plan.slice(1)} plan is active`, `Active until ${until.slice(0, 10)}.`);
+    }
+    if (u.referredBy && affPercent > 0 && subtotalIdr > 0) {
+      const tenths = Math.round((subtotalIdr * affPercent) / 10);
+      await repo.addAffEarning(u.referredBy, { invoiceId: inv.id, amountTenths: tenths, from: u.id });
+      notify(u.referredBy, "affiliate", "Affiliate commission earned", `Rp${Math.floor(tenths / 10).toLocaleString("id-ID")} from a referral's payment.`);
+    }
+    webhooks.emit(u.id, "invoice.paid", { invoice: inv.id, type: inv.type ?? "plan", amount: inv.amount, currency: inv.currency ?? "IDR" });
+    const invoice = await repo.patchItem("invoice", inv.id, { status: "paid", paidAt: new Date().toISOString(), paidVia: via, ...(paymentId ? { paymentId } : {}) });
+    return { invoice, already: false };
+  }
+}

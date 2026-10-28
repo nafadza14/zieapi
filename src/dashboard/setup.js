@@ -69,6 +69,18 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
   else add("github", "GitHub sign-in", "warn", "Not configured, so the login page shows no GitHub button.", ghFix);
 
   add("bank", "Bank transfer details", bank ? "ok" : "warn", bank ? "Shown on every invoice: " + bank : "Customers can create invoices but see no account to pay into.", bank ? null : 'Set APIZIE_BANK_INFO, for example "BCA 1234567890 a.n. PT Zieads".');
+  {
+    // Card payments through Dodo Payments (merchant of record).
+    const key = env.DODO_PAYMENTS_API_KEY ?? env.DODO_API_KEY;
+    const product = env.DODO_PAYMENTS_PRODUCT_ID;
+    const hook = env.DODO_PAYMENTS_WEBHOOK_SECRET ?? env.DODO_PAYMENTS_WEBHOOK_KEY ?? env.DODO_WEBHOOK_SECRET;
+    const mode = /^test/i.test(env.DODO_PAYMENTS_ENVIRONMENT ?? "") ? "test mode" : "live mode";
+    const how = `In Dodo Payments: create one "Pay What You Want" product in USD (minimum $1) and set its id as DODO_PAYMENTS_PRODUCT_ID; create an API key (DODO_PAYMENTS_API_KEY); add the webhook ${publicUrl}/webhooks/dodo for payment.succeeded, payment.failed and payment.cancelled and set its signing secret as DODO_PAYMENTS_WEBHOOK_SECRET. Use DODO_PAYMENTS_ENVIRONMENT=test_mode with a test key to try it first.`;
+    if (!key && !product) add("card", "Card payments (Dodo Payments)", "warn", "Not configured, so customers can only pay by bank transfer.", how);
+    else if (!key || !product) add("card", "Card payments (Dodo Payments)", "fail", `${key ? "DODO_PAYMENTS_PRODUCT_ID" : "DODO_PAYMENTS_API_KEY"} is missing, so card checkout is off.`, how);
+    else if (!hook) add("card", "Card payments (Dodo Payments)", "warn", `Checkout works (${mode}), but without the webhook secret a payment is only picked up when the customer returns to the billing page.`, how);
+    else add("card", "Card payments (Dodo Payments)", "ok", `Card checkout is on (${mode}). Webhook: ${publicUrl}/webhooks/dodo`);
+  }
   add("email", "Email notifications", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "ok" : "warn", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "Notifications are also emailed through Resend." : "Notifications appear in the dashboard only.", env.RESEND_API_KEY ? "Set APIZIE_EMAIL_FROM too." : "Optional: set RESEND_API_KEY and APIZIE_EMAIL_FROM.");
   add("support", "Support contacts", env.ZIE_SUPPORT_EMAIL ? "ok" : "warn", env.ZIE_SUPPORT_EMAIL ? `Support email: ${env.ZIE_SUPPORT_EMAIL}` : "The Support page only offers the report form.", env.ZIE_SUPPORT_EMAIL ? null : "Optional: set APIZIE_SUPPORT_EMAIL and APIZIE_DISCORD_URL.");
 

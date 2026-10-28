@@ -11,7 +11,7 @@ export const COMPANY = {
   court: "Sleman District Court (Pengadilan Negeri Sleman)",
 };
 
-export const LEGAL_UPDATED = "27 October 2026";
+export const LEGAL_UPDATED = "29 October 2026";
 
 const C = COMPANY;
 const contactBlock = [
@@ -82,11 +82,12 @@ export const LEGAL_DOCS = {
         ]],
       ] },
       { h: "9. Prices, payment and taxes", blocks: [
-        "List prices are shown in US dollars. At present, payment is made by bank transfer in Indonesian Rupiah, using the amount shown on the invoice we issue in your dashboard. Each invoice includes a small unique code so we can match your transfer.",
+        "List prices are shown in US dollars. You can pay by card, Apple Pay or Google Pay in US dollars, or by bank transfer in Indonesian Rupiah using the amount shown on the invoice we issue in your dashboard (each bank transfer invoice includes a small unique code so we can match your transfer).",
         ["ul", [
-          "Value added tax (PPN) and other applicable taxes are added where required and shown on the invoice.",
+          "Card payments are processed by Dodo Payments, which acts as the merchant of record for those sales and adds any sales tax or VAT that applies where you are at checkout. Its own terms apply to the payment itself; we never receive your full card details.",
+          "For bank transfers, value added tax (PPN) and other applicable taxes are added where required and shown on the invoice.",
           "A paid Plan starts once we have verified your payment. Monthly plans run for one month and yearly plans for twelve months. Yearly plans are priced at ten months.",
-          "Plans do not renew automatically while payment is by bank transfer. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan.",
+          "Plans do not renew automatically, whichever way you pay. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan.",
           "Pay-as-you-go top-ups are prepaid and stay on your Account while it is active.",
           "We may change prices with at least 30 days' notice. Changes never affect a period you have already paid for.",
         ]],
@@ -174,6 +175,7 @@ export const LEGAL_DOCS = {
         ["ul", [
           "**Vercel** (application hosting and compute)",
           "**Supabase** (database and sign-in)",
+          "**Dodo Payments** (card payments, as merchant of record: it receives your email, name and payment details for card checkouts)",
           "**Resend** (transactional email, when email notifications are enabled)",
           "**Google, GitHub and Discord** (only if you choose to sign in with them)",
         ]],

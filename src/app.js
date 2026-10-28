@@ -37,6 +37,8 @@ import { scrapersPage, categoryPage, scraperPage } from "./web/pages/catalog.js"
 import { pricingPage } from "./web/pages/pricing.js";
 import { docsPage, DOC_SLUGS } from "./web/pages/docs.js";
 import { createAdminAnalytics } from "./dashboard/admin-analytics.js";
+import { createFulfiller } from "./billing/fulfill.js";
+import { dodoConfig, createDodo, verifyDodoWebhook, DodoError } from "./billing/dodo.js";
 import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage, DASH_SLUGS, ADMIN_SLUGS } from "./web/pages/misc.js";
 
 export const VERSION = "2.0.0";
@@ -148,7 +150,51 @@ export function createApp(opts = {}) {
   const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), keyId: null, keyPreview: "dashboard", keyName: "Dashboard", ip: clientIp(req), user, source });
   const isAdmin = (u) => u?.role === "admin" || (u?.email && adminEmails.has(u.email));
   const adminAnalytics = createAdminAnalytics({ repo, kv, catalog, storage, version: VERSION, env });
-  const accountApi = createAccountApi({ repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, bankConfigured, vatPercent, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
+  const fulfill = createFulfiller({ repo, kv, webhooks, notify, affPercent });
+  const dodoCfg = dodoConfig(env);
+  const dodo = createDodo(dodoCfg, opts.dodoFetch ?? globalThis.fetch);
+  /**
+   * Dodo Payments webhook (Standard Webhooks signature). Only payment.succeeded changes anything: it must name one of
+   * our card invoices, be in USD and cover the invoice amount. Replays are ignored by webhook-id.
+   */
+  async function dodoWebhook(req, body) {
+    const v = verifyDodoWebhook({ secret: dodoCfg.webhookSecret, headers: req.headers, rawBody: req.zieRawBody });
+    if (!v.ok) {
+      logger?.warn?.(`dodo webhook rejected: ${v.reason}`);
+      return json(401, errBody("Invalid webhook signature"));
+    }
+    const seenKey = `dodo:wh:${v.id}`;
+    if (await kv.get(seenKey)) return json(200, okContent({ duplicate: true }));
+    const out = await handleDodoEvent(body);
+    await kv.set(seenKey, "1", { ex: 7 * 86400 }); // only after it was handled, so a failed attempt is retried by Dodo
+    return out;
+  }
+
+  async function handleDodoEvent(body) {
+    const type = String(body?.type ?? "");
+    const data = body?.data ?? {};
+    const invoiceId = data?.metadata?.invoice_id;
+    if (!invoiceId) return json(200, okContent({ ignored: type }));
+    const inv = await repo.getItem("invoice", String(invoiceId));
+    if (!inv || inv.provider !== "dodo") return json(200, okContent({ ignored: "unknown invoice" }));
+    if (type === "payment.succeeded") {
+      const amount = Number(data.total_amount ?? data.settlement_amount ?? 0);
+      if (String(data.currency ?? "").toUpperCase() !== "USD" || amount < inv.amount || (data.metadata?.user_id && data.metadata.user_id !== inv.userId)) {
+        logger?.warn?.(`dodo payment ${data.payment_id} does not match invoice ${inv.id}`);
+        await repo.patchItem("invoice", inv.id, { lastPaymentStatus: "mismatch", lastPaymentId: data.payment_id ?? null });
+        return json(200, okContent({ ignored: "amount or currency mismatch" }));
+      }
+      const r = await fulfill(inv, { via: "dodo", paymentId: data.payment_id ?? null });
+      return json(200, okContent({ invoice: inv.id, status: r.invoice?.status, already: r.already }));
+    }
+    if (type === "payment.failed" || type === "payment.cancelled") {
+      if (inv.status === "pending") await repo.patchItem("invoice", inv.id, { lastPaymentStatus: type.split(".")[1], lastPaymentId: data.payment_id ?? null });
+      return json(200, okContent({ invoice: inv.id, noted: type }));
+    }
+    return json(200, okContent({ ignored: type }));
+  }
+
+  const accountApi = createAccountApi({ dodo, fulfill, kv, repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, bankConfigured, vatPercent, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
   const requireUser = (ctx) => {
     if (!ctx.user) throw E.unauthorized("Sign in required");
     return ctx.user;
@@ -362,6 +408,9 @@ export function createApp(opts = {}) {
       return json(200, okContent({ ok: true }));
     }
 
+    // ----- payment provider webhooks ---------------------------------------------------
+    if (p === "/webhooks/dodo" && m === "POST") return dodoWebhook(req, body);
+
     // ----- MCP -------------------------------------------------------------------
     if (p === "/mcp" && (m === "POST" || /text\/event-stream/.test(req.headers.accept ?? "") || m === "DELETE")) {
       const r = await mcp(req, body);
@@ -484,26 +533,8 @@ export function createApp(opts = {}) {
         notify(inv.userId, null, `Invoice ${inv.id} was rejected`, note || "Contact support if you already paid.");
         return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "rejected", note })));
       }
-      const u = await repo.getUser(inv.userId);
-      if (!u) throw E.notFound("Customer account no longer exists");
-      const subtotal = inv.subtotal ?? inv.base;
-      if (inv.type === "topup") {
-        await repo.creditBalance(u.id, subtotal * 10);
-        notify(u.id, "balance", "Balance topped up", `Rp${subtotal.toLocaleString("id-ID")} was added to your pay-as-you-go balance.`);
-      } else {
-        const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
-        const until = new Date(base + inv.months * 30 * 86400000).toISOString();
-        await repo.updateUser(u.id, { plan: inv.plan, planExpiresAt: until });
-        webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
-        notify(u.id, null, `${inv.plan[0].toUpperCase() + inv.plan.slice(1)} plan is active`, `Active until ${until.slice(0, 10)}.`);
-      }
-      if (u.referredBy && affPercent > 0) {
-        const tenths = Math.round((subtotal * affPercent) / 10);
-        await repo.addAffEarning(u.referredBy, { invoiceId: inv.id, amountTenths: tenths, from: u.id });
-        notify(u.referredBy, "affiliate", "Affiliate commission earned", `Rp${Math.floor(tenths / 10).toLocaleString("id-ID")} from a referral's payment.`);
-      }
-      webhooks.emit(u.id, "invoice.paid", { invoice: inv.id, type: inv.type ?? "plan", amount: inv.amount });
-      return json(200, okContent(await repo.patchItem("invoice", inv.id, { status: "paid", paidAt: new Date().toISOString() })));
+      if (!(await repo.getUser(inv.userId))) throw E.notFound("Customer account no longer exists");
+      return json(200, okContent((await fulfill(inv, { via: "admin" })).invoice));
     }
     if (p === "/api/admin/payouts" && m === "GET") return json(200, okContent(await repo.listItems("payout")));
     if ((mm = /^\/api\/admin\/payouts\/([^/]+)\/(paid|reject)$/.exec(p)) && m === "POST") {
@@ -807,6 +838,7 @@ async function readBody(req) {
       return undefined;
     }
   }
+  req.zieRawBody = raw; // payment webhooks verify their signature over the exact bytes
   const type = String(req.headers["content-type"] ?? "");
   if (type.includes("application/x-www-form-urlencoded")) return Object.fromEntries(new URLSearchParams(raw));
   try {

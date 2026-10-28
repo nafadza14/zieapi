@@ -93,13 +93,14 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
           return { id, requests, email: u?.email ?? null, name: u?.name ?? (id.startsWith("key_") ? "Server key" : "Deleted account"), plan: u ? repo.effectivePlan(u) : null, usedShare: cur.total ? requests / cur.total : 0 };
         });
 
-      // revenue (invoices are in IDR, VAT included)
+      // revenue in IDR: bank invoices with VAT; card invoices (USD, via Dodo Payments) at their rupiah list price
+      const idrOf = (i) => (i.currency === "USD" ? i.subtotalIdr ?? 0 : i.amount ?? 0);
       const paid = invoices.filter((i) => i.status === "paid");
       const paidIn = (a, b) => paid.filter((i) => inRange(i.paidAt, a, b));
-      const revenue = paidIn(r.from, r.to).reduce((n, i) => n + (i.amount ?? 0), 0);
-      const prevRevenue = paidIn(prevFrom, r.from).reduce((n, i) => n + (i.amount ?? 0), 0);
+      const revenue = paidIn(r.from, r.to).reduce((n, i) => n + idrOf(i), 0);
+      const prevRevenue = paidIn(prevFrom, r.from).reduce((n, i) => n + idrOf(i), 0);
       const revSeries = daySeries(r.from, r.to, r.tz);
-      for (const i of paidIn(r.from, r.to)) { const k = dayKeyTz(Date.parse(i.paidAt), r.tz); if (revSeries.has(k)) revSeries.set(k, revSeries.get(k) + (i.amount ?? 0)); }
+      for (const i of paidIn(r.from, r.to)) { const k = dayKeyTz(Date.parse(i.paidAt), r.tz); if (revSeries.has(k)) revSeries.set(k, revSeries.get(k) + idrOf(i)); }
 
       // source health: sources with traffic, worst first
       const sources = Object.entries(x.proj)
@@ -108,7 +109,7 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
         .sort((a, b) => b.serverErrors - a.serverErrors || b.errorRate - a.errorRate || b.requests - a.requests);
       const failing = sources.filter((s) => s.requests >= 5 && s.serverErrors / s.requests >= 0.2);
 
-      const pick = (i) => ({ id: i.id, email: i.email ?? byId.get(i.userId)?.email ?? null, type: i.type ?? "plan", plan: i.plan ?? null, months: i.months ?? null, amount: i.amount, status: i.status, createdAt: i.createdAt, paidAt: i.paidAt ?? null });
+      const pick = (i) => ({ id: i.id, email: i.email ?? byId.get(i.userId)?.email ?? null, type: i.type ?? "plan", plan: i.plan ?? null, months: i.months ?? null, amount: i.amount, currency: i.currency ?? "IDR", method: i.method ?? "bank_transfer", status: i.status, createdAt: i.createdAt, paidAt: i.paidAt ?? null });
       const delta = (a, b) => (b ? (a - b) / b : null);
 
       return {

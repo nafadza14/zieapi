@@ -1,7 +1,7 @@
 name: apizie
 version: 1.0.0
 description: Unified MCP server giving AI agents direct access to 600+ live public data sources, financial feeds, PubMed academic research, and news with one key.
-url: https://zieapi.vercel.app/mcp
+url: https://apizie.tech/mcp
 type: http
 tools:
   - name: search_scrapers

@@ -50,7 +50,7 @@ export function createApp(opts = {}) {
   if (!opts.env) applyEnvAliases();
   const env = withEnvAliases(opts.env ?? process.env);
   const vercelHost = env.VERCEL_PROJECT_PRODUCTION_URL ?? env.VERCEL_URL;
-  // Only the origin is used: a value like "https://x.vercel.app/auth/supabase/callback" would otherwise double every path.
+  // Only the origin is used: a value like "https://apizie.tech/auth/supabase/callback" would otherwise double every path.
   const originOf = (v) => { try { return new URL(v).origin; } catch { return String(v).replace(/\/+$/, ""); } };
   const apiUrl = originOf(opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`));
   const publicUrl = originOf(opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl);

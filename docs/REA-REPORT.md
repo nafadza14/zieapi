@@ -281,7 +281,7 @@ Riset kompetitor dan hasil lengkap ada di [`COMPETITORS.md`](COMPETITORS.md).
 - Nama produk di semua UI, dokumentasi, OpenAPI, llms.txt, MCP (`serverInfo.name: "apizie"`, `title: "Apizie"`), OAuth (`resource_name: "Apizie MCP"`) dan aset brand.
 - Logo: simbol `//.` tetap; wordmark kini **Apizie** (Inter Display SemiBold, titik aksen di huruf "i" terakhir). Generator: `brand/logo/*.svg`, PNG di `brand/png/`.
 - Teknis: fungsi Vercel `api/apizie.js`, tabel Supabase `apizie_kv`, prefix API key baru `apz_` (kunci `zie_` lama tetap valid), env `APIZIE_*` (nama lama `ZIE_*` tetap dibaca), header webhook `X-Apizie-Signature`.
-- Repo GitHub tetap `nafadza14/zieapi` sampai di-rename; domain default `apizie.vercel.app`.
+- Repo GitHub tetap `nafadza14/zieapi` sampai di-rename; domain default `apizie.tech`.
 
 # Iterasi 6: Hero, favicon, metadata, SEO dan GEO (26 Okt 2026)
 Bukti E42-E45; detail dan sumber di [`SEO-GEO.md`](SEO-GEO.md). Hero baru ("One API key for 1,600+ data sources"), logo brand live berwarna asli, favicon yang terbaca di tab terang/gelap, metadata lengkap per halaman, JSON-LD (WebAPI per API), twin Markdown, robots.txt untuk crawler AI, sitemap dengan lastmod. Diverifikasi dengan `npm test` (153 lulus) dan tangkapan layar desktop/mobile.
@@ -290,7 +290,7 @@ Bukti E42-E45; detail dan sumber di [`SEO-GEO.md`](SEO-GEO.md). Hero baru ("One 
 
 ## A. Observations baru
 - O-70: 9 tangkapan layar dashboard zapi.ink dari pemilik (Dashboard, Logs, API keys, Bulk, Webhooks, Billing, Affiliate, Settings, Support). Struktur: sidebar 3 grup (Overview, API, Account) dengan badge jumlah key, kunci plan (Ultra/Pro), pencarian ⌘K dan meter kuota tersegmentasi; header per halaman dengan kontrol rentang 24H/7D/30D (Pro)/90D (Ultra) dan filter "All API keys".
-- O-71: QA pemilik di `https://zieapi.vercel.app` gagal. `GET /healthz` menjawab `{"storage":"MemoryKV","uptimeSec":1}`: tidak ada database, jadi akun, sesi, key dan log hilang di antara instance serverless. Ini akar masalah utama, bukan bug UI.
+- O-71: QA pemilik di `https://apizie.tech` gagal. `GET /healthz` menjawab `{"storage":"MemoryKV","uptimeSec":1}`: tidak ada database, jadi akun, sesi, key dan log hilang di antara instance serverless. Ini akar masalah utama, bukan bug UI.
 
 ## B. Inferensi
 - I-40: Semua angka di dashboard zapi diturunkan dari agregat per jam (heatmap 7×24, p95, error per status, endpoint teratas). Apizie menyimpannya sebagai hash per jam `ah:<owner>:<jam UTC>` dengan salinan per key, sehingga filter key dan zona waktu penonton tetap tepat untuk 24 jam sampai 90 hari.

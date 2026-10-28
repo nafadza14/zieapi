@@ -60,7 +60,7 @@ To run the tests: `npm test` (138 tests).
 
    | Name | Value |
    |---|---|
-   | `APIZIE_PUBLIC_URL` | `https://your-project.vercel.app` (or your domain) |
+   | `APIZIE_PUBLIC_URL` | `https://apizie.tech` (your domain, no path) |
    | `APIZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
    | `APIZIE_SESSION_SECRET` | any long random string |
    | `APIZIE_BANK_INFO` | bank account text shown on invoices |

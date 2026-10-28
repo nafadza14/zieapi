@@ -98,12 +98,12 @@ test("no GitHub button when nothing is configured; setup explains how", async ()
   } finally {
     await close();
   }
-  const base = { kv: null, storage: { backend: "SupabaseKV" }, publicUrl: "https://apizie.vercel.app", stableSecret: "x", bankConfigured: true };
+  const base = { kv: null, storage: { backend: "SupabaseKV" }, publicUrl: "https://apizie.tech", stableSecret: "x", bankConfigured: true };
   const kv = { batch: async () => ["PONG"] };
   const r1 = await setupReport({ ...base, kv, env: {}, sbAuth: null, fetchImpl: fetch });
   const gh1 = r1.checks.find((c) => c.id === "github");
   assert.equal(gh1.status, "warn");
-  assert.match(gh1.fix, /https:\/\/apizie\.vercel\.app\/auth\/github\/callback/);
+  assert.match(gh1.fix, /https:\/\/apizie\.tech\/auth\/github\/callback/);
   const r2 = await setupReport({ ...base, kv, env: { GITHUB_CLIENT_ID: "a", GITHUB_CLIENT_SECRET: "b" }, sbAuth: null, fetchImpl: fetch });
   assert.equal(r2.checks.find((c) => c.id === "github").status, "ok");
   const sbFetch = async () => Response.json({ external: { google: true, github: false } });

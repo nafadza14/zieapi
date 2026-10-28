@@ -11,7 +11,7 @@ export const SHOWCASE_EXAMPLES = [
     who: "Newsrooms, community groups, local government",
     uses: [["indonesia:bmkg", "gempa-terkini"]],
     lang: "Node.js",
-    code: `const API = "https://apizie.vercel.app/v1";
+    code: `const API = "https://apizie.tech/v1";
 const headers = { "x-api-key": process.env.APIZIE_KEY };
 let lastSeen = null;
 
@@ -32,7 +32,7 @@ setInterval(async () => {
     who: "Finance blogs, trading communities, portfolio apps",
     uses: [["finance:coingecko", "simple-price"], ["finance:binance", "ticker"]],
     lang: "JavaScript",
-    code: `const url = "https://apizie.vercel.app/v1/finance:coingecko/simple-price"
+    code: `const url = "https://apizie.tech/v1/finance:coingecko/simple-price"
   + "?ids=bitcoin,ethereum,solana&vsCurrencies=idr&include24hChange=true";
 
 async function refresh() {
@@ -57,7 +57,7 @@ setInterval(refresh, 30_000);
     uses: [["research:pubmed", "annotation-search"], ["search-tools:arxiv", "search"], ["search-tools:wikipedia", "summary"]],
     lang: "Terminal + prompt",
     code: `# 1. Give your agent the key (Claude Code shown; Claude.ai and ChatGPT use OAuth)
-claude mcp add --transport http apizie https://apizie.vercel.app/mcp \\
+claude mcp add --transport http apizie https://apizie.tech/mcp \\
   --header "x-api-key: $APIZIE_KEY"
 
 # 2. Ask in plain language
@@ -75,7 +75,7 @@ claude mcp add --transport http apizie https://apizie.vercel.app/mcp \\
     lang: "Python",
     code: `import os, requests
 
-API = "https://apizie.vercel.app/v1"
+API = "https://apizie.tech/v1"
 H = {"x-api-key": os.environ["APIZIE_KEY"]}
 
 today = requests.get(f"{API}/indonesia:sholat-kemenag/jadwal-today",
@@ -94,7 +94,7 @@ if day["isDayOff"]:
     who: "Founders, PR and comms teams, investors",
     uses: [["news:google-news", "feed"], ["news:cnn-indonesia", "latest"], ["news:guardian", "feed"]],
     lang: "Node.js (cron)",
-    code: `const API = "https://apizie.vercel.app/v1";
+    code: `const API = "https://apizie.tech/v1";
 const get = (path) => fetch(API + path, { headers: { "x-api-key": process.env.APIZIE_KEY } })
   .then((r) => r.json()).then((r) => r.data);
 

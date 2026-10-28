@@ -16,7 +16,7 @@ Setup in Cursor (.cursor/mcp.json):
 {
   "mcpServers": {
     "apizie": {
-      "url": "https://zieapi.vercel.app/mcp",
+      "url": "https://apizie.tech/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_API_KEY"
       }
@@ -35,8 +35,8 @@ Failed upstream requests (5xx) are automatically refunded from quota.
 Free tier includes 1000 requests per month with no credit card required.
 Would love feedback on which endpoints you want added next.
 
-Live endpoint: https://zieapi.vercel.app/mcp
-Full catalog: https://zieapi.vercel.app/scrapers
+Live endpoint: https://apizie.tech/mcp
+Full catalog: https://apizie.tech/scrapers
 
 ---
 
@@ -48,7 +48,7 @@ Connecting Claude Desktop to 600+ live data sources using Streamable HTTP MCP
 Isi Postingan:
 If you use Claude Desktop or Claude Code, here is a clean way to give Claude real world data capabilities without writing individual scrapers or running local Python servers.
 
-Apizie provides a native Streamable HTTP MCP server at https://zieapi.vercel.app/mcp
+Apizie provides a native Streamable HTTP MCP server at https://apizie.tech/mcp
 
 Configuration for claude_desktop_config.json:
 {
@@ -58,7 +58,7 @@ Configuration for claude_desktop_config.json:
       "args": [
         "y",
         "mcp remote",
-        "https://zieapi.vercel.app/mcp",
+        "https://apizie.tech/mcp",
         "header",
         "Authorization:Bearer YOUR_API_KEY"
       ]
@@ -67,7 +67,7 @@ Configuration for claude_desktop_config.json:
 }
 
 Alternatively, Claude.ai web users can use the one click OAuth connector:
-Settings -> Connectors -> Add Custom Connector -> Enter https://zieapi.vercel.app/mcp
+Settings -> Connectors -> Add Custom Connector -> Enter https://apizie.tech/mcp
 
 Key capabilities available out of the box:
 • Academic research via PubMed (titles, abstracts, DOIs)
@@ -87,7 +87,7 @@ Show HN: Apizie (YC W26 hopeful) – One MCP server and API key for 600+ live da
 Isi Postingan:
 Hi HN,
 
-I built Apizie (https://zieapi.vercel.app) to solve API integration fatigue for developers and AI agents.
+I built Apizie (https://apizie.tech) to solve API integration fatigue for developers and AI agents.
 
 The Problem:
 Every external data source requires separate authentication, custom response parsing, unique rate limits, and individual payment methods. For developers building autonomous agents with Cursor, Claude, or LangChain, this friction slows down development significantly.
@@ -102,8 +102,8 @@ Architecture highlights:
 4. Fair billing: server side errors (5xx) are refunded automatically
 5. Free tier: 1000 requests per month, no card required
 
-Catalog and documentation: https://zieapi.vercel.app
-MCP endpoint: https://zieapi.vercel.app/mcp
+Catalog and documentation: https://apizie.tech
+MCP endpoint: https://apizie.tech/mcp
 
 I would love your feedback on the schema design and suggestions for additional datasets.
 
@@ -114,14 +114,14 @@ I would love your feedback on the schema design and suggestions for additional d
 Tweet 1:
 Building AI agents with Cursor or Claude? 
 Instead of managing 30 API keys for news, finance, and academic data, you can connect to 600+ live endpoints with a single MCP server.
-Introducing Apizie (https://zieapi.vercel.app/mcp)
+Introducing Apizie (https://apizie.tech/mcp)
 
 Tweet 2:
 Add this to your .cursor/mcp.json:
 {
   "mcpServers": {
     "apizie": {
-      "url": "https://zieapi.vercel.app/mcp",
+      "url": "https://apizie.tech/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_API_KEY"
       }
@@ -137,4 +137,4 @@ Why developers are using it:
 • Auto refund on 5xx upstream failures
 • 1000 free requests per month
 
-Try it free: https://zieapi.vercel.app
+Try it free: https://apizie.tech

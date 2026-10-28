@@ -30,7 +30,7 @@ Buat tiga produk subscription di dashboard Lemon Squeezy (lemonsqueezy.com):
 
 ## 3. Konfigurasi Webhook
 URL Webhook di Apizie:
-`https://zieapi.vercel.app/api/webhooks/lemonsqueezy`
+`https://apizie.tech/api/webhooks/lemonsqueezy`
 
 Event yang dipantau:
 • `subscription_created`: Mengubah status user.plan menjadi 'pro' atau 'ultra' serta memperbarui user.planExpiresAt

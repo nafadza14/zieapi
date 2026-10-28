@@ -41,7 +41,7 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
   let pubPath = "";
   try { pubPath = pub ? new URL(pub).pathname.replace(/\/+$/, "") : ""; } catch {}
   if (pubPath) add("url-path", "Public URL has a path", "warn", `APIZIE_PUBLIC_URL is ${pub}; only the origin is used (${publicUrl}).`, `Set APIZIE_PUBLIC_URL to just the domain, for example ${publicUrl}, and redeploy.`);
-  add("url", "Public URL", https ? "ok" : "warn", pub ? `APIZIE_PUBLIC_URL is ${pub}.${https ? "" : " Production should use https."}` : `Not set; using ${publicUrl}. OAuth callbacks, sitemap and canonical links use this.`, https ? null : "Set APIZIE_PUBLIC_URL to your final https domain, for example https://apizie.vercel.app.");
+  add("url", "Public URL", https ? "ok" : "warn", pub ? `APIZIE_PUBLIC_URL is ${pub}.${https ? "" : " Production should use https."}` : `Not set; using ${publicUrl}. OAuth callbacks, sitemap and canonical links use this.`, https ? null : "Set APIZIE_PUBLIC_URL to your final https domain, for example https://apizie.tech.");
 
   add("admins", "Admin accounts", env.ZIE_ADMIN_EMAILS ? "ok" : "warn", env.ZIE_ADMIN_EMAILS ? `Admins: ${env.ZIE_ADMIN_EMAILS}` : "No admin emails configured, so nobody can approve invoices.", env.ZIE_ADMIN_EMAILS ? null : "Set APIZIE_ADMIN_EMAILS to your email.");
 

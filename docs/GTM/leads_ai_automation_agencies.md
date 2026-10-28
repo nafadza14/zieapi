@@ -2,7 +2,7 @@
 
 Dokumen ini memuat daftar terverifikasi 12 agensi otomasi AI (AI Automation Agencies / AAA) dan workflow builders global yang aktif menjual solusi agen otonom. Setiap entitas dilengkapi data riil, spesialisasi teknis, serta analisis use case integrasi data produk Apizie (REST API dan MCP Server).
 
-Produk Fokus: Apizie (https://zieapi.vercel.app dan https://zieapi.vercel.app/mcp)
+Produk Fokus: Apizie (https://apizie.tech dan https://apizie.tech/mcp)
 
 ## Daftar Profil Agensi dan Potensi Integrasi Apizie
 

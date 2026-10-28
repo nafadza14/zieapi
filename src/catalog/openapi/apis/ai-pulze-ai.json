@@ -1,0 +1,1 @@
+{"base":"https://api.pulze.ai","auth":{"t":"bearer"},"ops":[["chat-perform-completion-request","POST","/v1/chat/completions","Chat Completions",[],2],["models-get-rank-of-best","POST","/v1/models/rank","Get Rank Of Best Models For Payload",[],2],["logs-get-by-id","GET","/v1/logs/{log_id}","Get Log By Id",[["log_id","string",1,"p"]],0]]}

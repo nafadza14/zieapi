@@ -1,0 +1,1 @@
+{"base":"https://oss-admin.aliyuncs.com","auth":{"t":"acs3"},"ops":[["open-oss-service","POST","/","Activates Object Storage Service (OSS) for an Alibaba Cloud account",[],0,{"h":{"x-acs-action":"OpenOssService","x-acs-version":"2019-04-22"}}],["version","POST","/","version",[],0,{"h":{"x-acs-action":"version","x-acs-version":"2019-04-22"}}]]}

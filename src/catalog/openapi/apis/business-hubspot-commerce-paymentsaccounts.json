@@ -1,0 +1,1 @@
+{"base":"https://api.hubapi.com","auth":{"t":"key","in":"query","name":"hapikey"},"ops":[["get-commerce-payment-accounts-2026-09-status","GET","/commerce/payment-accounts/2026-09/status","Retrieve status and general information about a portal's payments account.",[],0]]}

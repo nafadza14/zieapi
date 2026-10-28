@@ -1,0 +1,1 @@
+{"base":"https://manager.line.biz","auth":{"t":"basic"},"ops":[["attach-module","POST","/module/auth/v1/token","Attach by operation of the module channel provider",[],4]]}

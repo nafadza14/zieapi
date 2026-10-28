@@ -48,28 +48,39 @@ const T = { s: "string" };
 /** Build Apizie endpoints for one directory API (called lazily). */
 export function loadEndpoints(entry, buildEndpoint) {
   const raw = JSON.parse(readFileSync(`${DIR}apis/${entry.f}.json`, "utf8"));
-  const api = { key: entry.k, name: entry.n, base: raw.base, auth: raw.auth ?? entry.authOverride ?? null };
-  return raw.ops.map(([slug, method, path, summary, fields, body]) => {
-    const fl = fields.map(([name, type, req, loc, extra = {}]) => ({
+  const api = { key: entry.k, name: entry.n, base: raw.base, hv: raw.hv, hs: raw.hs, ct: raw.ct, auth: raw.auth ?? entry.authOverride ?? null };
+  // Caller-chosen parts of the server address (tenant, region, resource endpoint) are fields on every endpoint.
+  const hostFields = (raw.hv ?? []).map((h) => ({
+    name: h.n,
+    type: "string",
+    required: h.d === undefined,
+    src: "host",
+    description: h.x || (h.full ? `Your ${entry.n} endpoint URL, for example https://myresource.${raw.hs?.[0] ?? "example.com"}` : `Part of the server address: ${raw.base}`),
+    ...(h.d !== undefined ? { default: h.d } : {}),
+    ...(h.e ? { enum: h.e } : {}),
+  }));
+  return raw.ops.map(([slug, method, path, summary, fields, body, fixed]) => {
+    const fl0 = fields.map(([name, type, req, loc, extra = {}]) => ({
       name,
       type: T[type] ?? type,
       required: !!req,
-      src: { p: "path", q: "query", h: "header" }[loc],
+      src: { p: "path", q: "query", h: "header", j: "json" }[loc],
       ...(extra.x ? { description: extra.x } : {}),
       ...(extra.d !== undefined ? { default: extra.d } : {}),
       ...(extra.e ? { enum: extra.e } : {}),
       ...(extra.ex !== undefined ? { example: extra.ex } : {}),
     }));
+    const fl = [...hostFields.filter((h) => !fl0.some((f) => f.name === h.name)), ...fl0];
     // Some specs use {placeholders} in the path without declaring them (or declare them only at path-item level).
     // Expose them as required path fields so the schema is complete and the operation is callable.
-    for (const m of path.matchAll(/\{([^}]+)\}/g)) {
+    for (const m of path.matchAll(/\{\+?([^}]+)\}/g)) {
       const name = m[1];
       const have = fl.find((f) => f.name === name);
       if (!have) fl.push({ name, type: "string", required: true, src: "path", description: `Path parameter {${name}}` });
       else if (have.src !== "path") { have.src = "path"; have.required = true; }
     }
-    if (body && method !== "GET" && method !== "HEAD" && !fl.some((f) => f.name === "body")) fl.push({ name: "body", type: "object", required: body === 2 || body === 4, src: "body", description: body >= 3 ? "Form fields as a JSON object" : "JSON request body" });
-    const op = { method, path, fields: fl, body };
+    if (body && method !== "GET" && method !== "HEAD" && !fl.some((f) => f.name === "body")) fl.push({ name: "body", type: body >= 5 ? "string" : "object", required: body === 2 || body === 4 || body === 6, src: "body", description: body >= 5 ? "XML request body (string)" : body >= 3 ? "Form fields as a JSON object" : "JSON request body" });
+    const op = { method, path, fields: fl, body, ...(fixed ? { fixed } : {}) };
     return buildEndpoint({
       slug,
       displayName: summary,

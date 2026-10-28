@@ -1,0 +1,1 @@
+{"base":"https://webexapis.com/v1","auth":{"t":"bearer"},"ops":[["read-the-list-of-uc-manager-profiles","GET","/telephony/config/callingProfiles","Read the List of UC Manager Profiles",[["orgId","string",0,"q",{"x":"List manager profiles in this organization.","ex":"Y2lzY29zcGFyazovL3VzL09SR0FOSVpBVElPTi85NmFiYzJhYS0zZGNjLTExZTUtYTE1Mi1mZTM0ODE5Y2RjOWE"}]],0]]}

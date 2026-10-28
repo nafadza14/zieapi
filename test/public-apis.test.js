@@ -5,8 +5,9 @@ import assert from "node:assert/strict";
 import mods1 from "../src/scrapers/live/public-apis.js";
 import mods2 from "../src/scrapers/live/public-apis-2.js";
 import mods3 from "../src/scrapers/live/public-apis-3.js";
+import portals from "../src/scrapers/live/data-portals.js";
 // The RSS toolkit fetches caller URLs (several per call) and has its own tests below.
-const mods = [...mods1, ...mods2, ...mods3.filter((m) => m.slug !== "rss-reader")];
+const mods = [...mods1, ...mods2, ...mods3.filter((m) => m.slug !== "rss-reader"), ...portals];
 
 const sample = (fld) => fld.example ?? fld.default ?? (fld.enum ? fld.enum[0] : fld.type === "integer" || fld.type === "number" ? 1 : "x");
 

@@ -1,0 +1,1 @@
+{"base":"https://api.sendgrid.com","auth":{"t":"bearer"},"ops":[["erase-recipient-email-data","POST","/v3/recipients/erasejob","Erase recipients' email data",[["on-behalf-of","string",0,"h",{"x":"The `on-behalf-of` header allows you to make API calls from a parent account on behalf of the parent's Subusers or customer accounts. You…"}]],2]]}

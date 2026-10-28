@@ -1,0 +1,1 @@
+{"base":"https://api.confluent.cloud","auth":{"t":"basic"},"ops":[["create-terraform-usage-v1-usage","POST","/terraform-usage/v1/usages","Create a Usage",[],1]]}

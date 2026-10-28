@@ -1,1 +1,1 @@
-{"base":"https://gateway.wso2apistore.com/transform/1.0.0","auth":{"t":"bearer"},"ops":[["post-jsontoxml","POST","/jsontoxml","POST /jsontoxml",[],2],["post-xmltojson","POST","/xmltojson","POST /xmltojson",[],0]]}
+{"base":"https://gateway.wso2apistore.com/transform/1.0.0","auth":{"t":"bearer"},"ops":[["post-jsontoxml","POST","/jsontoxml","POST /jsontoxml",[],2],["post-xmltojson","POST","/xmltojson","POST /xmltojson",[],6]]}

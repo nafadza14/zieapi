@@ -1,0 +1,1 @@
+{"base":"https://api.sendgrid.com","auth":{"t":"bearer"},"ops":[["list-scope","GET","/v3/scopes","Retrieve a list of scopes for which this user has access.",[["on-behalf-of","string",0,"h",{"x":"The `on-behalf-of` header allows you to make API calls from a parent account on behalf of the parent's Subusers or customer accounts. You…"}]],0]]}

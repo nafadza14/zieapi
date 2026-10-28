@@ -1,0 +1,1 @@
+{"base":"https://taf.tencentcloudapi.com","auth":{"t":"tc3","svc":"taf"},"ops":[["manage-portrait-risk","POST","/","Manage Portrait Risk",[["X-TC-Region","string",0,"h",{"x":"Region for regional products, for example ap-singapore, ap-guangzhou, na-siliconvalley"}],["BusinessSecurityData","object",1,"j"]],0,{"h":{"x-tc-action":"ManagePortraitRisk","x-tc-version":"2020-02-10"}}]]}

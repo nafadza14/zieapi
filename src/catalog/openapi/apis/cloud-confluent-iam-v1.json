@@ -1,0 +1,1 @@
+{"base":"https://api.confluent.cloud","auth":{"t":"basic"},"ops":[["list-v1-service-accounts","GET","/service_accounts","List of Service Accounts",[],0],["list-v1-users","GET","/users","List of Users",[],0]]}

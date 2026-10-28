@@ -1,0 +1,1 @@
+{"base":"https://api.line.me","auth":{"t":"bearer"},"ops":[["mission-sticker-v3","POST","/shop/v3/mission","Sends a mission sticker.",[],2]]}

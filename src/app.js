@@ -518,7 +518,7 @@ export function createApp(opts = {}) {
       notify(po.userId, "affiliate", "Payout sent", `Rp${po.amount.toLocaleString("id-ID")} was transferred to your account.`);
       return json(200, okContent(await repo.patchItem("payout", po.id, { status: "paid", paidAt: new Date().toISOString(), reference: String(body?.reference ?? "").slice(0, 200) })));
     }
-    if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, bankConfigured, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
+    if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, bankConfigured, bank, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
     if (p === "/api/admin/scrapers" && m === "GET") {
       const off = await repo.disabledScrapers();
       const st = await statsFor(catalog.all);

@@ -1,0 +1,1 @@
+{"base":"https://app.onedoclabs.com","auth":{"t":"key","in":"header","name":"x-api-key"},"ops":[["document-generate-pdf-from-bucket","POST","/api/docs/generate","Generates a PDF from a specified bucket.",[],2],["document-rendering-bucket","POST","/api/docs/initiate","Initiates a document's rendering",[],2]]}

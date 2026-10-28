@@ -1,0 +1,1 @@
+{"base":"https://api.hubapi.com","auth":{"t":"key","in":"query","name":"hapikey"},"ops":[["get-account-info-2026-09-api-usage-daily-private-apps","GET","/account-info/2026-09/api-usage/daily/private-apps","Retrieve API Usage",[],0],["get-account-info-2026-09-details","GET","/account-info/2026-09/details","Retrieve details",[],0]]}

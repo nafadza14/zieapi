@@ -1,0 +1,1 @@
+{"base":"https://wimgs.tencentcloudapi.com","auth":{"t":"tc3","svc":"wimgs"},"ops":[["search-by-text","POST","/","Search By Text",[["X-TC-Region","string",0,"h",{"x":"Region for regional products, for example ap-singapore, ap-guangzhou, na-siliconvalley"}],["Query","string",1,"j"]],0,{"h":{"x-tc-action":"SearchByText","x-tc-version":"2025-11-06"}}]]}

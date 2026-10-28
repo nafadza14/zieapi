@@ -1,0 +1,1 @@
+{"base":"https://api.hubapi.com","auth":{"t":"key","in":"query","name":"hapikey"},"ops":[["post-marketing-email-campaigns-2026-09-single-send-marketing","POST","/marketing/email-campaigns/2026-09/single-send","Send an email",[],2]]}

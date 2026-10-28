@@ -1,6 +1,6 @@
 // Production readiness checks shown at /admin/setup. Each check says what is wrong and how to fix it.
 
-export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableSecret, bankConfigured, fetchImpl }) {
+export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableSecret, bankConfigured, bank = null, fetchImpl }) {
   const checks = [];
   const add = (id, label, status, detail, fix = null) => checks.push({ id, label, status, detail, fix });
 
@@ -68,7 +68,7 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
   else if (ghListed) add("github", "GitHub sign-in", "fail", "SUPABASE_AUTH_PROVIDERS lists github, but the GitHub provider is off in Supabase Auth, so the button fails.", "Supabase, Authentication, Providers: enable GitHub with your OAuth App's client ID and secret (callback https://<project>.supabase.co/auth/v1/callback). Or remove github from SUPABASE_AUTH_PROVIDERS and use the direct setup: " + ghFix);
   else add("github", "GitHub sign-in", "warn", "Not configured, so the login page shows no GitHub button.", ghFix);
 
-  add("bank", "Bank transfer details", "ok", "Configured: " + bank, null);
+  add("bank", "Bank transfer details", bank ? "ok" : "warn", bank ? "Shown on every invoice: " + bank : "Customers can create invoices but see no account to pay into.", bank ? null : 'Set APIZIE_BANK_INFO, for example "BCA 1234567890 a.n. PT Zieads".');
   add("email", "Email notifications", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "ok" : "warn", env.RESEND_API_KEY && env.ZIE_EMAIL_FROM ? "Notifications are also emailed through Resend." : "Notifications appear in the dashboard only.", env.RESEND_API_KEY ? "Set APIZIE_EMAIL_FROM too." : "Optional: set RESEND_API_KEY and APIZIE_EMAIL_FROM.");
   add("support", "Support contacts", env.ZIE_SUPPORT_EMAIL ? "ok" : "warn", env.ZIE_SUPPORT_EMAIL ? `Support email: ${env.ZIE_SUPPORT_EMAIL}` : "The Support page only offers the report form.", env.ZIE_SUPPORT_EMAIL ? null : "Optional: set APIZIE_SUPPORT_EMAIL and APIZIE_DISCORD_URL.");
 

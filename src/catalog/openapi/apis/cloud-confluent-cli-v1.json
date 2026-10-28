@@ -1,0 +1,1 @@
+{"base":"https://api.confluent.cloud","auth":{"t":"basic"},"ops":[["create-cli-v1-feedback","POST","/cli/v1/feedbacks","Create a Feedback",[],1],["create-cli-v1-usage","POST","/cli/v1/usages","Create a Usage",[],1]]}

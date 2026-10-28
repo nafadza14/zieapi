@@ -1,0 +1,1 @@
+{"base":"https://areainsights.googleapis.com","auth":{"t":"key","in":"query","name":"key"},"ops":[["areainsights-compute-insights","POST","/v1:computeInsights","This method lets you retrieve insights about areas using a variety of filter such as: area, place type,…",[],2]]}

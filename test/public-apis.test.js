@@ -4,7 +4,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import mods1 from "../src/scrapers/live/public-apis.js";
 import mods2 from "../src/scrapers/live/public-apis-2.js";
-const mods = [...mods1, ...mods2];
+import mods3 from "../src/scrapers/live/public-apis-3.js";
+// The RSS toolkit fetches caller URLs (several per call) and has its own tests below.
+const mods = [...mods1, ...mods2, ...mods3.filter((m) => m.slug !== "rss-reader")];
 
 const sample = (fld) => fld.example ?? fld.default ?? (fld.enum ? fld.enum[0] : fld.type === "integer" || fld.type === "number" ? 1 : "x");
 
@@ -20,7 +22,7 @@ test("public APIs: unique keys and endpoints, every field documented", () => {
     assert.equal(new Set(slugs).size, slugs.length, `${k} endpoint slugs`);
     for (const e of m.endpoints) for (const fld of e.fields) if (fld.required) assert.ok(fld.example !== undefined || fld.enum, `${k}/${e.slug}.${fld.name} needs an example`);
   }
-  assert.ok(mods.length >= 150);
+  assert.ok(mods.length >= 170);
 });
 
 test("public APIs: every endpoint calls one valid public URL with its example params", async () => {

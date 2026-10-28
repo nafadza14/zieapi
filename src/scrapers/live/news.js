@@ -13,7 +13,7 @@ const limitField = f.int("limit", { default: 20, min: 1, max: 50, description: "
  *   param: name of the optional section param, sections: { value: feedUrl },
  *   extraFields / build(p) → URL for fully custom cases.
  */
-function rss(o) {
+export function rss(o) {
   const fields = [];
   if (o.sections) fields.push(f.enm(o.param ?? "category", Object.keys(o.sections), { description: o.paramDesc ?? "Kanal / rubrik", example: Object.keys(o.sections)[0] }));
   fields.push(...(o.extraFields ?? []), limitField);

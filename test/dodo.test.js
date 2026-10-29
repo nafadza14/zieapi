@@ -164,3 +164,49 @@ test("a lower plan cannot be bought while a higher one is still running", async 
   assert.match(r.json.errors[0].message, /lower plan after it ends/);
   assert.equal((await me("/api/me/invoices", { type: "plan", plan: "max", months: 1, method: "card" })).status, 201, "renewing the same plan still works");
 });
+
+test("config tolerates other variable names and pasted quotes; no product id means one is created once", async () => {
+  const { dodoConfig, createDodo } = await import("../src/billing/dodo.js");
+  const cfg = dodoConfig({ DODO_SECRET_KEY: '  "sk_live_abc"\n', DODO_WEBHOOK: "whsec_x", DODO_MODE: "Test" });
+  assert.equal(cfg.apiKey, "sk_live_abc");
+  assert.equal(cfg.webhookSecret, "whsec_x");
+  assert.equal(cfg.mode, "test_mode");
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.productId, null);
+  assert.deepEqual(cfg.names, ["DODO_MODE", "DODO_SECRET_KEY", "DODO_WEBHOOK"]);
+
+  const kv = new MemoryKV();
+  const seen = [];
+  const f = async (url, init) => {
+    seen.push(`${init.method} ${url}`);
+    if (url.endsWith("/products")) return Response.json({ product_id: "pdt_auto" });
+    return Response.json({ session_id: "cks_1", checkout_url: "https://test.checkout.dodopayments.com/x" });
+  };
+  const d = createDodo(cfg, f, { kv });
+  const inv = { id: "INV-1", amount: 900 };
+  const usr = { id: "u", email: "a@b.test", name: "A" };
+  await d.createCheckout({ invoice: inv, user: usr, returnUrl: "https://x/r" });
+  await d.createCheckout({ invoice: inv, user: usr, returnUrl: "https://x/r" });
+  assert.equal(seen.filter((s) => s.endsWith("/products")).length, 1, "product created once");
+  assert.equal(await kv.get("dodo:product:test_mode"), "pdt_auto");
+  // a fresh instance (another serverless function) reuses the saved product
+  const d2 = createDodo(cfg, f, { kv });
+  assert.equal(await d2.productId(), "pdt_auto");
+});
+
+test("a key used against the wrong environment switches once when the mode was not set", async () => {
+  const { dodoConfig, createDodo } = await import("../src/billing/dodo.js");
+  const hits = [];
+  const f = async (url, init) => {
+    hits.push(url);
+    if (url.startsWith("https://live.")) return new Response("unauthorized", { status: 401 });
+    return Response.json({ session_id: "cks_t", checkout_url: "https://test.checkout.dodopayments.com/t" });
+  };
+  const d = createDodo(dodoConfig({ DODO_PAYMENTS_API_KEY: "k", DODO_PAYMENTS_PRODUCT_ID: "pdt" }), f);
+  const r = await d.createCheckout({ invoice: { id: "I", amount: 500 }, user: { id: "u", email: "a@b.test" }, returnUrl: "https://x" });
+  assert.equal(r.sessionId, "cks_t");
+  assert.equal(d.mode, "test_mode");
+  // explicit live_mode never silently switches
+  const d3 = createDodo(dodoConfig({ DODO_PAYMENTS_API_KEY: "k", DODO_PAYMENTS_PRODUCT_ID: "pdt", DODO_PAYMENTS_ENVIRONMENT: "live_mode" }), f);
+  await assert.rejects(d3.createCheckout({ invoice: { id: "I", amount: 500 }, user: { id: "u", email: "a@b.test" }, returnUrl: "https://x" }), /invalid Dodo Payments API key/);
+});

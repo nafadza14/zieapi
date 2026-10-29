@@ -154,7 +154,7 @@ export function createApp(opts = {}) {
   const adminAnalytics = createAdminAnalytics({ repo, kv, catalog, storage, version: VERSION, env });
   const fulfill = createFulfiller({ repo, kv, webhooks, notify, affPercent });
   const dodoCfg = dodoConfig(env);
-  const dodo = createDodo(dodoCfg, opts.dodoFetch ?? globalThis.fetch);
+  const dodo = createDodo(dodoCfg, opts.dodoFetch ?? globalThis.fetch, { kv });
   /**
    * Dodo Payments webhook (Standard Webhooks signature). Only payment.succeeded changes anything: it must name one of
    * our card invoices, be in USD and cover the invoice amount. Replays are ignored by webhook-id.

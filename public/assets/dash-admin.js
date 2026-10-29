@@ -11,7 +11,9 @@
 
   // ===== Shared monitoring helpers ===========================================================
   const RW = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days", "90d": "last 90 days" };
-  const idrShort = (n) => { const v = Number(n ?? 0); return v >= 1e9 ? `Rp${(v / 1e9).toFixed(2)}B` : v >= 1e6 ? `Rp${(v / 1e6).toFixed(2)}M` : "Rp" + Math.round(v).toLocaleString("id-ID"); };
+  const usdShort = (n) => { const v = Number(n ?? 0); return v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e4 ? `$${(v / 1e3).toFixed(1)}K` : "$" + v.toLocaleString("en-US", { maximumFractionDigits: 2 }); };
+  // Payout amounts: US dollars; requests made before October 2026 were in rupiah.
+  const payoutAmt = (c, p) => (p.currency === "USD" ? c.usd(p.amount) : c.idr(p.amount));
   const usd = (n) => "$" + Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
   const deltaTag = (v, { goodUp = true } = {}) => {
     if (v === null || v === undefined || !Number.isFinite(v)) return "";
@@ -83,7 +85,7 @@
       const rw = RW[o.range];
       const todo = [
         [at.invoicesToReview, "invoice", "to confirm", "/admin/invoices"],
-        [at.payoutsRequested, "payout request", at.payoutAmount ? `· ${idr(at.payoutAmount)}` : "", "/admin/payouts"],
+        [at.payoutsRequested, "payout request", at.payoutAmount ? `· ${c.usd(at.payoutAmount)}` : "", "/admin/payouts"],
         [at.openReports, "open report", "", "/admin/reports"],
         [at.showcasePending, "showcase submission", "to review", "/admin/showcase"],
         [at.failingSources, "failing source", "≥20% server errors", "/admin/health"],
@@ -95,7 +97,7 @@
           <div class="kpi kpi-lead"><span class="stat-label">Requests · ${rw}</span><b class="hero-num">${c.compact(t.total)}</b><span class="stat-sub">${deltaTag(t.change?.total)} ${num(t.allTime)} all time</span></div>
           <div class="kpi"><span class="stat-label">Active customers</span><b class="stat-value">${num(t.activeCustomers)}</b><span class="stat-sub">made a call · ${rw}</span></div>
           <div class="kpi"><span class="stat-label">New sign-ups</span><b class="stat-value">${num(cu.newInRange)}</b><span class="stat-sub">${cu.newPrevious !== null ? deltaTag(cu.newPrevious ? (cu.newInRange - cu.newPrevious) / cu.newPrevious : null) : ""} ${num(cu.total)} total</span></div>
-          <div class="kpi"><span class="stat-label">Revenue · ${rw}</span><b class="stat-value" title="${idr(rv.inRange)}">${idrShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)} ${num(rv.paidCount)} paid invoices</span></div>
+          <div class="kpi"><span class="stat-label">Revenue · ${rw}</span><b class="stat-value" title="${c.usd(rv.inRange)}">${usdShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)} ${num(rv.paidCount)} paid invoices</span></div>
           <div class="kpi"><span class="stat-label">Success rate</span><b class="stat-value">${c.pct(t.successRate)}</b><span class="stat-sub">p95 ${t.p95Ms === null ? "–" : "≤ " + c.ms(t.p95Ms)} · ${num(t.serverErrors)} server errors</span></div>
         </section>
         <div class="ov-row">
@@ -340,14 +342,14 @@
       const rw = RW[o.range];
       c.root.innerHTML = `
         <section class="ds-card kpis">
-          <div class="kpi kpi-lead"><span class="stat-label">Revenue · ${rw}</span><b class="hero-num" title="${idr(rv.inRange)}">${idrShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)}${rv.previous !== null ? ` vs ${idr(rv.previous)} before` : ""} · VAT included</span></div>
+          <div class="kpi kpi-lead"><span class="stat-label">Revenue · ${rw}</span><b class="hero-num" title="${c.usd(rv.inRange)}">${usdShort(rv.inRange)}</b><span class="stat-sub">${deltaTag(rv.change)}${rv.previous !== null ? ` vs ${usdShort(rv.previous)} before` : ""}</span></div>
           <div class="kpi"><span class="stat-label">MRR</span><b class="stat-value">${usd(rv.mrrUsd)}</b><span class="stat-sub">active paid plans at list price</span></div>
           <div class="kpi"><span class="stat-label">Paying customers</span><b class="stat-value">${num(cu.paying)}</b><span class="stat-sub">${c.pct(cu.conversion === null ? null : Math.round(cu.conversion * 1000) / 10)} of ${num(cu.total)}</span></div>
           <div class="kpi"><span class="stat-label">ARPU</span><b class="stat-value">${usd(rv.arpuUsd)}</b><span class="stat-sub">per paying customer / month</span></div>
-          <div class="kpi"><span class="stat-label">To confirm</span><b class="stat-value">${num(o.attention.invoicesToReview)}</b><span class="stat-sub">${num(rv.pending)} more awaiting transfer</span></div>
+          <div class="kpi"><span class="stat-label">To confirm</span><b class="stat-value">${num(o.attention.invoicesToReview)}</b><span class="stat-sub">${num(rv.pending)} checkouts not completed</span></div>
         </section>
         <div class="ov-row">
-          <section class="ds-card"><div class="card-top"><h2>Paid per day</h2><span class="meta push">${num(rv.paidCount)} invoices · ${rw}</span></div>${rv.inRange ? barChart(c, rv.series.map((x) => ({ t: x.t, v: x.amount })), { fmt: idr, label: "Revenue" }) : h.empty("No payments in this range", "Approved invoices count on the day they are marked paid.")}</section>
+          <section class="ds-card"><div class="card-top"><h2>Paid per day</h2><span class="meta push">${num(rv.paidCount)} invoices · ${rw}</span></div>${rv.inRange ? barChart(c, rv.series.map((x) => ({ t: x.t, v: x.amount })), { fmt: c.usd, label: "Revenue" }) : h.empty("No payments in this range", "Approved invoices count on the day they are marked paid.")}</section>
           <section class="ds-card"><div class="card-top"><h2>Plan mix</h2></div>
             <div class="planmix">${["free", "pro", "ultra", "max"].map((p) => `<span class="pm-seg pm-${p}" style="flex:${cu.byPlan[p] || 0}"></span>`).join("")}</div>
             <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.cap(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
@@ -479,13 +481,13 @@
                 <td><b>${esc(i.id)}</b><br><span class="muted-sm">${dt(i.createdAt)}</span></td>
                 <td>${esc(i.email ?? i.userId)}</td>
                 <td>${what(i)}</td>
-                <td class="num"><b>${c.money(i.amount, i.currency)}</b><br><span class="muted-sm">${i.provider === "dodo" ? `Card via Dodo Payments${i.paymentId ? ` · ${esc(i.paymentId)}` : ""}` : `${idr(i.subtotal ?? i.base)} + VAT ${idr(i.vat ?? 0)} + code ${i.uniqueCode ?? 0}`}</span></td>
+                <td class="num"><b>${c.money(i.amount, i.currency)}</b><br><span class="muted-sm">${i.provider === "dodo" ? `Card via Dodo Payments${i.paymentId ? ` · ${esc(i.paymentId)}` : ""}` : `Bank transfer (older invoice) · ${c.idr(i.amount)}`}</span></td>
                 <td>${h.badge(i.status)}${i.reference ? `<br><span class="muted-sm">Ref: ${esc(i.reference)}</span>` : ""}</td>
                 <td>${["pending", "awaiting_review"].includes(i.status) && i.provider !== "dodo" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="approve" data-id="${esc(i.id)}">Mark paid</button><button class="btn btn-danger-ghost btn-sm" data-act="reject" data-id="${esc(i.id)}">Reject</button></div>` : ""}</td>
               </tr>`
             )
           )
-        : h.empty(filter === "awaiting_review" ? "Nothing to review" : "No invoices here", "Customers confirm their transfer and the invoice lands in this list.");
+        : h.empty(filter === "awaiting_review" ? "Nothing to review" : "No invoices here", "Invoices appear here when customers start a checkout.");
     };
     const load = async () => {
       $list.innerHTML = h.skeleton(5);
@@ -497,7 +499,7 @@
       const n = all.filter((i) => ["pending", "awaiting_review"].includes(i.status)).length;
       $bar.innerHTML = h.seg("filter", [["awaiting_review", `Open (${n})`], ["paid", "Paid"], ["rejected", "Rejected"], ["cancelled", "Cancelled"], ["all", "All"]], filter);
     };
-    c.root.innerHTML = `<div class="filterbar" data-bar></div><p class="muted-sm">Check your bank statement for the exact amount (the last digits are the unique code), then mark the invoice paid. Plans activate and top-ups are credited immediately.</p><div data-list></div>`;
+    c.root.innerHTML = `<div class="filterbar" data-bar></div><p class="muted-sm">Card payments through Dodo Payments activate plans and top-ups automatically. Older bank-transfer invoices can still be marked paid or rejected here. Plans activate and top-ups are credited immediately.</p><div data-list></div>`;
     const $list = c.$("[data-list]", c.root);
     const $bar = c.$("[data-bar]", c.root);
     setActions("");
@@ -510,7 +512,7 @@
       },
       approve: async (el) => {
         const i = all.find((x) => x.id === el.dataset.id);
-        const ok = await c.confirmModal({ title: `Mark ${esc(i.id)} paid?`, text: `Only do this after ${idr(i.amount)} reached your account. ${i.type === "topup" ? `${idr(i.subtotal)} is added to the customer's balance.` : `The ${esc(i.plan)} plan is activated for ${i.months} month${i.months > 1 ? "s" : ""}.`}`, confirm: "Mark paid", danger: false });
+        const ok = await c.confirmModal({ title: `Mark ${esc(i.id)} paid?`, text: `Only do this after ${c.money(i.amount, i.currency)} reached your account. ${i.type === "topup" ? `${c.money(i.subtotal, i.currency)} is added to the customer's balance.` : `The ${esc(i.plan)} plan is activated for ${i.months} month${i.months > 1 ? "s" : ""}.`}`, confirm: "Mark paid", danger: false });
         if (!ok) return;
         await api(`/api/admin/invoices/${encodeURIComponent(i.id)}/approve`, { method: "POST" });
         c.toast("Invoice paid");
@@ -552,13 +554,13 @@
                 <td><b>${esc(p.id)}</b><br><span class="muted-sm">${dt(p.createdAt)}</span></td>
                 <td>${esc(p.email)}</td>
                 <td class="clip">${esc(p.account)}</td>
-                <td class="num"><b>${idr(p.amount)}</b></td>
+                <td class="num"><b>${payoutAmt(c, p)}</b></td>
                 <td>${h.badge(p.status)}${p.reference ? `<br><span class="muted-sm">Ref: ${esc(p.reference)}</span>` : ""}</td>
                 <td>${p.status === "requested" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="paid" data-id="${esc(p.id)}">Mark sent</button><button class="btn btn-danger-ghost btn-sm" data-act="reject" data-id="${esc(p.id)}">Return</button></div>` : ""}</td>
               </tr>`
             )
           )
-        : h.empty("No payout requests", "Affiliates can request a payout once they have Rp100.000 available.");
+        : h.empty("No payout requests", "Affiliates can request a payout once they have $10 available.");
     };
     const act = (kind) => async (el) => {
       const id = el.dataset.id;
@@ -567,12 +569,12 @@
         title: kind === "paid" ? `Mark ${esc(id)} sent` : `Return ${esc(id)}`,
         body:
           kind === "paid"
-            ? `<p class="modal-text">Transfer ${idr(p.amount)} to <b>${esc(p.account)}</b> first.</p><label class="field">Transfer reference<input name="v" maxlength="200" required autofocus></label>`
-            : `<p class="modal-text">${idr(p.amount)} goes back to the affiliate's available earnings.</p><label class="field">Reason<textarea name="v" rows="3" maxlength="200"></textarea></label>`,
+            ? `<p class="modal-text">Send ${payoutAmt(c, p)} to <b>${esc(p.account)}</b> first (PayPal or international transfer).</p><label class="field">Transfer reference<input name="v" maxlength="200" required autofocus></label>`
+            : `<p class="modal-text">${payoutAmt(c, p)} goes back to the affiliate's available earnings.</p><label class="field">Reason<textarea name="v" rows="3" maxlength="200"></textarea></label>`,
         submit: kind === "paid" ? "Mark sent" : "Return payout",
         danger: kind !== "paid",
         onSubmit: async (f) => {
-          if (kind === "paid" && !f.v.value.trim()) throw new Error("Add the transfer reference so the affiliate can trace it.");
+          if (kind === "paid" && !f.v.value.trim()) throw new Error("Add the PayPal or transfer reference so the affiliate can trace it.");
           await api(`/api/admin/payouts/${encodeURIComponent(id)}/${kind}`, { method: "POST", body: kind === "paid" ? { reference: f.v.value.trim() } : { note: f.v.value.trim() } });
           return true;
         },

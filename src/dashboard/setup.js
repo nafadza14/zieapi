@@ -1,6 +1,6 @@
 // Production readiness checks shown at /admin/setup. Each check says what is wrong and how to fix it.
 
-export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableSecret, bankConfigured, bank = null, fetchImpl }) {
+export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableSecret, fetchImpl }) {
   const checks = [];
   const add = (id, label, status, detail, fix = null) => checks.push({ id, label, status, detail, fix });
 
@@ -68,7 +68,6 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
   else if (ghListed) add("github", "GitHub sign-in", "fail", "SUPABASE_AUTH_PROVIDERS lists github, but the GitHub provider is off in Supabase Auth, so the button fails.", "Supabase, Authentication, Providers: enable GitHub with your OAuth App's client ID and secret (callback https://<project>.supabase.co/auth/v1/callback). Or remove github from SUPABASE_AUTH_PROVIDERS and use the direct setup: " + ghFix);
   else add("github", "GitHub sign-in", "warn", "Not configured, so the login page shows no GitHub button.", ghFix);
 
-  add("bank", "Bank transfer details", bank ? "ok" : "warn", bank ? "Shown on every invoice: " + bank : "Customers can create invoices but see no account to pay into.", bank ? null : 'Set APIZIE_BANK_INFO, for example "BCA 1234567890 a.n. PT Zieads".');
   {
     // Card payments through Dodo Payments (merchant of record).
     const key = env.DODO_PAYMENTS_API_KEY ?? env.DODO_API_KEY;
@@ -76,7 +75,7 @@ export async function setupReport({ env, kv, storage, publicUrl, sbAuth, stableS
     const hook = env.DODO_PAYMENTS_WEBHOOK_SECRET ?? env.DODO_PAYMENTS_WEBHOOK_KEY ?? env.DODO_WEBHOOK_SECRET;
     const mode = /^test/i.test(env.DODO_PAYMENTS_ENVIRONMENT ?? "") ? "test mode" : "live mode";
     const how = `In Dodo Payments: create one "Pay What You Want" product in USD (minimum $1) and set its id as DODO_PAYMENTS_PRODUCT_ID; create an API key (DODO_PAYMENTS_API_KEY); add the webhook ${publicUrl}/webhooks/dodo for payment.succeeded, payment.failed and payment.cancelled and set its signing secret as DODO_PAYMENTS_WEBHOOK_SECRET. Use DODO_PAYMENTS_ENVIRONMENT=test_mode with a test key to try it first.`;
-    if (!key && !product) add("card", "Card payments (Dodo Payments)", "warn", "Not configured, so customers can only pay by bank transfer.", how);
+    if (!key && !product) add("card", "Card payments (Dodo Payments)", "fail", "Not configured: customers cannot buy a plan or top up until it is.", how);
     else if (!key || !product) add("card", "Card payments (Dodo Payments)", "fail", `${key ? "DODO_PAYMENTS_PRODUCT_ID" : "DODO_PAYMENTS_API_KEY"} is missing, so card checkout is off.`, how);
     else if (!hook) add("card", "Card payments (Dodo Payments)", "warn", `Checkout works (${mode}), but without the webhook secret a payment is only picked up when the customer returns to the billing page.`, how);
     else add("card", "Card payments (Dodo Payments)", "ok", `Card checkout is on (${mode}). Webhook: ${publicUrl}/webhooks/dodo`);

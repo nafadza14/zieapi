@@ -1,5 +1,7 @@
 // Turns a paid invoice into what the customer bought (plan time or pay-as-you-go balance), once.
-// Used by the admin "approve" action (bank transfer) and by Dodo Payments (webhook or return-page check).
+// Used by Dodo Payments (webhook or return-page check) and by the admin "approve" action for older bank invoices.
+import { PAYG, MICROS } from "../core/plans.js";
+const fmtUsd = (n) => "$" + Number(n).toFixed(2);
 
 export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
   return async function fulfill(inv, opts = {}) {
@@ -19,12 +21,12 @@ export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
     if (!fresh || fresh.status === "paid") return { invoice: fresh, already: true };
     const u = await repo.getUser(inv.userId);
     if (!u) throw Object.assign(new Error("Customer account no longer exists"), { status: 404 });
-    // Amounts in rupiah for balance and commission (card invoices are in USD and carry the rupiah equivalent).
-    const subtotalIdr = inv.currency === "USD" ? inv.subtotalIdr ?? 0 : inv.subtotal ?? inv.base;
+    // Everything in US dollars. Card invoices: amount in cents. Older bank-transfer invoices (rupiah) carry priceUsd/requests.
+    const paidCents = inv.currency === "USD" ? inv.amount ?? 0 : Math.round((inv.priceUsd ?? ((inv.requests ?? 0) * PAYG.usdPer1k) / 1000) * 100);
     if (inv.type === "topup") {
-      const creditIdr = inv.currency === "USD" ? inv.creditIdr ?? subtotalIdr : subtotalIdr;
-      await repo.creditBalance(u.id, creditIdr * 10);
-      notify(u.id, "balance", "Balance topped up", `Rp${creditIdr.toLocaleString("id-ID")} was added to your pay-as-you-go balance.`);
+      const credit = inv.creditMicros ?? (inv.requests ?? 0) * PAYG.priceMicros;
+      await repo.creditBalance(u.id, credit);
+      notify(u.id, "balance", "Balance topped up", `${fmtUsd(credit / MICROS)} was added to your pay-as-you-go balance.`);
     } else {
       const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
       const until = new Date(base + inv.months * 30 * 86400000).toISOString();
@@ -32,12 +34,12 @@ export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
       webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
       notify(u.id, null, `${inv.plan[0].toUpperCase() + inv.plan.slice(1)} plan is active`, `Active until ${until.slice(0, 10)}.`);
     }
-    if (u.referredBy && affPercent > 0 && subtotalIdr > 0) {
-      const tenths = Math.round((subtotalIdr * affPercent) / 10);
-      await repo.addAffEarning(u.referredBy, { invoiceId: inv.id, amountTenths: tenths, from: u.id });
-      notify(u.referredBy, "affiliate", "Affiliate commission earned", `Rp${Math.floor(tenths / 10).toLocaleString("id-ID")} from a referral's payment.`);
+    if (u.referredBy && affPercent > 0 && paidCents > 0) {
+      const micros = Math.round((paidCents * 10_000 * affPercent) / 100);
+      await repo.addAffEarning(u.referredBy, { invoiceId: inv.id, amountMicros: micros, from: u.id });
+      notify(u.referredBy, "affiliate", "Affiliate commission earned", `${fmtUsd(micros / MICROS)} from a referral's payment.`);
     }
-    webhooks.emit(u.id, "invoice.paid", { invoice: inv.id, type: inv.type ?? "plan", amount: inv.amount, currency: inv.currency ?? "IDR" });
+    webhooks.emit(u.id, "invoice.paid", { invoice: inv.id, type: inv.type ?? "plan", amount: inv.amount, currency: inv.currency ?? "IDR" }); // amount in cents for USD invoices
     const invoice = await repo.patchItem("invoice", inv.id, { status: "paid", paidAt: new Date().toISOString(), paidVia: via, ...(paymentId ? { paymentId } : {}) });
     return { invoice, already: false };
   }

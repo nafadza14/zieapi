@@ -13,7 +13,7 @@ Apizie is a complete, self-hostable public-data API platform with zero runtime d
 
 - **Website:** a landing page with the animated globe hero, a searchable catalog, a page per scraper with a "Try it" console and code samples, pricing, docs, the MCP page, a showcase, a status page, issue reporting and legal pages.
 - **Accounts:** email/password sign-in plus GitHub, Google and Discord OAuth.
-- **Dashboard:** overview, API keys (with IP allowlists), usage charts, request logs, bulk jobs, signed webhooks, billing with manual bank-transfer invoices, and settings.
+- **Dashboard:** overview, API keys (with IP allowlists), usage charts, request logs, bulk jobs, signed webhooks, billing with card checkout through Dodo Payments (USD), and settings.
 - **Admin panel:** users and plans, invoice approval, scraper on/off switches, reports and showcase moderation.
 - **API:** `GET|POST /v1/{category}:{scraper}/{endpoint}` with one envelope, plans and quotas, per-minute rate limits, caching, bulk jobs with idempotency, OpenAPI files and `llms.txt`.
 - **MCP server** at `/mcp` with 8 tools for AI agents.
@@ -63,7 +63,7 @@ To run the tests: `npm test` (138 tests).
    | `APIZIE_PUBLIC_URL` | `https://apizie.tech` (your domain, no path) |
    | `APIZIE_ADMIN_EMAILS` | your email (becomes admin when you sign up) |
    | `APIZIE_SESSION_SECRET` | any long random string |
-   | `APIZIE_BANK_INFO` | bank account text shown on invoices |
+   | `DODO_PAYMENTS_API_KEY`, `DODO_PAYMENTS_PRODUCT_ID`, `DODO_PAYMENTS_WEBHOOK_SECRET`, `DODO_PAYMENTS_ENVIRONMENT` | card checkout (required for paid plans and top-ups) |
    | `APIZIE_SUPPORT_EMAIL`, `APIZIE_DISCORD_URL` | optional, shown on the Support page |
    | `RESEND_API_KEY`, `APIZIE_EMAIL_FROM` | optional, also email dashboard notifications |
    | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{APIZIE_PUBLIC_URL}/auth/{provider}/callback` |
@@ -86,16 +86,16 @@ All options are listed in [`.env.example`](.env.example).
 | Machine docs | `/openapi.json`, `/category/{slug}/openapi.json`, `/llms.txt`, `/llms-full.txt` |
 | MCP | `POST /mcp` with tools `search_scrapers`, `get_scraper_schema`, `list_categories`, `run_scraper`, `get_account`, `get_usage`, `bulk_submit`, `bulk_status` |
 
-Plans are defined in `src/core/plans.js`. List prices are in USD; `priceIdr` is the local bank-transfer amount. The research behind the numbers is in [`docs/PRICING.md`](docs/PRICING.md).
+Plans are defined in `src/core/plans.js`. Every price is in USD and paid by card through Dodo Payments. The research behind the numbers is in [`docs/PRICING.md`](docs/PRICING.md).
 
 | Plan | Price / month | Yearly (2 months free) | Req/month | Req/min |
 |---|---|---|---|---|
 | Free | $0 | - | 1,000 | 100 |
-| Pro | $9 (Rp149.000) | $90 | 25,000 | 2,000 |
-| Ultra | $29 (Rp479.000) | $290 | 200,000 | 5,000 |
-| Max | $99 (Rp1.599.000) | $990 | 1,000,000 | 15,000 |
+| Pro | $9 | $90 | 25,000 | 2,000 |
+| Ultra | $29 | $290 | 200,000 | 5,000 |
+| Max | $99 | $990 | 1,000,000 | 15,000 |
 
-Pay-as-you-go above the quota: $0.40 per 1,000 requests (Rp6,6 per request) from a prepaid balance.
+Pay-as-you-go above the quota: $0.40 per 1,000 requests ($0.0004 per request) from a prepaid USD balance.
 
 ## Dashboard
 
@@ -109,16 +109,16 @@ Pay-as-you-go above the quota: $0.40 per 1,000 requests (Rp6,6 per request) from
 | API keys | create (limit per plan), reveal again, copy, rename, IP allowlist with IPv4 CIDR (Pro+), revoke (permanent), delete, 30-day sparkline, connected MCP apps, code samples in 6 languages |
 | Bulk jobs (Ultra) | submit from the dashboard with an API/endpoint picker, job list with filters, per-item results, JSON download |
 | Webhooks (Pro) | up to 5 endpoints, event selection, test, delivery history with payload, redeliver, on/off, rotate secret. Private and localhost targets are refused. |
-| Billing | plan, pay-as-you-go balance, top-ups (Rp50k to Rp1M or custom), plan invoices for 1 to 12 months, VAT, pay/cancel, transactions |
-| Affiliate | referral link (`/?ref=code`, 30-day cookie), clicks, sign-ups, paying customers, commission history, move to balance, bank payout (min Rp100.000) |
+| Billing | plan, pay-as-you-go balance, USD top-ups ($5 to $5,000), plan checkout for 1 to 12 months, transactions |
+| Affiliate | referral link (`/?ref=code`, 30-day cookie), clicks, sign-ups, paying customers, commission history, move to balance, payout via PayPal or SWIFT (min $10) |
 | Showcase, Settings, Support | project submissions; profile photo, name, password, notification switches, active sessions, delete account; support form prefilled from your latest errors |
 
-## Billing flow (manual bank transfer)
+## Billing flow (card checkout, USD)
 
-1. The user picks a plan (1 to 12 months) or a top-up amount in Billing. The invoice adds VAT (`APIZIE_VAT_PERCENT`, default 11%) and a unique 3-digit code.
-2. They transfer the exact amount and click **I've paid** with their reference.
-3. An admin marks it paid in **Admin → Invoices**. A plan becomes active for 30 days per month paid; a top-up is added to the balance. The `invoice.paid` webhook fires and, if the customer was referred, the referrer earns `APIZIE_AFFILIATE_PERCENT` (default 10%) of the subtotal.
-4. With **Use balance when the plan quota runs out** switched on, requests above the monthly quota cost Rp2,2 each from the balance instead of returning 429 (response header `X-Billing: payg`).
+1. The user picks a plan (1 to 12 months) or a USD top-up in Billing and is sent to a Dodo Payments checkout. Tax is calculated at checkout by Dodo (merchant of record).
+2. Dodo calls `POST /webhooks/dodo` (signed, Standard Webhooks). The return page also asks Dodo directly, so payment is applied even if the webhook is late.
+3. A plan becomes active for 30 days per month paid; a top-up is added to the balance. The `invoice.paid` webhook fires and, if the customer was referred, the referrer earns `APIZIE_AFFILIATE_PERCENT` (default 10%).
+4. With **Use balance when the plan quota runs out** switched on, requests above the monthly quota cost $0.0004 each from the balance instead of returning 429 (response header `X-Billing: payg`).
 
 ## Adding scrapers
 

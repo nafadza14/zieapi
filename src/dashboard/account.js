@@ -2,7 +2,9 @@
 // Every route the dashboard calls lives here; app.js only resolves the session and CSRF.
 
 import { E, HttpError, okContent } from "../core/envelope.js";
-import { PLANS, PAYG, getPlan, planAllows, requestsForRupiah, billedMonths } from "../core/plans.js";
+import { PLANS, PAYG, MICROS, getPlan, planAllows, requestsForUsd, billedMonths } from "../core/plans.js";
+
+const MIN_PAYOUT_USD = 10;
 import { RANGES, loadHours, summarize, systemStatus } from "../core/analytics.js";
 import { WEBHOOK_EVENTS, newWebhookSecret } from "../core/webhooks.js";
 import { ulid, monthKey, secondsToMonthReset } from "../core/util.js";
@@ -39,7 +41,7 @@ const validRule = (r) => {
 };
 
 export function createAccountApi(d) {
-  const { repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, vatPercent, affPercent, support, storage, notify, cookie, SESSION_COOKIE, isHttps } = d;
+  const { repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, affPercent, support, storage, notify, cookie, SESSION_COOKIE, isHttps } = d;
   const kv = repo.kv;
   const memo = new Map();
 
@@ -132,43 +134,32 @@ export function createAccountApi(d) {
     return { rows, req, err, range, status, retentionDays: plan.logDays, since: new Date(cutoff).toISOString() };
   }
 
+  /** New invoices are in US dollars (cents) and paid through Dodo Payments checkout. */
   async function invoiceFor(user, body) {
     const type = body?.type === "topup" ? "topup" : "plan";
-    let subtotal;
+    let cents;
     let extra;
-    if (type === "topup" && body?.method === "card" && body?.usd !== undefined) {
-      // Card top-up chosen in dollars: requests at $0.40 per 1,000, credited in rupiah at the same per-request price.
-      const usd = Math.round(Number(body.usd) * 100) / 100;
-      if (!Number.isFinite(usd) || usd < PAYG.minTopupUsd || usd > 5000) throw E.invalidParams([{ path: "usd", message: `Top-up must be between $${PAYG.minTopupUsd} and $5,000` }]);
-      const requests = Math.floor((usd * 1000) / PAYG.usdPer1k);
-      subtotal = Math.round((requests * PAYG.priceTenths) / 10);
-      extra = { requests, usd };
-    } else if (type === "topup") {
-      const amount = Math.round(Number(body?.amount));
-      if (!Number.isFinite(amount) || amount < PAYG.minTopup || amount > 100_000_000) throw E.invalidParams([{ path: "amount", message: `Top-up must be between Rp${PAYG.minTopup.toLocaleString("id-ID")} and Rp100.000.000` }]);
-      subtotal = amount;
-      extra = { requests: requestsForRupiah(amount) };
+    if (type === "topup") {
+      const usd = Math.round(Number(body?.usd) * 100) / 100;
+      if (!Number.isFinite(usd) || usd < PAYG.minTopupUsd || usd > PAYG.maxTopupUsd) throw E.invalidParams([{ path: "usd", message: `Top-up must be between $${PAYG.minTopupUsd} and $${PAYG.maxTopupUsd.toLocaleString("en-US")}` }]);
+      const requests = requestsForUsd(usd);
+      cents = Math.round(usd * 100);
+      extra = { usd, requests, creditMicros: requests * PAYG.priceMicros };
     } else {
       const target = PLANS[body?.plan];
       const months = Math.min(12, Math.max(1, Math.round(Number(body?.months) || 1)));
       if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
-      subtotal = target.priceIdr * billedMonths(months);
-      extra = { plan: target.id, months, priceUsd: target.priceUsd * billedMonths(months) };
+      const priceUsd = target.priceUsd * billedMonths(months);
+      cents = Math.round(priceUsd * 100);
+      extra = { plan: target.id, months, priceUsd };
     }
+    if (!d.dodo?.enabled) throw new HttpError(503, { content: null, message: "Checkout is not available right now. Please try again later or contact support.", errors: [] });
     const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
     if (open.length >= 5) throw E.invalidParams([{ path: "type", message: "You already have 5 open invoices. Pay or cancel one first" }]);
-    if (body?.method === "card") {
-      // Card / Apple Pay / Google Pay through Dodo Payments (merchant of record: it adds the right sales tax itself).
-      if (!d.dodo?.enabled) throw E.invalidParams([{ path: "method", message: "Card payments are not available yet. Use bank transfer." }]);
-      const cents = type === "topup" ? (extra.usd ? Math.round(extra.usd * 100) : Math.max(100, Math.round((extra.requests * PAYG.usdPer1k * 100) / 1000))) : Math.round(extra.priceUsd * 100);
-      const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal: cents, vatPercent: 0, vat: 0, base: cents, amount: cents, currency: "USD", subtotalIdr: subtotal, ...(type === "topup" ? { creditIdr: subtotal } : {}), method: "card", provider: "dodo", status: "pending", reference: null, createdAt: new Date().toISOString() };
-      await repo.put("invoice", inv, user.id);
-      return startCheckout(user, inv);
-    }
-    const vat = Math.round((subtotal * vatPercent) / 100);
-    const uniqueCode = 1 + Math.floor(Math.random() * 999);
-    const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal, vatPercent, vat, uniqueCode, base: subtotal, amount: subtotal + vat + uniqueCode, currency: "IDR", method: "bank_transfer", status: "pending", reference: null, createdAt: new Date().toISOString() };
-    return repo.put("invoice", inv, user.id);
+    // Card / Apple Pay / Google Pay through Dodo Payments (merchant of record: it adds the right sales tax itself).
+    const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal: cents, vat: 0, base: cents, amount: cents, currency: "USD", method: "card", provider: "dodo", status: "pending", reference: null, createdAt: new Date().toISOString() };
+    await repo.put("invoice", inv, user.id);
+    return startCheckout(user, inv);
   }
 
   async function startCheckout(user, inv) {
@@ -192,22 +183,26 @@ export function createAccountApi(d) {
     return inv;
   }
 
+  const usdCents = (i) => (i.currency === "USD" ? i.amount : Math.round((i.priceUsd ?? ((i.requests ?? 0) * PAYG.usdPer1k) / 1000) * 100));
   async function transactions(user) {
     const inv = (await repo.listItems("invoice", user.id)).map((i) => ({
       id: i.id,
       kind: i.type === "topup" ? "topup" : "plan",
       date: i.createdAt,
-      item: i.type === "topup" ? `Balance top-up (≈ ${(i.requests ?? requestsForRupiah(i.subtotal ?? i.base)).toLocaleString("en-US")} requests)` : `${cap(i.plan)} plan · ${i.months} month${i.months > 1 ? "s" : ""}`,
+      item: i.type === "topup" ? `Balance top-up (≈ ${(i.requests ?? 0).toLocaleString("en-US")} requests)` : `${cap(i.plan)} plan · ${i.months} month${i.months > 1 ? "s" : ""}`,
       method: i.method === "card" ? "Card (Dodo Payments)" : "Bank transfer",
-      currency: i.currency ?? "IDR",
-      subtotal: i.subtotal ?? i.base,
-      vat: i.vat ?? 0,
-      total: i.amount,
+      // Older bank-transfer invoices were in rupiah; they are shown at their US dollar list price.
+      currency: "USD",
+      subtotal: usdCents(i),
+      vat: 0,
+      total: usdCents(i),
       status: i.status,
       reference: i.reference,
-      uniqueCode: i.uniqueCode,
     }));
-    const usage = (await repo.paygUsage(user.id, 90)).map((u) => ({ id: `USE-${u.date}`, kind: "usage", date: `${u.date}T23:59:59.000Z`, item: `${u.requests.toLocaleString("en-US")} requests over quota`, method: "Balance", subtotal: -Math.round((u.requests * PAYG.priceTenths) / 10), vat: 0, total: -Math.round((u.requests * PAYG.priceTenths) / 10), status: "settled" }));
+    const usage = (await repo.paygUsage(user.id, 90)).map((u) => {
+      const cents = -(u.requests * PAYG.priceMicros) / 10_000;
+      return { id: `USE-${u.date}`, kind: "usage", date: `${u.date}T23:59:59.000Z`, item: `${u.requests.toLocaleString("en-US")} requests over quota`, method: "Balance", currency: "USD", subtotal: cents, vat: 0, total: cents, status: "settled" };
+    });
     return [...inv, ...usage].sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
@@ -257,7 +252,7 @@ export function createAccountApi(d) {
         admin: d.isAdmin(user),
         providers: Object.keys(user.providers ?? {}),
         prefs,
-        balance: balance / 10,
+        balance: balance / MICROS, // US dollars
         keys: { active: keys.filter((k) => k.status === "active").length, revoked: keys.filter((k) => k.status !== "active").length, max: getPlan(plan).maxKeys },
         unread: notes.unread,
         emailEnabled: !!d.emailEnabled,
@@ -309,7 +304,7 @@ export function createAccountApi(d) {
         today: day.total,
         errors24h: last24.errors,
         quota: qt,
-        balance: balance / 10,
+        balance: balance / MICROS, // US dollars
         key: active[0] ? publicKey(active[0]) : null,
         activeKeys: active.length,
         keys: keys.map((k) => ({ id: k.id, name: k.name, preview: k.preview, status: publicKey(k).status })),
@@ -519,12 +514,10 @@ export function createAccountApi(d) {
         planExpiresAt: user.planExpiresAt,
         quota: qt,
         plans: Object.values(PLANS),
-        balance: balance / 10,
-        balanceRequests: Math.floor(balance / PAYG.priceTenths),
-        payg: { priceIdr: PAYG.priceTenths / 10, usdPer1k: PAYG.usdPer1k, topups: PAYG.topups.map((a) => ({ amount: a, requests: requestsForRupiah(a) })), topupsUsd: PAYG.topupsUsd.map((usd) => ({ usd, requests: Math.floor((usd * 1000) / PAYG.usdPer1k) })), minTopupUsd: PAYG.minTopupUsd, minTopup: PAYG.minTopup, lowBalance: PAYG.lowBalance, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
-        vatPercent,
-        bank,
-        bankConfigured: !!d.bankConfigured,
+        currency: "USD",
+        balance: balance / MICROS, // US dollars
+        balanceRequests: Math.floor(balance / PAYG.priceMicros),
+        payg: { usdPer1k: PAYG.usdPer1k, topupsUsd: PAYG.topupsUsd.map((usd) => ({ usd, requests: requestsForUsd(usd) })), minTopupUsd: PAYG.minTopupUsd, maxTopupUsd: PAYG.maxTopupUsd, lowBalanceUsd: PAYG.lowBalanceUsd, enabled: prefs.payg, lowBalanceAlert: prefs.lowBalanceAlert },
         cardEnabled: !!d.dodo?.enabled,
         invoices: await repo.listItems("invoice", user.id),
         transactions: tx,
@@ -534,7 +527,7 @@ export function createAccountApi(d) {
     if ((mm = /^\/api\/me\/invoices\/([^/]+)\/(checkout|sync)$/.exec(p)) && m === "POST") {
       const inv = await repo.getItem("invoice", mm[1]);
       if (!inv || inv.userId !== user.id) throw E.notFound("Invoice not found");
-      if (inv.provider !== "dodo") throw E.invalidParams([{ path: "method", message: "This invoice is paid by bank transfer" }]);
+      if (inv.provider !== "dodo") throw E.invalidParams([{ path: "method", message: "This older invoice cannot be paid online. Cancel it and choose the plan again" }]);
       if (mm[2] === "sync") return ok(await syncCard(user, inv));
       const synced = await syncCard(user, inv); // never open a second checkout for an invoice that was just paid
       if (synced.status !== "pending") throw E.invalidParams([{ path: "status", message: `Invoice is ${synced.status}` }]);
@@ -543,7 +536,7 @@ export function createAccountApi(d) {
     if ((mm = /^\/api\/me\/invoices\/([^/]+)\/(confirm|cancel)$/.exec(p)) && m === "POST") {
       const inv = await repo.getItem("invoice", mm[1]);
       if (!inv || inv.userId !== user.id) throw E.notFound("Invoice not found");
-      if (mm[2] === "confirm" && inv.provider === "dodo") throw E.invalidParams([{ path: "method", message: "Card invoices are confirmed automatically" }]);
+      if (mm[2] === "confirm") throw E.invalidParams([{ path: "method", message: "Payments are confirmed automatically at checkout" }]);
       if (inv.status !== "pending") throw E.invalidParams([{ path: "status", message: `Invoice is ${inv.status}` }]);
       if (mm[2] === "cancel") {
         if (inv.provider === "dodo" && (await syncCard(user, inv)).status === "paid") throw E.invalidParams([{ path: "status", message: "This invoice was just paid" }]);
@@ -568,26 +561,27 @@ export function createAccountApi(d) {
         clicks: stats.clicks,
         signups: stats.referrals.length,
         paying,
-        earned: stats.totalTenths / 10,
-        available: stats.availableTenths / 10,
-        minPayout: 100000,
-        earnings: stats.earnings.map((e) => ({ ...e, amount: e.amountTenths / 10 })),
+        currency: "USD",
+        earned: stats.totalMicros / MICROS,
+        available: stats.availableMicros / MICROS,
+        minPayout: MIN_PAYOUT_USD,
+        earnings: stats.earnings.map((e) => ({ ...e, amount: (e.amountMicros ?? 0) / MICROS })),
         payouts,
       });
     }
     if (p === "/api/me/affiliate/move" && m === "POST") {
       const moved = await repo.moveAffToBalance(user.id);
       if (!moved) throw E.invalidParams([{ path: "amount", message: "Nothing available to move yet" }]);
-      return ok({ moved: moved / 10, balance: (await repo.getBalance(user.id)) / 10 });
+      return ok({ moved: moved / MICROS, balance: (await repo.getBalance(user.id)) / MICROS });
     }
     if (p === "/api/me/affiliate/payout" && m === "POST") {
       const stats = await repo.affiliateStats(user.id);
-      const amount = Math.floor(stats.availableTenths / 10);
-      if (amount < 100000) throw E.invalidParams([{ path: "amount", message: "Payouts start at Rp100.000" }]);
+      const amount = Math.floor(stats.availableMicros / 10_000) / 100; // whole cents, US dollars
+      if (amount < MIN_PAYOUT_USD) throw E.invalidParams([{ path: "amount", message: `Payouts start at $${MIN_PAYOUT_USD}` }]);
       const account = String(body?.account ?? "").trim().slice(0, 200);
-      if (account.length < 6) throw E.invalidParams([{ path: "account", message: "Enter your bank name, account number and account holder" }]);
-      if (!(await repo.takeAffForPayout(user.id, amount * 10))) throw E.invalidParams([{ path: "amount", message: "Balance changed, try again" }]);
-      const payout = await repo.put("payout", { id: "PO-" + ulid().slice(-10), userId: user.id, email: user.email, amount, account, status: "requested", createdAt: new Date().toISOString() }, user.id);
+      if (account.length < 6) throw E.invalidParams([{ path: "account", message: "Enter your PayPal email, or bank name, SWIFT code, account number and holder" }]);
+      if (!(await repo.takeAffForPayout(user.id, Math.round(amount * MICROS)))) throw E.invalidParams([{ path: "amount", message: "Balance changed, try again" }]);
+      const payout = await repo.put("payout", { id: "PO-" + ulid().slice(-10), userId: user.id, email: user.email, amount, currency: "USD", account, status: "requested", createdAt: new Date().toISOString() }, user.id);
       return json(201, okContent(payout));
     }
 

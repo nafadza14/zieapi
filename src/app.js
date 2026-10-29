@@ -20,7 +20,7 @@ import { createAccountApi } from "./dashboard/account.js";
 import { setupReport } from "./dashboard/setup.js";
 import { buildOpenApi, buildLlmsTxt } from "./core/openapi.js";
 import { E, HttpError, okContent, errBody } from "./core/envelope.js";
-import { PLANS, PAYG, getPlan } from "./core/plans.js";
+import { PLANS, PAYG, MICROS, getPlan, microsFromLegacyTenths } from "./core/plans.js";
 import { ulid, monthKey } from "./core/util.js";
 import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
 import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
@@ -67,9 +67,6 @@ export function createApp(opts = {}) {
   const sbSecret = env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
   const stateSecret = env.ZIE_SESSION_SECRET ?? (sbSecret ? createHmac("sha256", "apizie-state").update(sbSecret).digest("hex") : randomBytes(32).toString("hex"));
   const stableSecret = env.ZIE_SESSION_SECRET ?? sbSecret ?? null;
-  const bankConfigured = !!(env.APIZIE_BANK_INFO ?? env.ZIE_BANK_INFO ?? true);
-  const bank = env.APIZIE_BANK_INFO ?? env.ZIE_BANK_INFO ?? "BCA 0374827720 a.n. Ghilman Nafadza Hakim";
-  const vatPercent = Math.max(0, Math.min(30, Number(env.ZIE_VAT_PERCENT ?? 11)));
   const affPercent = Math.max(0, Math.min(50, Number(env.ZIE_AFFILIATE_PERCENT ?? 10)));
   const support = { email: env.ZIE_SUPPORT_EMAIL ?? null, discord: env.ZIE_DISCORD_URL ?? null };
   const upstream = env.ZIE_UPSTREAM_URL ? { url: env.ZIE_UPSTREAM_URL.replace(/\/+$/, ""), key: env.ZIE_UPSTREAM_KEY ?? "", header: (env.ZIE_UPSTREAM_HEADER ?? "x-api-key").toLowerCase() } : null;
@@ -121,11 +118,11 @@ export function createApp(opts = {}) {
         notify(owner, "quotaExceeded", "Monthly quota used up", "New requests return 429 until the 1st (UTC). Upgrade, or turn on pay-as-you-go in Billing.");
       }
     },
-    onPayg: (owner, balanceTenths) => {
-      const threshold = PAYG.lowBalance * 10;
-      if (balanceTenths < threshold && balanceTenths + PAYG.priceTenths >= threshold) {
-        webhooks.emit(owner, "balance.low", { balance: balanceTenths / 10, threshold: PAYG.lowBalance });
-        repo.getPrefs(owner).then((pr) => pr.lowBalanceAlert && notify(owner, "balance", "Balance is running low", `Your pay-as-you-go balance is Rp${Math.floor(balanceTenths / 10).toLocaleString("id-ID")}.`)).catch(() => {});
+    onPayg: (owner, balanceMicros) => {
+      const threshold = PAYG.lowBalanceUsd * MICROS;
+      if (balanceMicros < threshold && balanceMicros + PAYG.priceMicros >= threshold) {
+        webhooks.emit(owner, "balance.low", { balance: balanceMicros / MICROS, threshold: PAYG.lowBalanceUsd, currency: "USD" });
+        repo.getPrefs(owner).then((pr) => pr.lowBalanceAlert && notify(owner, "balance", "Balance is running low", `Your pay-as-you-go balance is $${(balanceMicros / MICROS).toFixed(2)}.`)).catch(() => {});
       }
     },
   });
@@ -199,7 +196,7 @@ export function createApp(opts = {}) {
     return json(200, okContent({ ignored: type }));
   }
 
-  const accountApi = createAccountApi({ dodo, fulfill, kv, repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, bank, bankConfigured, vatPercent, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
+  const accountApi = createAccountApi({ dodo, fulfill, kv, repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
   const requireUser = (ctx) => {
     if (!ctx.user) throw E.unauthorized("Sign in required");
     return ctx.user;
@@ -284,7 +281,12 @@ export function createApp(opts = {}) {
     if (m === "GET" && (p === "/.well-known/oauth-protected-resource" || p === "/.well-known/oauth-protected-resource/mcp")) return json(200, oauth.metadata.protectedResource(), { "Cache-Control": "public, max-age=3600" });
     if (m === "GET" && (p === "/.well-known/oauth-authorization-server" || p === "/.well-known/oauth-authorization-server/mcp" || p === "/.well-known/openid-configuration")) return json(200, oauth.metadata.authorizationServer(), { "Cache-Control": "public, max-age=3600" });
     if (p.startsWith("/oauth/")) return oauthRoutes(ctx, p, m, q, body);
-    if (p === "/sitemap.xml") return { status: 200, body: memo("sm", sitemap), headers: { "content-type": "application/xml; charset=utf-8" } };
+    // Sitemap index plus small child sitemaps (Search Console fetches small files faster and more reliably).
+    if (p === "/sitemap.xml" || (mm = /^\/sitemap-(pages|apis-(\d{1,3}))\.xml$/.exec(p))) {
+      const body = p === "/sitemap.xml" ? memo("smi", sitemapIndex) : memo(`sm:${mm[1]}`, () => sitemapPart(mm[1]));
+      if (body === null) throw E.notFound("Sitemap not found");
+      return { status: 200, body, headers: { "content-type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=3600, s-maxage=86400", "X-Robots-Tag": "noindex" } };
+    }
 
     // ----- public catalog API -----------------------------------------------
     const LIST_CACHE = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
@@ -506,7 +508,7 @@ export function createApp(opts = {}) {
       const [users, invoices, reports, days, requests] = await Promise.all([repo.listUsers(), repo.listItems("invoice"), repo.listItems("report"), repo.dailyUsage(null, 30), repo.globalRequests()]);
       const byPlan = {};
       for (const u of users) byPlan[repo.effectivePlan(u)] = (byPlan[repo.effectivePlan(u)] ?? 0) + 1;
-      const revenue = invoices.filter((i) => i.status === "paid" && i.paidAt?.startsWith(monthKey())).reduce((n, i) => n + i.amount, 0);
+      const revenue = invoices.filter((i) => i.status === "paid" && i.paidAt?.startsWith(monthKey())).reduce((n, i) => n + (i.currency === "USD" ? i.amount / 100 : i.priceUsd ?? 0), 0); // US dollars
       return json(200, okContent({ users: users.length, byPlan, pendingInvoices: invoices.filter((i) => i.status === "awaiting_review").length, openReports: reports.filter((r) => r.status === "open").length, revenueThisMonth: revenue, requests, days, catalog: catalog.totals() }));
     }
     if (p === "/api/admin/users" && m === "GET") {
@@ -547,14 +549,14 @@ export function createApp(opts = {}) {
       if (!po) throw E.notFound("Payout not found");
       if (po.status !== "requested") throw E.invalidParams([{ path: "status", message: `Payout is ${po.status}` }]);
       if (mm[2] === "reject") {
-        await repo.kv.incrby(`aff_avail:${po.userId}`, po.amount * 10);
+        await repo.creditAffiliate(po.userId, po.currency === "USD" ? Math.round(po.amount * MICROS) : microsFromLegacyTenths(po.amount * 10));
         notify(po.userId, "affiliate", "Payout request returned", String(body?.note ?? "The amount is back in your available earnings."));
         return json(200, okContent(await repo.patchItem("payout", po.id, { status: "rejected", note: String(body?.note ?? "").slice(0, 200) })));
       }
-      notify(po.userId, "affiliate", "Payout sent", `Rp${po.amount.toLocaleString("id-ID")} was transferred to your account.`);
+      notify(po.userId, "affiliate", "Payout sent", `${po.currency === "USD" ? "$" + Number(po.amount).toFixed(2) : "Your payout"} was sent to your account.`);
       return json(200, okContent(await repo.patchItem("payout", po.id, { status: "paid", paidAt: new Date().toISOString(), reference: String(body?.reference ?? "").slice(0, 200) })));
     }
-    if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, bankConfigured, bank, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
+    if (p === "/api/admin/setup" && m === "GET") return json(200, okContent(await setupReport({ env, kv, storage, publicUrl, apiUrl, sbAuth, stableSecret: !!stableSecret, fetchImpl: opts.oauthFetch ?? globalThis.fetch })));
     if (p === "/api/admin/scrapers" && m === "GET") {
       const off = await repo.disabledScrapers();
       const st = await statsFor(catalog.all);
@@ -693,17 +695,28 @@ export function createApp(opts = {}) {
     return html(notFoundPage({ user }), 404);
   }
 
-  function sitemap() {
-    const day = BUILD_DATE.slice(0, 10);
-    const urls = [
-      ["/", "daily", "1.0"], ["/scrapers", "daily", "0.9"], ["/mcp", "weekly", "0.9"], ["/pricing", "weekly", "0.8"], ["/docs", "weekly", "0.8"],
-      ...DOC_SLUGS.filter(Boolean).map((s) => [`/docs/${s}`, "weekly", "0.7"]),
-      ["/showcase", "weekly", "0.4"], ["/status", "daily", "0.3"],
-      ...catalog.categoryList().map((c) => [`/category/${c.slug}`, "weekly", "0.7"]),
-      ...catalog.scrapers.map((s) => [`/api/${s.category}/${s.slug}`, "weekly", s.status === "live" ? "0.7" : "0.5"]),
-      ...["/terms", "/privacy", "/aup"].map((u) => [u, "yearly", "0.2"]),
-    ];
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, f, pr]) => `<url><loc>${publicUrl}${u}</loc><lastmod>${day}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`).join("\n")}\n</urlset>\n`;
+  // ---- sitemaps: one index, the site pages, then the API pages in chunks of SITEMAP_CHUNK ----
+  const SITEMAP_CHUNK = 1000;
+  const smDay = () => BUILD_DATE.slice(0, 10);
+  const urlset = (urls) => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, f, pr]) => `<url><loc>${publicUrl}${u}</loc><lastmod>${smDay()}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`).join("\n")}\n</urlset>\n`;
+  const sitePages = () => [
+    ["/", "daily", "1.0"], ["/scrapers", "daily", "0.9"], ["/mcp", "weekly", "0.9"], ["/pricing", "weekly", "0.8"], ["/docs", "weekly", "0.8"],
+    ...DOC_SLUGS.filter(Boolean).map((s) => [`/docs/${s}`, "weekly", "0.7"]),
+    ["/showcase", "weekly", "0.4"], ["/status", "daily", "0.3"],
+    ...catalog.categoryList().map((c) => [`/category/${c.slug}`, "weekly", "0.7"]),
+    ...["/terms", "/privacy", "/cookies", "/aup", "/refund"].map((u) => [u, "yearly", "0.2"]),
+  ];
+  const apiPages = () => catalog.scrapers.map((s) => [`/api/${s.category}/${s.slug}`, "weekly", s.status === "live" ? "0.7" : "0.5"]);
+  function sitemapIndex() {
+    const n = Math.ceil(apiPages().length / SITEMAP_CHUNK);
+    const parts = ["pages", ...Array.from({ length: n }, (_, i) => `apis-${i + 1}`)];
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${parts.map((x) => `<sitemap><loc>${publicUrl}/sitemap-${x}.xml</loc><lastmod>${smDay()}</lastmod></sitemap>`).join("\n")}\n</sitemapindex>\n`;
+  }
+  function sitemapPart(name) {
+    if (name === "pages") return urlset(sitePages());
+    const i = Number(name.slice(5)) - 1;
+    const chunk = apiPages().slice(i * SITEMAP_CHUNK, (i + 1) * SITEMAP_CHUNK);
+    return i >= 0 && chunk.length ? urlset(chunk) : null;
   }
 
   async function serveStatic(p) {

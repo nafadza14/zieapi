@@ -76,7 +76,7 @@
             <div class="card-top"><h2 id="q-h">Monthly quota</h2><span class="meta push">${c.cap(q.plan.id)} plan</span></div>
             <div class="row-between"><b class="stat-value">${usedPct}%</b><span class="meta">${num(q.month.used)} / ${num(q.month.limit)}</span></div>
             ${h.bar(q.month.used, q.month.limit)}
-            <p class="meta">Resets ${resets}${q.projectedPercent !== null ? ` · on pace for ${q.projectedPercent}%` : ""}${o.balance > 0 ? ` · balance ${c.idr(o.balance)}` : ""}</p>
+            <p class="meta">Resets ${resets}${q.projectedPercent !== null ? ` · on pace for ${q.projectedPercent}%` : ""}${o.balance > 0 ? ` · balance ${c.usd(o.balance)}` : ""}</p>
             ${usedPct >= 80 ? `<a class="btn btn-ghost btn-sm" href="/dashboard/billing#plans">Raise your limit</a>` : ""}
           </section>
         </div>
@@ -467,7 +467,7 @@
     let data;
     let current = null;
     const f = { q: "", tab: "all" };
-    const example = `POST ${c.D.apiUrl}/v1/finance:coingecko/simple-price/bulk\nx-api-key: $APIZIE_KEY\nIdempotency-Key: prices-2026-10-27\n\n{\n  "items": [\n    { "ids": "bitcoin", "vsCurrencies": "idr" },\n    { "ids": "ethereum", "vsCurrencies": "idr" }\n  ]\n}`;
+    const example = `POST ${c.D.apiUrl}/v1/finance:coingecko/simple-price/bulk\nx-api-key: $APIZIE_KEY\nIdempotency-Key: prices-2026-10-27\n\n{\n  "items": [\n    { "ids": "bitcoin", "vsCurrencies": "usd" },\n    { "ids": "ethereum", "vsCurrencies": "usd" }\n  ]\n}`;
     const kind = (j) => (j.status === "RUNNING" ? "running" : j.status === "FAILED" ? "failed" : j.failed ? "partial" : "completed");
     const load = async () => {
       try {
@@ -541,7 +541,7 @@
           wide: true,
           body: `<label class="field">API<input name="project" list="bulk-apis" placeholder="e.g. finance:coingecko" required autofocus autocomplete="off" data-bulk-api></label><datalist id="bulk-apis"></datalist>
             <label class="field">Endpoint<select name="endpoint" required data-bulk-ep><option value="">Pick an API first</option></select></label>
-            <label class="field">Items (JSON array of params)<textarea name="items" rows="7" required placeholder='[{ "ids": "bitcoin", "vsCurrencies": "idr" }]'></textarea></label>
+            <label class="field">Items (JSON array of params)<textarea name="items" rows="7" required placeholder='[{ "ids": "bitcoin", "vsCurrencies": "usd" }]'></textarea></label>
             <label class="field">Idempotency key (optional)<input name="idem" maxlength="100" placeholder="Reuse it to avoid running the same job twice"></label>
             <p class="hint">Up to ${num(data.cap)} items on your plan. Each item counts as one request; 5xx results are refunded.</p>`,
           submit: "Run job",
@@ -709,7 +709,7 @@
 
   // ===== Billing ==============================================================================
   S.billing = async (c) => {
-    const { h, esc, num, api, idr } = c;
+    const { h, esc, num, api, usd } = c;
     let b;
     let tab = "all";
     let autoOpened = false;
@@ -729,7 +729,7 @@
       const p = b.plan;
       const q = b.quota;
       const rows = b.transactions.filter((t) => tab === "all" || t.kind === tab);
-      c.root.innerHTML = `${b.bankConfigured || b.cardEnabled ? "" : `<div class="ds-banner warn" role="status">Payments aren't set up yet, so invoices can't be paid. The site owner needs to set <code>APIZIE_BANK_INFO</code> or Dodo Payments.</div>`}
+      c.root.innerHTML = `${b.cardEnabled ? "" : `<div class="ds-banner warn" role="status">Checkout is temporarily unavailable. Plans and top-ups will be back shortly; your current plan keeps working.</div>`}
       <div class="grid-hero">
         <section class="ds-card hero-card plan-hero" aria-labelledby="cp-h">
           <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>$${p.priceUsd} / month</small></h2>
@@ -739,23 +739,22 @@
         </section>
         <section class="ds-card" aria-labelledby="bal-h">
           <div class="card-top"><h2 id="bal-h">Pay-as-you-go balance</h2><button class="btn btn-primary btn-sm push" data-act="topupCustom">Top up</button></div>
-          <b class="hero-num sm">${idr(b.balance)}</b><p class="meta">≈ ${num(b.balanceRequests)} requests over your plan quota, at $${b.payg.usdPer1k.toFixed(2)} per 1,000</p>
+          <b class="hero-num sm">${usd(b.balance)}</b><p class="meta">≈ ${num(b.balanceRequests)} requests over your plan quota, at $${b.payg.usdPer1k.toFixed(2)} per 1,000</p>
           <label class="switch-row"><span><b>Use balance when the plan quota runs out</b><small>Your API keeps working past 100% instead of returning 429.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="payg" ${b.payg.enabled ? "checked" : ""}></label>
-          <label class="switch-row"><span><b>Low-balance alert</b><small>Notify me (and send <code>balance.low</code>) below ${idr(b.payg.lowBalance)}.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="lowBalanceAlert" ${b.payg.lowBalanceAlert ? "checked" : ""}></label>
+          <label class="switch-row"><span><b>Low-balance alert</b><small>Notify me (and send <code>balance.low</code>) below ${usd(b.payg.lowBalanceUsd)}.</small></span><input type="checkbox" role="switch" data-change="pref" data-pref="lowBalanceAlert" ${b.payg.lowBalanceAlert ? "checked" : ""}></label>
         </section>
       </div>
-      <section class="ds-card" aria-labelledby="tu-h"><div class="card-top"><h2 id="tu-h">Top up balance</h2><span class="meta">${b.cardEnabled ? "Secure checkout by Dodo Payments · card, Apple Pay, Google Pay" : `Bank transfer · VAT ${b.vatPercent}% added on the invoice`}</span></div>
-        ${b.cardEnabled ? `<div class="topups">${b.payg.topupsUsd.map((t) => `<div class="topup"><b>$${t.usd}</b><span class="meta">≈ ${num(t.requests)} requests</span><button class="btn btn-ghost btn-sm" data-act="topupUsd" data-usd="${t.usd}">Top up $${t.usd}</button></div>`).join("")}
-          <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in US dollars</label><input id="tu-amt" name="amount" type="number" inputmode="decimal" min="${b.payg.minTopupUsd}" step="1" placeholder="$"><span class="meta">min $${b.payg.minTopupUsd}</span><button class="btn btn-ghost btn-sm" data-act="topupForm">Top up</button></form></div>` : `<div class="topups">${b.payg.topups.map((t) => `<div class="topup"><b>${idr(t.amount)}</b><span class="meta">≈ ${num(t.requests)} requests</span><button class="btn btn-ghost btn-sm" data-act="topup" data-amount="${t.amount}">Top up ${idr(t.amount)}</button></div>`).join("")}
-          <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in rupiah</label><input id="tu-amt" name="amount" type="number" inputmode="numeric" min="${b.payg.minTopup}" step="1000" placeholder="Rp"><span class="meta">min ${idr(b.payg.minTopup)}</span><button class="btn btn-ghost btn-sm" data-act="topupForm">Top up</button></form></div>`}
+      <section class="ds-card" aria-labelledby="tu-h"><div class="card-top"><h2 id="tu-h">Top up balance</h2><span class="meta">Secure checkout by Dodo Payments · card, Apple Pay, Google Pay</span></div>
+        <div class="topups">${b.payg.topupsUsd.map((t) => `<div class="topup"><b>$${t.usd}</b><span class="meta">≈ ${num(t.requests)} requests</span><button class="btn btn-ghost btn-sm" data-act="topupUsd" data-usd="${t.usd}"${b.cardEnabled ? "" : " disabled"}>Top up $${t.usd}</button></div>`).join("")}
+          <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in US dollars</label><input id="tu-amt" name="amount" type="number" inputmode="decimal" min="${b.payg.minTopupUsd}" max="${b.payg.maxTopupUsd}" step="1" placeholder="$"><span class="meta">min $${b.payg.minTopupUsd}</span><button class="btn btn-ghost btn-sm" data-act="topupForm"${b.cardEnabled ? "" : " disabled"}>Top up</button></form></div>
       </section>
       <section class="ds-card" id="plans" aria-labelledby="pl-h"><div class="card-top"><h2 id="pl-h">Plans</h2><span class="meta">Each plan includes a monthly quota; your balance covers anything above it</span></div>
         <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? h.badge("current", "Current plan") : x.id === "free" ? "" : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">${p.id === x.id ? "Renew" : "Choose"}</button>`}</div>
-          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceIdr ? `<p class="meta">${b.cardEnabled ? `$${x.priceUsd * 10} / year (2 months free)` : `${idr(x.priceIdr)} by bank transfer`}</p>` : ""}
+          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceUsd ? `<p class="meta">$${x.priceUsd * 10} / year (2 months free)</p>` : ""}
           <ul class="tips small"><li>${num(x.monthly)} requests / month</li><li>${num(x.perMinute)} requests / minute</li><li>${x.logDays}-day log history</li>${x.webhooks ? "<li>Webhooks and IP allowlists</li>" : ""}${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>${num(x.maxKeys)} active API keys</li></ul></div>`).join("")}</div>
       </section>
       <section class="ds-card" aria-labelledby="tx-h"><div class="card-top"><h2 id="tx-h">Transactions</h2>${h.seg("tab", [["all", "All"], ["plan", "Plans"], ["topup", "Top-ups"], ["usage", "Usage"]], tab)}</div>
-        ${rows.length ? h.table(["Order ID", "Date", "Item", "Method", "Subtotal", `VAT ${b.vatPercent}%`, "Total", "Status", ""], rows.map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${c.day(t.date)}</td><td>${esc(t.item)}</td><td>${esc(t.method)}</td><td>${c.money(t.subtotal, t.currency)}</td><td>${t.kind === "usage" ? "–" : t.currency === "USD" ? `<span class="meta">at checkout</span>` : idr(t.vat)}</td><td><b>${c.money(t.total, t.currency)}</b></td><td>${statusTag(t.status)}${t.reference ? `<div class="meta">Ref: ${esc(t.reference)}</div>` : ""}</td><td>${t.status === "pending" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="pay" data-id="${esc(t.id)}">Pay</button><button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${esc(t.id)}">Cancel</button></div>` : ""}</td></tr>`)) : h.empty("No transactions yet", "Invoices for plans and top-ups, and pay-as-you-go usage, show up here.")}
+        ${rows.length ? h.table(["Order ID", "Date", "Item", "Method", "Subtotal", "Tax", "Total", "Status", ""], rows.map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${c.day(t.date)}</td><td>${esc(t.item)}</td><td>${esc(t.method)}</td><td>${c.money(t.subtotal, t.currency)}</td><td>${t.kind === "usage" ? "–" : `<span class="meta">at checkout</span>`}</td><td><b>${c.money(t.total, t.currency)}</b></td><td>${statusTag(t.status)}${t.reference ? `<div class="meta">Ref: ${esc(t.reference)}</div>` : ""}</td><td>${t.status === "pending" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="pay" data-id="${esc(t.id)}">Pay</button><button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${esc(t.id)}">Cancel</button></div>` : ""}</td></tr>`)) : h.empty("No transactions yet", "Invoices for plans and top-ups, and pay-as-you-go usage, show up here.")}
       </section>`;
       if (want) document.getElementById("plans")?.scrollIntoView({ block: "start" });
       if (want && !autoOpened && b.plans.some((x) => x.id === want && x.id !== "free")) {
@@ -770,37 +769,12 @@
       c.toast("Opening secure checkout…");
       location.assign(url);
     };
-    const payModal = (inv) =>
-      inv.provider === "dodo" ? goCheckout(inv) :
-      c.openModal({
-        title: `Pay invoice ${esc(inv.id)}`,
-        wide: true,
-        body: `<p class="modal-text">Transfer the exact amount below. The last three digits (${inv.uniqueCode}) let us match your payment.</p>
-          <div class="pay-amount"><span>Amount to transfer</span><b>${idr(inv.amount)}</b>${h.copyBtn(String(inv.amount), "Copy amount")}</div>
-          <dl class="kv small"><dt>Subtotal</dt><dd>${idr(inv.subtotal ?? inv.base)}</dd><dt>VAT ${inv.vatPercent ?? 0}%</dt><dd>${idr(inv.vat ?? 0)}</dd><dt>Unique code</dt><dd>${idr(inv.uniqueCode)}</dd></dl>
-          <div class="bank-box">${esc(b.bank)}</div>
-          <label class="field">After you pay: transfer reference or sender name<input name="reference" maxlength="200" placeholder="e.g. BCA a.n. Nafadza, ref 8823…"></label>
-          <p class="hint">${inv.type === "topup" ? "Your balance" : "Your plan"} is activated as soon as an admin confirms the transfer.</p>`,
-        submit: "I've paid",
-        cancel: "Pay later",
-        onSubmit: async (form) => {
-          if (!form.reference.value.trim()) throw new Error("Add the transfer reference or the sender's name so we can find your payment.");
-          await api(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: { reference: form.reference.value.trim() } });
-          c.toast("Thanks. We'll confirm it shortly");
-          return true;
-        },
-      });
-    // Dodo Payments is the checkout whenever it is configured; bank transfer is only the fallback without it.
-    const chooseMethod = async () => (b.cardEnabled ? "card" : "bank_transfer");
-    const createInvoice = async (body0) => {
-      const method = await chooseMethod(body0);
-      if (!method) return;
-      const body = { ...body0, method };
-      const { content: inv } = await api("/api/me/invoices", { method: "POST", body });
-      if (inv.checkoutUrl) return goCheckout(inv);
-      await load();
-      await payModal(inv);
-      await load();
+    const payModal = (inv) => (inv.provider === "dodo" ? goCheckout(inv) : c.toast("This older invoice can't be paid online. Cancel it and choose the plan again."));
+    // Every purchase goes to Dodo Payments checkout (US dollars).
+    const createInvoice = async (body) => {
+      if (!b.cardEnabled) return c.toast("Checkout is temporarily unavailable. Please try again soon.");
+      const { content: inv } = await api("/api/me/invoices", { method: "POST", body: { ...body, method: "card" } });
+      return goCheckout(inv);
     };
     setHandlers({
       pref: async (el) => {
@@ -815,16 +789,12 @@
           el.disabled = false;
         }
       },
-      topup: (el) => createInvoice({ type: "topup", amount: Number(el.dataset.amount) }),
       topupUsd: (el) => createInvoice({ type: "topup", usd: Number(el.dataset.usd) }),
       topupForm: (el) => {
         const v = Number(el.closest("form").amount.value);
-        if (b.cardEnabled) {
-          if (!v || v < b.payg.minTopupUsd) return c.toast(`Enter at least $${b.payg.minTopupUsd}`);
-          return createInvoice({ type: "topup", usd: v });
-        }
-        if (!v || v < b.payg.minTopup) return c.toast(`Enter at least ${idr(b.payg.minTopup)}`);
-        return createInvoice({ type: "topup", amount: v });
+        if (!v || v < b.payg.minTopupUsd) return c.toast(`Enter at least $${b.payg.minTopupUsd}`);
+        if (v > b.payg.maxTopupUsd) return c.toast(`The most you can add at once is $${b.payg.maxTopupUsd.toLocaleString("en-US")}`);
+        return createInvoice({ type: "topup", usd: v });
       },
       topupCustom: () => {
         const i = c.$("#tu-amt");
@@ -835,8 +805,8 @@
         const plan = b.plans.find((x) => x.id === el.dataset.plan);
         const months = await c.openModal({
           title: `${c.cap(plan.id)} plan`,
-          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid}${b.cardEnabled ? "" : ` (${idr(plan.priceIdr * paid)})`}</option>`; }).join("")}</select></label><p class="hint">${b.cardEnabled ? `You'll continue to a secure checkout by Dodo Payments (card, Apple Pay or Google Pay). The plan is active as soon as the payment goes through${b.plan.id === plan.id ? " and the time is added to your current period" : ""}. No automatic renewal.` : `You'll get an invoice to pay by bank transfer. The plan starts when the payment is confirmed${b.plan.id === plan.id ? " and the time is added to your current period" : ""}.`}</p>`,
-          submit: b.cardEnabled ? "Continue to checkout" : "Create invoice",
+          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid}</option>`; }).join("")}</select></label><p class="hint">You'll continue to a secure checkout by Dodo Payments (card, Apple Pay or Google Pay, in US dollars). The plan is active as soon as the payment goes through${b.plan.id === plan.id ? " and the time is added to your current period" : ""}. No automatic renewal.</p>`,
+          submit: "Continue to checkout",
           onSubmit: (form) => Number(form.months.value),
         });
         if (months) await createInvoice({ type: "plan", plan: plan.id, months });
@@ -847,7 +817,7 @@
         await load();
       },
       cancel: async (el) => {
-        if (!(await c.confirmModal({ title: "Cancel this invoice?", text: "Don't cancel it if you already transferred the money.", confirm: "Cancel invoice" }))) return;
+        if (!(await c.confirmModal({ title: "Cancel this invoice?", text: "Don't cancel it if you already paid at checkout.", confirm: "Cancel invoice" }))) return;
         await api(`/api/me/invoices/${el.dataset.id}/cancel`, { method: "POST" });
         await load();
       },
@@ -878,7 +848,7 @@
 
   // ===== Affiliate ============================================================================
   S.affiliate = async (c) => {
-    const { h, esc, num, api, idr } = c;
+    const { h, esc, num, api, usd } = c;
     let a;
     const load = async () => {
       try {
@@ -892,24 +862,24 @@
       c.root.innerHTML = `<div class="grid-hero">
         <section class="ds-card hero-card" aria-labelledby="ref-h"><div class="hero-left"><h2 id="ref-h">Your referral link</h2><p class="meta">Share it. When someone signs up through it and pays for a plan or a top-up, you earn ${a.percent}% of what they pay (before VAT), for as long as they stay.</p>
           <div class="secret-row big"><code>${esc(a.link)}</code>${h.copyBtn(a.link, "Copy link")}</div><p class="meta">Code <code>${esc(a.code)}</code> · the link remembers a visitor for 30 days</p></div></section>
-        <section class="ds-card" aria-labelledby="earn-h"><h2 id="earn-h">Earnings</h2><b class="hero-num sm">${idr(a.available)}</b><p class="meta">available · ${idr(a.earned)} earned in total</p>
+        <section class="ds-card" aria-labelledby="earn-h"><h2 id="earn-h">Earnings</h2><b class="hero-num sm">${usd(a.available)}</b><p class="meta">available · ${usd(a.earned)} earned in total</p>
           <div class="ds-row"><button class="btn btn-primary btn-sm" data-act="move" ${a.available > 0 ? "" : "disabled"}>Move to balance</button><button class="btn btn-ghost btn-sm" data-act="payout" ${a.available >= a.minPayout ? "" : "disabled"}>Request payout</button></div>
-          <p class="meta">Moving to your pay-as-you-go balance is instant. Bank payouts start at ${idr(a.minPayout)}.</p></section>
+          <p class="meta">Moving to your pay-as-you-go balance is instant. Payouts (PayPal or international bank transfer) start at ${usd(a.minPayout)}.</p></section>
       </div>
       <div class="grid-4">${h.stat("Link clicks", num(a.clicks))}${h.stat("Sign-ups", num(a.signups))}${h.stat("Paying customers", num(a.paying))}${h.stat("Commission", `${a.percent}%`, "of each paid invoice")}</div>
       <div class="grid-main">
-        <section class="ds-card" aria-labelledby="ce-h"><h2 id="ce-h">Commission history</h2>${a.earnings.length ? h.table(["Date", "Invoice", "Amount"], a.earnings.map((e) => `<tr><td>${c.day(e.at)}</td><td><code>${esc(e.invoiceId)}</code></td><td>${idr(e.amount)}</td></tr>`)) : h.empty("No commission yet", "It appears here when someone you referred pays an invoice.")}</section>
-        <section class="ds-card" aria-labelledby="po-h"><h2 id="po-h">Payout requests</h2>${a.payouts.length ? h.table(["Date", "Amount", "Status"], a.payouts.map((p) => `<tr><td>${c.day(p.createdAt)}</td><td>${idr(p.amount)}</td><td>${h.badge(p.status)}</td></tr>`)) : h.empty("No payouts yet")}</section>
+        <section class="ds-card" aria-labelledby="ce-h"><h2 id="ce-h">Commission history</h2>${a.earnings.length ? h.table(["Date", "Invoice", "Amount"], a.earnings.map((e) => `<tr><td>${c.day(e.at)}</td><td><code>${esc(e.invoiceId)}</code></td><td>${usd(e.amount)}</td></tr>`)) : h.empty("No commission yet", "It appears here when someone you referred pays an invoice.")}</section>
+        <section class="ds-card" aria-labelledby="po-h"><h2 id="po-h">Payout requests</h2>${a.payouts.length ? h.table(["Date", "Amount", "Status"], a.payouts.map((p) => `<tr><td>${c.day(p.createdAt)}</td><td>${p.currency === "USD" ? usd(p.amount) : c.idr(p.amount)}</td><td>${h.badge(p.status)}</td></tr>`)) : h.empty("No payouts yet")}</section>
       </div>`;
     };
     setHandlers({
       move: async () => {
         const { content } = await api("/api/me/affiliate/move", { method: "POST" });
-        c.toast(`${idr(content.moved)} moved to your balance`);
+        c.toast(`${usd(content.moved)} moved to your balance`);
         await load();
       },
       payout: async () => {
-        const r = await c.openModal({ title: `Request a payout of ${idr(Math.floor(a.available))}`, body: `<label class="field">Bank account<input name="account" required maxlength="200" placeholder="BCA 1234567890 a.n. Your Name" autofocus></label><p class="hint">We transfer it manually, usually within a few business days, and notify you when it's sent.</p>`, submit: "Request payout", onSubmit: (form) => api("/api/me/affiliate/payout", { method: "POST", body: { account: form.account.value } }) });
+        const r = await c.openModal({ title: `Request a payout of ${usd(Math.floor(a.available * 100) / 100)}`, body: `<label class="field">Where should we send it?<input name="account" required maxlength="200" placeholder="PayPal email, or bank name + SWIFT + account number + holder" autofocus></label><p class="hint">We transfer it manually, usually within a few business days, and notify you when it's sent.</p>`, submit: "Request payout", onSubmit: (form) => api("/api/me/affiliate/payout", { method: "POST", body: { account: form.account.value } }) });
         if (r) {
           c.toast("Payout requested");
           await load();

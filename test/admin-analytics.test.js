@@ -20,7 +20,7 @@ before(async () => {
   userCookie = `apz_session=${(await app.repo.createSession(cust.id)).token}`;
   const key = (await app.repo.createKey(cust.id, { name: "k" })).secret;
   for (let i = 0; i < 8; i++) await fetch(`${base}/v1/search-tools:wikipedia/search?query=a${i}`, { headers: { "x-api-key": key } });
-  await app.repo.put("invoice", { id: "INV-1", userId: cust.id, email: cust.email, type: "plan", plan: "pro", months: 1, amount: 165000, status: "paid", createdAt: new Date().toISOString(), paidAt: new Date().toISOString() }, cust.id);
+  await app.repo.put("invoice", { id: "INV-1", userId: cust.id, email: cust.email, type: "plan", plan: "pro", months: 1, currency: "USD", amount: 900, status: "paid", createdAt: new Date().toISOString(), paidAt: new Date().toISOString() }, cust.id);
   await app.repo.put("invoice", { id: "INV-2", userId: cust.id, email: cust.email, type: "plan", plan: "pro", months: 1, amount: 165000, status: "awaiting_review", createdAt: new Date().toISOString() }, cust.id);
 });
 after(() => new Promise((r) => app.server.close(r)));
@@ -45,7 +45,7 @@ test("analytics: traffic, customers, revenue, attention and source health", asyn
   assert.equal(o.customers.byPlan.pro, 1);
   assert.equal(o.customers.top[0].email, "cust@example.test");
   assert.equal(o.customers.top[0].requests, 8);
-  assert.equal(o.revenue.inRange, 165000);
+  assert.equal(o.revenue.inRange, 9);
   assert.equal(o.revenue.mrrUsd, 9);
   assert.equal(o.attention.invoicesToReview, 1);
   const wiki = o.sources.top.find((s) => s.project === "search-tools:wikipedia");
@@ -79,7 +79,7 @@ test("planned sources are hidden from users everywhere and listed for admins onl
   assert.equal(list.items.filter((i) => i.status === "planned").length, 0);
   assert.equal(list.total, app.catalog.all.length - app.catalog.planned.scrapers);
   assert.equal((await fetch(`${base}/api/${planned.category}/${planned.slug}`)).status, 404);
-  for (const p of ["/llms-full.txt", "/openapi.json", "/sitemap.xml", "/scrapers"]) assert.ok(!(await (await fetch(base + p)).text()).includes(`/${planned.category}/${planned.slug}`), p);
+  for (const p of ["/llms-full.txt", "/openapi.json", "/sitemap.xml", "/sitemap-pages.xml", "/sitemap-apis-1.xml", "/sitemap-apis-2.xml", "/sitemap-apis-3.xml", "/sitemap-apis-4.xml", "/scrapers"]) assert.ok(!(await (await fetch(base + p)).text()).includes(`/${planned.category}/${planned.slug}`), p);
   assert.ok(!(await (await fetch(`${base}/llms-full.txt`)).text()).includes(planned.key));
   const key = (await app.repo.createKey(cust.id, { name: "m" })).secret;
   const mcp = async (name, args) => (await (await fetch(`${base}/mcp`, { method: "POST", headers: { "content-type": "application/json", "x-api-key": key }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) })).json()).result;

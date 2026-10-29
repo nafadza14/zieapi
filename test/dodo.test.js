@@ -99,20 +99,20 @@ test("webhook: wrong amount, currency or customer never activates anything", asy
 });
 
 test("return page: the server asks Dodo and credits a card top-up even before the webhook", async () => {
-  const inv = (await me("/api/me/invoices", { type: "topup", amount: 80000, method: "card" })).json.content;
-  assert.equal(inv.amount, Math.round((Math.floor(800000 / 66) * 0.4 * 100) / 1000), "top-up priced at $0.40 per 1,000 requests");
+  const inv = (await me("/api/me/invoices", { type: "topup", usd: 25, method: "card" })).json.content;
+  assert.equal(inv.amount, 2500, "top-up billed in US cents");
   checkoutState = { payment_id: null, payment_status: null };
   assert.equal((await me(`/api/me/invoices/${inv.id}/sync`, {})).json.content.status, "pending");
   const before = await app.repo.getBalance(user.id);
   checkoutState = { payment_id: "pay_t", payment_status: "succeeded" };
   assert.equal((await me(`/api/me/invoices/${inv.id}/sync`, {})).json.content.status, "paid");
-  assert.equal((await app.repo.getBalance(user.id)) - before, 800000, "Rp80.000 credited (in tenths)");
+  assert.equal((await app.repo.getBalance(user.id)) - before, 25_000_000, "$25 credited (in micro-dollars)");
   // the late webhook is a no-op
   await hook({ type: "payment.succeeded", data: { payment_id: "pay_t", total_amount: inv.amount, currency: "USD", metadata: { invoice_id: inv.id, user_id: user.id } } });
-  assert.equal((await app.repo.getBalance(user.id)) - before, 800000);
+  assert.equal((await app.repo.getBalance(user.id)) - before, 25_000_000);
 });
 
-test("without Dodo settings card payment is off and bank transfer still works", async () => {
+test("without Dodo settings checkout is unavailable and there is no bank-transfer fallback", async () => {
   const plain = createApp({ quiet: true, logger: null, kv: new MemoryKV(), env: {}, supabaseAuth: null, apiUrl: "http://api.test", publicUrl: "http://p.test", dodoFetch: async () => { throw new Error("must not be called"); } });
   await new Promise((r) => plain.server.listen(0, "127.0.0.1", r));
   try {
@@ -121,9 +121,9 @@ test("without Dodo settings card payment is off and bank transfer still works", 
     const ck = `apz_session=${(await plain.repo.createSession(u.id)).token}`;
     const call = (p, body) => fetch(b2 + p, { method: body ? "POST" : "GET", headers: { cookie: ck, "content-type": "application/json", "x-zie-csrf": "1" }, body: body ? JSON.stringify(body) : undefined });
     assert.equal((await (await call("/api/me/billing")).json()).content.cardEnabled, false);
-    assert.equal((await call("/api/me/invoices", { type: "plan", plan: "pro", months: 1, method: "card" })).status, 400);
-    const bank = await (await call("/api/me/invoices", { type: "plan", plan: "pro", months: 1 })).json();
-    assert.equal(bank.content.method, "bank_transfer");
+    assert.equal((await call("/api/me/invoices", { type: "plan", plan: "pro", months: 1, method: "card" })).status, 503);
+    assert.equal((await call("/api/me/invoices", { type: "plan", plan: "pro", months: 1 })).status, 503);
+    assert.equal((await plain.repo.listItems("invoice", u.id)).length, 0);
     assert.equal((await fetch(`${b2}/webhooks/dodo`, { method: "POST", body: "{}" })).status, 401, "unsigned webhooks are refused when no secret is set");
   } finally {
     await new Promise((r) => plain.server.close(r));
@@ -134,7 +134,7 @@ test("card top-up in dollars: $10 buys 25,000 requests, credited at the same per
   const inv = (await me("/api/me/invoices", { type: "topup", usd: 10, method: "card" })).json.content;
   assert.equal(inv.amount, 1000);
   assert.equal(inv.requests, 25000);
-  assert.equal(inv.creditIdr, 165000);
+  assert.equal(inv.creditMicros, 10_000_000);
   assert.equal(calls.at(-1).body.product_cart[0].amount, 1000);
   assert.equal((await me("/api/me/invoices", { type: "topup", usd: 1, method: "card" })).status, 400, "minimum $5");
   const billing = (await me("/api/me/billing")).json.content;

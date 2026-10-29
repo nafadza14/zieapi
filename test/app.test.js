@@ -26,7 +26,8 @@ before(async () => {
   app = createApp({
     logger: null,
     quiet: true,
-    env: { ZIE_ADMIN_EMAILS: "boss@zieads.com", ZIE_UPSTREAM_URL: "https://upstream.test", ZIE_UPSTREAM_KEY: "up_secret", ZIE_KEYS: "ultra:zie_env_ultra_key_000000" },
+    env: { ZIE_ADMIN_EMAILS: "boss@zieads.com", ZIE_UPSTREAM_URL: "https://upstream.test", ZIE_UPSTREAM_KEY: "up_secret", ZIE_KEYS: "ultra:zie_env_ultra_key_000000", DODO_PAYMENTS_API_KEY: "test_dodo", DODO_PAYMENTS_PRODUCT_ID: "pdt_test", DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    dodoFetch: async (url, init) => (init.method === "POST" ? Response.json({ session_id: "cks_x", checkout_url: "https://test.checkout.dodopayments.com/session/x" }) : Response.json({ payment_id: "pay_test", payment_status: "succeeded" })),
     apiUrl: "http://api.test",
     publicUrl: "http://zie.test",
     scrapers: [...devtools, flaky],
@@ -165,24 +166,22 @@ test("plan gate, admin upgrade, invoices, bulk, webhooks", async () => {
 
   const inv = await c("/api/me/invoices", { method: "POST", body: { plan: "ultra", months: 1 } });
   assert.equal(inv.status, 201);
-  assert.equal(inv.body.content.subtotal, 479000);
-  assert.equal(inv.body.content.vat, 52690);
+  assert.equal(inv.body.content.currency, "USD");
+  assert.equal(inv.body.content.amount, 2900, "$29 in cents");
   assert.equal(inv.body.content.priceUsd, 29);
-  assert.ok(inv.body.content.amount > 531690 && inv.body.content.amount < 532690);
+  assert.match(inv.body.content.checkoutUrl, /dodopayments\.com/);
   const yearly = await c("/api/me/invoices", { method: "POST", body: { plan: "pro", months: 12 } });
-  assert.equal(yearly.body.content.subtotal, 149000 * 10, "12 months bills 10");
+  assert.equal(yearly.body.content.amount, 9000, "12 months bills 10");
   assert.equal(yearly.body.content.priceUsd, 90);
   await c(`/api/me/invoices/${yearly.body.content.id}/cancel`, { method: "POST" });
-  const conf = await c(`/api/me/invoices/${inv.body.content.id}/confirm`, { method: "POST", body: { reference: "BCA a.n. U" } });
-  assert.equal(conf.body.content.status, "awaiting_review");
 
   const admin = client();
   await admin("/auth/register", { method: "POST", body: { name: "Boss", email: "boss@zieads.com", password: "password1" } });
   assert.equal((await c("/api/admin/overview")).status, 403);
   const ov = await admin("/api/admin/overview");
   assert.equal(ov.status, 200);
-  assert.ok(ov.body.content.pendingInvoices >= 1);
-  const ap = await admin(`/api/admin/invoices/${inv.body.content.id}/approve`, { method: "POST" });
+  // back from checkout: the server asks Dodo (stand-in says paid) and activates the plan
+  const ap = await c(`/api/me/invoices/${inv.body.content.id}/sync`, { method: "POST", body: {} });
   assert.equal(ap.body.content.status, "paid");
   assert.equal((await c("/api/me")).body.content.plan.id, "ultra");
 
@@ -327,8 +326,21 @@ test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", asy
   assert.match(robots, /Sitemap: http:\/\/zie\.test\/sitemap\.xml/);
   assert.match(robots, /Disallow: \/dashboard/);
   assert.doesNotMatch(robots, /Disallow: \/mcp/);
-  const sm = await (await fetch(base + "/sitemap.xml")).text();
+  const smi = await (await fetch(base + "/sitemap.xml")).text();
+  assert.match(smi, /<sitemapindex[^>]*>[\s\S]*<loc>http:\/\/zie\.test\/sitemap-pages\.xml<\/loc>[\s\S]*<loc>http:\/\/zie\.test\/sitemap-apis-1\.xml<\/loc>/);
+  const sm = await (await fetch(base + "/sitemap-pages.xml")).text();
   assert.match(sm, /<loc>http:\/\/zie\.test\/mcp<\/loc><lastmod>\d{4}-\d\d-\d\d<\/lastmod>/);
+  // every API page is listed exactly once across the child sitemaps, each under 50,000 URLs
+  const parts = [...smi.matchAll(/sitemap-(apis-\d+)\.xml/g)].map((m) => m[1]);
+  let apiUrls = 0;
+  for (const part of parts) {
+    const x = await (await fetch(`${base}/sitemap-${part}.xml`)).text();
+    const n = (x.match(/<url>/g) ?? []).length;
+    assert.ok(n > 0 && n <= 1000, part);
+    apiUrls += n;
+  }
+  assert.equal(apiUrls, app.catalog.scrapers.length);
+  assert.equal((await fetch(base + "/sitemap-apis-999.xml")).status, 404);
 
   for (const p of ["/favicon.ico", "/favicon.svg", "/apple-touch-icon.png", "/assets/og/home.png"]) assert.equal((await fetch(base + p)).status, 200, p);
   const login = await (await fetch(base + "/login")).text();

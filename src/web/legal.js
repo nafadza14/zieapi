@@ -11,7 +11,7 @@ export const COMPANY = {
   court: "Sleman District Court (Pengadilan Negeri Sleman)",
 };
 
-export const LEGAL_UPDATED = "29 October 2026";
+export const LEGAL_UPDATED = "30 October 2026";
 
 const C = COMPANY;
 const contactBlock = [
@@ -82,12 +82,11 @@ export const LEGAL_DOCS = {
         ]],
       ] },
       { h: "9. Prices, payment and taxes", blocks: [
-        "List prices are shown in US dollars. You can pay by card, Apple Pay or Google Pay in US dollars, or by bank transfer in Indonesian Rupiah using the amount shown on the invoice we issue in your dashboard (each bank transfer invoice includes a small unique code so we can match your transfer).",
+        "All prices are in US dollars. You pay by card, Apple Pay or Google Pay at a checkout run by Dodo Payments.",
         ["ul", [
-          "Card payments are processed by Dodo Payments, which acts as the merchant of record for those sales and adds any sales tax or VAT that applies where you are at checkout. Its own terms apply to the payment itself; we never receive your full card details.",
-          "For bank transfers, value added tax (PPN) and other applicable taxes are added where required and shown on the invoice.",
+          "Payments are processed by Dodo Payments, which acts as the merchant of record for those sales and adds any sales tax or VAT that applies where you are at checkout. Its own terms apply to the payment itself; we never receive your full card details.",
           "A paid Plan starts once we have verified your payment. Monthly plans run for one month and yearly plans for twelve months. Yearly plans are priced at ten months.",
-          "Plans do not renew automatically, whichever way you pay. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan.",
+          "Plans do not renew automatically. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan.",
           "Pay-as-you-go top-ups are prepaid and stay on your Account while it is active.",
           "We may change prices with at least 30 days' notice. Changes never affect a period you have already paid for.",
         ]],
@@ -154,7 +153,7 @@ export const LEGAL_DOCS = {
         "**Keys and security.** Your API keys (stored encrypted so you can reveal them in the dashboard), key names, optional IP allowlists, and session records with sign-in time, IP address and browser user agent.",
         "**Request logs and usage.** For each API or MCP call: time, method, API and endpoint, status code, response time, which key was used, IP address, source (REST, MCP or bulk), cache result and any error message. We count requests per day and per API to show usage and enforce quotas. **We do not store your request parameters or response bodies in your logs.**",
         "**Provider keys.** Keys you send in `x-upstream-key` are forwarded to the Upstream Provider for that request only. **They are never stored or logged.**",
-        "**Billing.** Plan, invoices, amounts, tax, the transfer reference or sender name you enter when confirming a payment, pay-as-you-go balance and referral commissions.",
+        "**Billing.** Plan, invoices, amounts, tax, payment status from our payment provider (never your full card number), pay-as-you-go balance and referral commissions.",
         "**Webhooks and apps.** Webhook URLs, signing secrets, event settings and delivery history, and the MCP or OAuth apps you have authorised.",
         "**Things you send us.** Support requests, issue reports, showcase submissions and any other messages.",
         "**Referrals.** If you arrive through a referral link, we record the referral so the referrer can earn commission.",
@@ -292,7 +291,7 @@ export const LEGAL_DOCS = {
         "Unused top-up balance can be refunded within 14 days of the top-up if none of it has been used.",
       ] },
       { h: "How to ask", blocks: [
-        `Email [${C.email}](mailto:${C.email}) with your invoice ID. Approved refunds are sent to the originating bank account within 14 business days.`,
+        `Email [${C.email}](mailto:${C.email}) with your invoice ID. Approved refunds go back to the original payment method through Dodo Payments, usually within 5 to 10 business days.`,
       ] },
       { h: "Contact", blocks: contactBlock },
     ],

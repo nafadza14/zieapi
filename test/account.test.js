@@ -17,7 +17,9 @@ before(async () => {
   app = createApp({
     logger: null,
     quiet: true,
-    env: { ZIE_ADMIN_EMAILS: "owner@apizie.test", ZIE_SESSION_SECRET: "test-secret-that-is-long-enough-1234567890", ZIE_BANK_INFO: "BCA 123 a.n. Test", ZIE_SUPPORT_EMAIL: "help@apizie.test" },
+    env: { ZIE_ADMIN_EMAILS: "owner@apizie.test", ZIE_SESSION_SECRET: "test-secret-that-is-long-enough-1234567890", ZIE_SUPPORT_EMAIL: "help@apizie.test", DODO_PAYMENTS_API_KEY: "test_dodo", DODO_PAYMENTS_PRODUCT_ID: "pdt_test", DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    // Dodo Payments stand-in: every checkout is paid as soon as the return page asks.
+    dodoFetch: async (url, init) => (init.method === "POST" ? Response.json({ session_id: "cks_" + Math.random().toString(36).slice(2), checkout_url: "https://test.checkout.dodopayments.com/session/x" }) : Response.json({ payment_id: "pay_test", payment_status: "succeeded" })),
     apiUrl: "http://api.test",
     publicUrl: "http://apz.test",
     scrapers: devtools,
@@ -75,7 +77,8 @@ test("setup checks report what is missing", async () => {
   assert.equal(r.status, 200);
   const byId = Object.fromEntries(r.c.checks.map((x) => [x.id, x]));
   assert.equal(byId.secret.status, "ok");
-  assert.equal(byId.bank.status, "ok");
+  assert.equal(byId.card.status, "warn", "checkout works, webhook secret not set");
+  assert.equal(byId.bank, undefined, "no bank transfer any more");
   if (process.env.ZIE_TEST_SUPABASE_URL) {
     assert.equal(byId.storage.status, "ok", byId.storage.detail);
   } else {
@@ -226,29 +229,38 @@ test("analytics math: summarize respects key filter, timezone and p95 buckets", 
   assert.equal(k2.p95Ms, 3000);
 });
 
-test("billing: top-up invoice with VAT, admin approval credits balance, pay-as-you-go past quota", async () => {
+/** Start a Dodo checkout for an invoice and come back from it (the stand-in reports it paid). */
+async function buy(c, body) {
+  const inv = (await c("/api/me/invoices", { method: "POST", body })).c;
+  assert.match(inv.checkoutUrl, /^https:\/\/test\.checkout\.dodopayments\.com\//);
+  const paid = (await c(`/api/me/invoices/${inv.id}/sync`, { method: "POST", body: {} })).c;
+  assert.equal(paid.status, "paid");
+  return paid;
+}
+
+test("billing: USD top-up through Dodo checkout credits the balance, pay-as-you-go past quota", async () => {
   const c = client();
   const u = await signUp(c, "payg@x.io");
   const bill = (await c("/api/me/billing")).c;
-  assert.equal(bill.vatPercent, 11);
-  assert.equal(bill.bankConfigured, true);
-  assert.deepEqual(bill.payg.topups.map((t) => t.amount), [80000, 160000, 400000, 800000]);
-  assert.equal((await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 50000 } })).status, 400, "minimum top-up is Rp80.000 (about $5)");
+  assert.equal(bill.currency, "USD");
+  assert.equal(bill.cardEnabled, true);
+  assert.equal(bill.vatPercent, undefined);
+  assert.equal(bill.bank, undefined);
+  assert.deepEqual(bill.payg.topupsUsd.map((t) => t.usd), [5, 10, 25, 50]);
+  assert.equal((await c("/api/me/invoices", { method: "POST", body: { type: "topup", usd: 1 } })).status, 400, "minimum top-up is $5");
+  assert.equal((await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 80000 } })).status, 400, "no rupiah amounts");
 
-  const inv = (await c("/api/me/invoices", { method: "POST", body: { type: "topup", amount: 80000 } })).c;
+  const inv = await buy(c, { type: "topup", usd: 10 });
   assert.equal(inv.type, "topup");
-  assert.equal(inv.subtotal, 80000);
-  assert.equal(inv.vat, 8800);
-  assert.equal(inv.amount, 88800 + inv.uniqueCode);
-  assert.equal((await c(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: {} })).status, 400, "reference required");
-  assert.equal((await c(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: { reference: "BCA a.n. Payg" } })).c.status, "awaiting_review");
-  assert.equal((await admin(`/api/admin/invoices/${inv.id}/approve`, { method: "POST" })).c.status, "paid");
+  assert.equal(inv.currency, "USD");
+  assert.equal(inv.amount, 1000, "cents");
+  assert.equal((await c(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: { reference: "x" } })).status, 400, "nothing to confirm by hand");
   const after = (await c("/api/me/billing")).c;
-  assert.equal(after.balance, 80000);
-  assert.equal(after.balanceRequests, Math.floor(800000 / 66), "Rp6,6 per request, about $0.40 per 1,000");
+  assert.equal(after.balance, 10);
+  assert.equal(after.balanceRequests, 25000, "$0.40 per 1,000 requests");
   assert.equal(after.transactions.find((t) => t.id === inv.id).status, "paid");
   const notes = (await c("/api/me/notifications")).c;
-  assert.ok(notes.items.some((n) => /topped up/i.test(n.title)));
+  assert.ok(notes.items.some((n) => /topped up/i.test(n.title) && /\$10\.00/.test(n.body ?? n.text ?? JSON.stringify(n))));
   assert.ok(notes.unread >= 1);
   await c("/api/me/notifications/read", { method: "POST" });
   assert.equal((await c("/api/me/notifications")).c.unread, 0);
@@ -261,7 +273,7 @@ test("billing: top-up invoice with VAT, admin approval credits balance, pay-as-y
   const r = await call(k);
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("x-billing"), "payg");
-  assert.equal((await c("/api/me/billing")).c.balance, 80000 - 6.6);
+  assert.equal((await c("/api/me/billing")).c.balance, 10 - 0.0004);
   assert.equal((await call(k, "/v1/dev-tools:flaky/boom")).status, 404);
   const tx = (await c("/api/me/billing")).c.transactions;
   assert.ok(tx.some((t) => t.kind === "usage" && t.total < 0));
@@ -282,18 +294,18 @@ test("plan invoices activate the plan and pay the referrer's commission", async 
   assert.equal(s1.clicks, 1);
   assert.equal(s1.signups, 1);
 
-  const inv = (await visitor("/api/me/invoices", { method: "POST", body: { plan: "pro", months: 1 } })).c;
-  await visitor(`/api/me/invoices/${inv.id}/confirm`, { method: "POST", body: { reference: "x" } });
-  await admin(`/api/admin/invoices/${inv.id}/approve`, { method: "POST" });
+  const inv = await buy(visitor, { plan: "pro", months: 1 });
+  assert.equal(inv.amount, 900, "$9 in cents");
   assert.equal((await visitor("/api/me")).c.plan.id, "pro");
   const s2 = (await ref("/api/me/affiliate")).c;
-  assert.equal(s2.earned, inv.subtotal * 0.1);
-  assert.equal(s2.available, inv.subtotal * 0.1);
+  assert.equal(s2.currency, "USD");
+  assert.equal(s2.earned, 0.9, "10% of $9");
+  assert.equal(s2.available, 0.9);
   assert.equal(s2.paying, 1);
-  assert.equal((await ref("/api/me/affiliate/payout", { method: "POST", body: { account: "BCA 1 a.n. Ref" } })).status, 400, "below the payout minimum");
+  assert.equal((await ref("/api/me/affiliate/payout", { method: "POST", body: { account: "ref@paypal.example" } })).status, 400, "below the $10 payout minimum");
   const moved = (await ref("/api/me/affiliate/move", { method: "POST" })).c;
-  assert.equal(moved.moved, inv.subtotal * 0.1);
-  assert.equal(moved.balance, inv.subtotal * 0.1);
+  assert.equal(moved.moved, 0.9);
+  assert.equal(moved.balance, 0.9);
   assert.equal((await ref("/api/me/affiliate")).c.available, 0);
 
   // Pro unlocks the IP allowlist, 30-day range and webhooks for the buyer.

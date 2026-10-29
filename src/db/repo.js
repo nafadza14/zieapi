@@ -3,7 +3,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from "node:crypto";
 import { sha256, ulid, stableId, monthKey, dayKey } from "../core/util.js";
-import { PLANS, PAYG } from "../core/plans.js";
+import { PLANS, PAYG, microsFromLegacyTenths } from "../core/plans.js";
 
 const J = (s) => (s ? JSON.parse(s) : null);
 const S = (o) => JSON.stringify(o);
@@ -374,29 +374,42 @@ export class Repo {
     await this.kv.set(`notif_unread:${userId}`, "0");
   }
 
-  // ---------- pay-as-you-go balance (tenths of a rupiah) ------------------------
-  async getBalance(userId) {
-    return Number(await this.kv.get(`bal:${userId}`)) || 0;
+  // ---------- pay-as-you-go balance (micro-dollars) ------------------------------
+  /** Moves a counter written in the old unit (tenths of a rupiah) to its micro-dollar key, once. */
+  async _migrateLegacy(oldKey, newKey) {
+    const old = Number(await this.kv.get(oldKey)) || 0;
+    if (!old) return;
+    const taken = await this.kv.incrby(oldKey, -old); // only one caller sees the full amount disappear
+    if (taken !== 0) {
+      await this.kv.incrby(oldKey, old);
+      return;
+    }
+    await this.kv.incrby(newKey, microsFromLegacyTenths(old));
   }
-  async creditBalance(userId, tenths) {
-    return this.kv.incrby(`bal:${userId}`, Math.round(tenths));
+  async getBalance(userId) {
+    await this._migrateLegacy(`bal:${userId}`, `balu:${userId}`);
+    return Number(await this.kv.get(`balu:${userId}`)) || 0;
+  }
+  async creditBalance(userId, micros) {
+    return this.kv.incrby(`balu:${userId}`, Math.round(micros));
   }
   /** Debit n requests from the balance when the owner opted in. Returns the new balance, or null when not allowed. */
   async tryPaygDebit(owner, n) {
     if (!owner || owner.startsWith("key_")) return null;
     const prefs = await this.getPrefs(owner);
     if (!prefs.payg) return null;
-    const cost = n * PAYG.priceTenths;
-    const after = await this.kv.incrby(`bal:${owner}`, -cost);
+    await this._migrateLegacy(`bal:${owner}`, `balu:${owner}`);
+    const cost = n * PAYG.priceMicros;
+    const after = await this.kv.incrby(`balu:${owner}`, -cost);
     if (after < 0) {
-      await this.kv.incrby(`bal:${owner}`, cost);
+      await this.kv.incrby(`balu:${owner}`, cost);
       return null;
     }
     await this.kv.incrby(`payg:${owner}:${dayKey()}`, n, 120 * 86400);
     return after;
   }
   async refundPayg(owner, n) {
-    await this.kv.batch([["INCRBY", `bal:${owner}`, n * PAYG.priceTenths], ["INCRBY", `payg:${owner}:${dayKey()}`, -n]]);
+    await this.kv.batch([["INCRBY", `balu:${owner}`, n * PAYG.priceMicros], ["INCRBY", `payg:${owner}:${dayKey()}`, -n]]);
   }
   async paygUsage(userId, days = 90) {
     const list = [];
@@ -434,30 +447,38 @@ export class Repo {
   async addReferral(refUserId, userId) {
     await this.kv.sadd(`aff_refs:${refUserId}`, userId);
   }
-  /** Record commission for a paid invoice. Amount in tenths of a rupiah. */
+  /** Record commission for a paid invoice. Amount in micro-dollars. */
   async addAffEarning(refUserId, entry) {
-    await this.kv.batch([["LPUSH", `aff_earn:${refUserId}`, S({ id: ulid(), at: new Date().toISOString(), ...entry }), 500], ["INCRBY", `aff_avail:${refUserId}`, Math.round(entry.amountTenths)], ["INCRBY", `aff_total:${refUserId}`, Math.round(entry.amountTenths)]]);
+    await this.kv.batch([["LPUSH", `aff_earn:${refUserId}`, S({ id: ulid(), at: new Date().toISOString(), ...entry }), 500], ["INCRBY", `aff_availu:${refUserId}`, Math.round(entry.amountMicros)], ["INCRBY", `aff_totalu:${refUserId}`, Math.round(entry.amountMicros)]]);
   }
   async affiliateStats(userId) {
-    const [clicks, refs, earn, avail, total] = await this.kv.batch([["GET", `aff_clicks:${userId}`], ["SMEMBERS", `aff_refs:${userId}`], ["LRANGE", `aff_earn:${userId}`, 0, 99], ["GET", `aff_avail:${userId}`], ["GET", `aff_total:${userId}`]]);
-    return { clicks: Number(clicks) || 0, referrals: refs ?? [], earnings: (earn ?? []).map(J), availableTenths: Number(avail) || 0, totalTenths: Number(total) || 0 };
+    await this._migrateLegacy(`aff_avail:${userId}`, `aff_availu:${userId}`);
+    await this._migrateLegacy(`aff_total:${userId}`, `aff_totalu:${userId}`);
+    const [clicks, refs, earn, avail, total] = await this.kv.batch([["GET", `aff_clicks:${userId}`], ["SMEMBERS", `aff_refs:${userId}`], ["LRANGE", `aff_earn:${userId}`, 0, 99], ["GET", `aff_availu:${userId}`], ["GET", `aff_totalu:${userId}`]]);
+    const earnings = (earn ?? []).map(J).map((e) => (e.amountMicros === undefined && e.amountTenths !== undefined ? { ...e, amountMicros: microsFromLegacyTenths(e.amountTenths) } : e));
+    return { clicks: Number(clicks) || 0, referrals: refs ?? [], earnings, availableMicros: Number(avail) || 0, totalMicros: Number(total) || 0 };
   }
-  /** Move available affiliate earnings into the PAYG balance. Returns the amount moved (tenths). */
+  /** Move available affiliate earnings into the PAYG balance. Returns the amount moved (micro-dollars). */
   async moveAffToBalance(userId) {
-    const avail = Number(await this.kv.get(`aff_avail:${userId}`)) || 0;
+    await this._migrateLegacy(`aff_avail:${userId}`, `aff_availu:${userId}`);
+    const avail = Number(await this.kv.get(`aff_availu:${userId}`)) || 0;
     if (avail <= 0) return 0;
-    const left = await this.kv.incrby(`aff_avail:${userId}`, -avail);
+    const left = await this.kv.incrby(`aff_availu:${userId}`, -avail);
     if (left < 0) {
-      await this.kv.incrby(`aff_avail:${userId}`, avail);
+      await this.kv.incrby(`aff_availu:${userId}`, avail);
       return 0;
     }
     await this.creditBalance(userId, avail);
     return avail;
   }
-  async takeAffForPayout(userId, tenths) {
-    const left = await this.kv.incrby(`aff_avail:${userId}`, -tenths);
+  /** Put an amount (micro-dollars) back into available affiliate earnings, e.g. a rejected payout. */
+  async creditAffiliate(userId, micros) {
+    await this.kv.incrby(`aff_availu:${userId}`, Math.round(micros));
+  }
+  async takeAffForPayout(userId, micros) {
+    const left = await this.kv.incrby(`aff_availu:${userId}`, -micros);
     if (left < 0) {
-      await this.kv.incrby(`aff_avail:${userId}`, tenths);
+      await this.kv.incrby(`aff_availu:${userId}`, micros);
       return false;
     }
     return true;

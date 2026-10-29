@@ -41,15 +41,10 @@ test("old vercel.app page links redirect to the same page on apizie.tech; API, M
   assert.equal((await get(base, "/pricing", "apizie.tech")).status, 200);
 });
 
-test("www.apizie.tech pages move to apizie.tech and a www public URL is folded into the bare domain", async () => {
+test("www and the bare domain never redirect each other from the app (Vercel owns that, so no loop)", async () => {
   const base = await start({ VERCEL_ENV: "production", APIZIE_PUBLIC_URL: "https://www.apizie.tech" });
-  const r = await get(base, "/pricing?x=1", "www.apizie.tech");
-  assert.equal(r.status, 308);
-  assert.equal(r.headers.get("location"), "https://apizie.tech/pricing?x=1");
-  assert.notEqual((await get(base, "/mcp", "www.apizie.tech")).status, 308, "MCP keeps working on www");
-  const home = await (await get(base, "/", "apizie.tech")).text();
-  assert.match(home, /<link rel="canonical" href="https:\/\/apizie\.tech\/"/);
-  assert.ok(!home.includes("www.apizie.tech"));
+  assert.equal((await get(base, "/pricing", "www.apizie.tech")).status, 200);
+  assert.equal((await get(base, "/pricing", "apizie.tech")).status, 200);
 });
 
 test("preview deployments and local runs keep their own host", async () => {

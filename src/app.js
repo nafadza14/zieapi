@@ -270,7 +270,7 @@ export function createApp(opts = {}) {
 
     // ----- machine-readable ----------------------------------------------------
     if (p === "/healthz") return json(200, { ok: true, version: VERSION, uptimeSec: Math.round(process.uptime()), storage: kv.constructor.name });
-    if (p === "/api/info") return json(200, okContent({ name: "apizie", version: VERSION, ...catalog.totals(), docs: `${publicUrl}/docs`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp` }));
+    if (p === "/api/info") return json(200, okContent({ name: "apizie", version: VERSION, commit: env.VERCEL_GIT_COMMIT_SHA ? String(env.VERCEL_GIT_COMMIT_SHA).slice(0, 7) : null, ...catalog.totals(), docs: `${publicUrl}/docs`, openapi: `${apiUrl}/openapi.json`, mcp: `${apiUrl}/mcp` }));
     if (p === "/openapi.json") return json(200, memo("oa", () => buildOpenApi(catalog, { apiUrl, version: VERSION })), { "Cache-Control": "public, max-age=600" });
     if (p === "/llms.txt") return text(memo("llms", () => buildLlmsTxt(catalog, { apiUrl, publicUrl, full: false })));
     if (p === "/llms-full.txt") return text(memo("llmsf", () => buildLlmsTxt(catalog, { apiUrl, publicUrl, full: true })));

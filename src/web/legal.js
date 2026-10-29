@@ -11,7 +11,7 @@ export const COMPANY = {
   court: "Sleman District Court (Pengadilan Negeri Sleman)",
 };
 
-export const LEGAL_UPDATED = "30 October 2026";
+export const LEGAL_UPDATED = "29 October 2026";
 
 const C = COMPANY;
 const contactBlock = [

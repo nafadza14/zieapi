@@ -48,10 +48,10 @@ export function footer() {
 
 export function layout({ title, description = BRAND.description, body, active = "", user = null, bodyClass = "", head = "", scripts = ["/assets/site.js"], noindex = false, bare = false, fullTitle: forcedTitle = null, ogImage = "/assets/og/home.png", ogType = "website", jsonLd = [], canonical = null, markdown = false }) {
   const { path } = seoCtx();
-  const fullTitle = forcedTitle ?? (title ? `${title} | Apizie` : "Apizie: One API Key for 1,600+ Public Data APIs (REST + MCP)");
+  const fullTitle = forcedTitle ?? (title ? `${title} | Apizie` : "Apizie: One API Key for 3,700+ Public Data APIs (REST + MCP)");
   const desc = metaDescription(description);
   const canon = absUrl(canonical ?? path ?? "/");
-  const img = absUrl(ogImage);
+  const img = absUrl(ogImage) + (/\?/.test(ogImage) ? "" : "?v=4"); // bump to refresh link previews cached by social networks
   const v = "?v=3";
   const graph = noindex ? [] : [...siteGraph(), ...jsonLd];
   return `<!doctype html>

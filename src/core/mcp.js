@@ -16,7 +16,7 @@ export const MCP_TOOLS = [
     name: "search_scrapers",
     title: "Search the catalog",
     annotations: { title: "Search the catalog", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Find APIs by name, source, tag or the data they return (Indonesian sources plus 1,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
+    description: "Find APIs by name, source, tag or the data they return (news, finance, research, open data, cloud and 3,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
     inputSchema: {
       type: "object",
       properties: {

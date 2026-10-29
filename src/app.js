@@ -52,8 +52,13 @@ export function createApp(opts = {}) {
   const vercelHost = env.VERCEL_PROJECT_PRODUCTION_URL ?? env.VERCEL_URL;
   // Only the origin is used: a value like "https://apizie.tech/auth/supabase/callback" would otherwise double every path.
   const originOf = (v) => { try { return new URL(v).origin; } catch { return String(v).replace(/\/+$/, ""); } };
-  const apiUrl = originOf(opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`));
-  const publicUrl = originOf(opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl);
+  // Production always answers as the brand domain: a *.vercel.app value (env var or Vercel's own default) is replaced by
+  // CANONICAL_URL, so links, OAuth callbacks, sitemap, canonical tags and code samples never show the Vercel host.
+  const isVercelProd = env.VERCEL_ENV === "production" || (env.VERCEL === "1" && !env.VERCEL_ENV);
+  const canonicalize = (u) => (isVercelProd && /\.vercel\.app$/i.test(hostOf(u)) ? CANONICAL_URL : u);
+  const apiUrl = canonicalize(originOf(opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (isVercelProd ? CANONICAL_URL : vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`)));
+  const publicUrl = canonicalize(originOf(opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl));
+  const canonicalHost = hostOf(publicUrl);
   const serverless = opts.serverless ?? env.VERCEL === "1";
   const production = env.NODE_ENV === "production" || serverless;
   const logger = opts.logger === undefined ? console : opts.logger;
@@ -714,6 +719,7 @@ export function createApp(opts = {}) {
   }
 
   // ---------- node:http glue ------------------------------------------------------
+  const offCanonicalPage = (req, url) => isOffCanonicalPage(req, url, canonicalHost);
   async function handler(req, res) {
     const t0 = process.hrtime.bigint();
     const requestId = /^[A-Za-z0-9._-]{6,64}$/.test(req.headers["x-request-id"] ?? "") ? req.headers["x-request-id"] : ulid();
@@ -722,6 +728,10 @@ export function createApp(opts = {}) {
     const isApi = /^\/(v1|api\/(me|admin|public|scrapers|info|report|showcase)|mcp|auth\/(login|register|logout)|\.well-known|oauth\/(register|token|revoke))(\/|$)/.test(url.pathname) && !(req.method === "GET" && url.pathname === "/mcp" && !/event-stream/.test(req.headers.accept ?? ""));
     try {
       if (req.method === "OPTIONS") out = { status: 204, body: "", headers: {} };
+      else if (offCanonicalPage(req, url)) {
+        // An old *.vercel.app link: send people (and search engines) to the same page on the brand domain.
+        out = { status: 308, body: "", headers: { Location: publicUrl + url.pathname + url.search, "Cache-Control": "public, max-age=3600" } };
+      }
       else {
         req.zieRequestId = requestId;
         const sessionToken = parseCookies(req.headers.cookie)[SESSION_COOKIE];
@@ -777,6 +787,24 @@ function upstreamAuthFrom(h) {
   return key || authorization ? { ...(key ? { key } : {}), ...(authorization ? { authorization } : {}) } : null;
 }
 const text = (s) => ({ status: 200, body: s, headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=600" } });
+export const CANONICAL_URL = "https://apizie.tech";
+function hostOf(u) {
+  try {
+    return new URL(u).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+/**
+ * GET/HEAD for a web page on a *.vercel.app host while the public URL is another domain. API calls, MCP, OAuth,
+ * webhooks and sign-in callbacks keep working on the old host so existing clients and in-flight logins do not break.
+ */
+function isOffCanonicalPage(req, url, canonicalHost) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
+  if (!host || host === canonicalHost || !/\.vercel\.app$/.test(host) || /\.vercel\.app$/.test(canonicalHost)) return false;
+  return !/^\/(v1|mcp|api|oauth|webhooks|\.well-known|auth\/[a-z]+\/callback)(\/|$)/.test(url.pathname);
+}
 const redirect = (to, headers = {}) => ({ status: 302, body: "", headers: { Location: to, ...headers } });
 const isHttps = (req) => req.headers["x-forwarded-proto"] === "https" || !!req.socket?.encrypted;
 const safeHost = (u) => {

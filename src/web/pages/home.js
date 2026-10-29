@@ -15,10 +15,10 @@ const WHY = [
 ];
 
 export const HOME_FAQ = [
-  ["What is Apizie?", "Apizie is an API gateway that puts 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, news, research databases and 1,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
+  ["What is Apizie?", "Apizie is an API gateway that puts 3,700+ public APIs and data sources (Wikipedia, GitHub, Binance, news, research databases and 3,300+ global APIs) behind one API key. Every source answers in the same JSON shape: { project, data, timestamp }."],
   ["How do I use Apizie with Claude, ChatGPT or Cursor?", "Add the Apizie MCP server URL (/mcp) to your app. Claude.ai, Claude Desktop and ChatGPT connect with one click through OAuth; Cursor, VS Code and Gemini CLI use an API key header. The agent can then search the catalog and call any API as a tool."],
   ["Is Apizie free?", "Yes. The Free plan includes 1,000 requests a month at 100 requests a minute on every live endpoint, with no credit card. Paid plans (Pro, Ultra, Max) raise the limits and add bulk jobs and webhooks."],
-  ["Which data sources does Apizie cover?", "Finance and crypto (Binance, OKX, CoinGecko, SEC EDGAR, ECB rates), news (The Guardian, BBC, Google News, Hacker News), research (PubMed, arXiv), developer tools (GitHub, npm, DNS, WHOIS), media (Apple Music, Deezer) and 1,300+ global APIs imported from public OpenAPI specifications."],
+  ["Which data sources does Apizie cover?", "Finance and crypto (Binance, OKX, CoinGecko, SEC EDGAR, ECB rates), news (The Guardian, BBC, Google News, Hacker News), research (PubMed, arXiv), developer tools (GitHub, npm, DNS, WHOIS), media (Apple Music, Deezer), cloud platforms and 3,300+ global APIs imported from official OpenAPI specifications."],
   ["What does a request look like?", "GET /v1/{category}:{api}/{endpoint}?param=value with the header x-api-key. For example /v1/search-tools:wikipedia/search?query=Eiffel%20Tower returns Wikipedia search results as JSON."],
 ];
 
@@ -119,7 +119,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
     <article class="card feat f-wide"><h3>We keep every scraper working</h3><p>Sources change their markup and APIs constantly. Health checks run around the clock and every endpoint reports its live status in the catalog, so you never guess.</p><div class="mini-status">${["live", "live", "live", "upstream", "live", "live", "planned", "live"].map((s) => `<i class="dot-${s}"></i>`).join("")}</div></article>
     <article class="card feat"><h3>One response shape</h3><p><code>project</code>, <code>data</code>, <code>timestamp</code>. Errors use the same codes everywhere.</p></article>
     <article class="card feat"><h3>Built for AI agents</h3><p>A remote MCP server exposes the whole catalog as tools for Claude, Cursor and VS Code.</p></article>
-    <article class="card feat"><h3>Bring your own key</h3><p>Stripe, Twilio, Spotify and 1,300+ more run with your provider key, sent per request and never stored.</p></article>
+    <article class="card feat"><h3>Bring your own key</h3><p>Stripe, Twilio, Spotify and 3,300+ more run with your provider key, sent per request and never stored.</p></article>
     <article class="card feat"><h3>Pay for what you use</h3><p>A 5xx never costs you a request. Quotas reset on the 1st (UTC) and every response tells you what is left.</p></article>
   </div>
 </section>`;
@@ -154,7 +154,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
   <div class="section-head"><span class="eyebrow">FAQ</span><h2 class="display-2">Questions, answered.</h2></div>
   <div class="faq">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
 </section>`;
-  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 1,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests/month, paid plans from $9.`;
+  const description = `One API key for ${apiCount} public data APIs: Wikipedia, GitHub, Binance, arXiv, news and 3,300+ global APIs as clean JSON, plus an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests/month, paid plans from $9.`;
   return layout({ active: "home", user, bodyClass: "home", description, markdown: true, canonical: "/", jsonLd: [webPageLd({ name: "Apizie: One API key for every public data source", description }), faqLd(HOME_FAQ)], body: `<main>${hero}${stats}${steps}${find}${globalSec}${code}${features}${pricing}${agent}${faqSec}${cta}</main>`, head: `<link rel="preload" as="image" href="${HERO_BG}" type="image/webp">` });
 }
 
@@ -175,7 +175,7 @@ export const _json = json;
 const HEADLINES = (apiCount) => [
   {
     lines: [[["One API key", "l"], ["for"]], [[apiCount, "r"], ["data sources"]]],
-    sub: "Finance, news, research, developer tools and 1,300+ global APIs as clean JSON. Call them from your code or hand them to your AI agent.",
+    sub: "Finance, news, research, developer tools and 3,300+ global APIs as clean JSON. Call them from your code or hand them to your AI agent.",
   },
   {
     lines: [[["The API key", "l"], ["for"]], [["your AI agent", "r"]]],

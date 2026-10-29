@@ -13,7 +13,7 @@ export const BRAND = {
   legalName: "Ziera Technology",
   tagline: "One API key for every public data source",
   description:
-    "Apizie turns 1,600+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests a month.",
+    "Apizie turns 3,700+ public APIs and data sources (Wikipedia, GitHub, Binance, arXiv, news and more) into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. Free 1,000 requests a month.",
   repo: "https://github.com/nafadza14/zieapi",
   email: "support@zieads.com",
   locale: "en_US",
@@ -45,7 +45,7 @@ export function siteGraph() {
     "@type": "Organization",
     "@id": `${base}#org`,
     name: BRAND.name,
-    alternateName: ["Apizie API", "apizie"],
+    alternateName: ["Apizie API", "apizie", "apizie.tech"],
     url: base,
     logo: { "@type": "ImageObject", url: absUrl("/assets/icon-512.png"), width: 512, height: 512 },
     legalName: BRAND.legalName,
@@ -73,7 +73,7 @@ export function siteGraph() {
     url: base,
     description: BRAND.description,
     publisher: { "@id": `${base}#org` },
-    featureList: ["REST API with one JSON envelope", "MCP server (Streamable HTTP, OAuth 2.1)", "Bulk jobs", "Signed webhooks", "OpenAPI 3.1 and llms.txt", "1,300+ global APIs from public OpenAPI specs"],
+    featureList: ["REST API with one JSON envelope", "MCP server (Streamable HTTP, OAuth 2.1)", "Bulk jobs", "Signed webhooks", "OpenAPI 3.1 and llms.txt", "3,300+ global APIs from official OpenAPI specs"],
     offers: Object.values(PLANS).map((p) => ({
       "@type": "Offer",
       name: `${PLAN_COPY[p.id]?.name ?? p.id} plan`,
@@ -143,7 +143,7 @@ const PRIVATE = ["/dashboard", "/admin", "/api/me", "/api/admin", "/oauth/", "/a
 export function robotsTxt(publicUrl) {
   const block = (ua) => [`User-agent: ${ua}`, "Allow: /", ...PRIVATE.map((p) => `Disallow: ${p}`)].join("\n");
   return [
-    "# Apizie: one API key for 1,600+ public data sources.",
+    "# Apizie: one API key for 3,700+ public data sources.",
     `# AI agents: start at ${publicUrl}/llms.txt (summary) or ${publicUrl}/llms-full.txt (full catalog).`,
     "# Every catalog and docs page also has a Markdown twin: append .md or send Accept: text/markdown.",
     "",

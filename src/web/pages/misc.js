@@ -52,8 +52,8 @@ ${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.
   <div class="table-wrap"><table class="doc-table">${tools.map(([n, d]) => `<tr><td><code>${n}</code></td><td>${d}</td></tr>`).join("")}</table></div>
   <div class="grid-3 mt"><div class="card"><h3>Rate limits</h3><p>Tool calls share your plan's per-minute and monthly limits with REST.</p></div><div class="card"><h3>Plan gating</h3><p>Bulk tools need Ultra or Max. Gated endpoints return <code>plan_upgrade_required</code>.</p></div><div class="card"><h3>Revoke access</h3><p>Connected apps are listed in <a href="/dashboard/keys">Dashboard → API keys</a>. Disconnect one and its tokens stop working at once.</p></div></div>
 </section></main>`;
-  const description = "Connect Claude, ChatGPT, Cursor, VS Code and Gemini CLI to 1,600+ APIs with the Apizie MCP server. One-click OAuth or an API key, 8 tools, same quota as REST.";
-  return layout({ fullTitle: "MCP Server: 1,600+ APIs for Claude, ChatGPT & Cursor | Apizie", active: "mcp", user, body, description, ogImage: "/assets/og/mcp.png", jsonLd: [webPageLd({ name: "Apizie MCP server", description, type: "TechArticle", extra: { headline: "Connect AI agents to 1,600+ APIs with MCP" } }), breadcrumb([["Home", "/"], ["MCP server", "/mcp"]])] });
+  const description = "Connect Claude, ChatGPT, Cursor, VS Code and Gemini CLI to 3,700+ APIs with the Apizie MCP server. One-click OAuth or an API key, 8 tools, same quota as REST.";
+  return layout({ fullTitle: "MCP Server: 3,700+ APIs for Claude, ChatGPT & Cursor | Apizie", active: "mcp", user, body, description, ogImage: "/assets/og/mcp.png", jsonLd: [webPageLd({ name: "Apizie MCP server", description, type: "TechArticle", extra: { headline: "Connect AI agents to 3,700+ APIs with MCP" } }), breadcrumb([["Home", "/"], ["MCP server", "/mcp"]])] });
 }
 
 // ---------- OAuth consent ------------------------------------------------------

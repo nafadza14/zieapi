@@ -104,7 +104,7 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   const lines = [
     category ? `# Apizie: ${catName(catalog, category)} APIs` : "# Apizie",
     "",
-    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools and 1,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card.`,
+    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools, cloud and 3,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card.`,
     "",
     "## Use it",
     `- Base URL: ${apiUrl}`,

@@ -27,7 +27,7 @@ ${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} APIs`, `${fmt(totals.e
 </div>
 <script type="application/json" id="catalog-data">${json({ items: items.map(({ id, description, sourceUrl, maxCacheTtl, minPlan, hasGatedEndpoint, ...it }) => ({ ...it, description: description ? description.slice(0, 120) : null })), initialCat: cat })}</script>
 </main>`;
-  const description = `Browse ${totals.scrapers.toLocaleString("en-US")} public data APIs and ${totals.endpoints.toLocaleString("en-US")} endpoints: finance, news, Indonesia, social media, research, developer tools and 1,300+ global APIs. One key, clean JSON, MCP-ready.`;
+  const description = `Browse ${totals.scrapers.toLocaleString("en-US")} public data APIs and ${totals.endpoints.toLocaleString("en-US")} endpoints: finance, news, social media, research, developer tools, cloud and 3,300+ global APIs. One key, clean JSON, MCP-ready.`;
   return layout({ fullTitle: `API Catalog: ${Math.floor(totals.scrapers / 100) * 100}+ Public Data APIs as JSON | Apizie`, active: "scrapers", user, body, description, ogImage: "/assets/og/api.png", canonical: "/scrapers", jsonLd: [webPageLd({ name: "Apizie API catalog", description, type: "CollectionPage" }), breadcrumb([["Home", "/"], ["Catalog", "/scrapers"]])] });
 }
 
@@ -89,7 +89,7 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
 <script type="application/json" id="detail-data">${json({ scraper: { key: s.key, displayName: s.displayName, category: s.category, slug: s.slug, auth: s.auth ?? null, provider: s.provider ?? null, origin: s.origin }, endpoints: s.endpoints, current: ep.slug, apiUrl, errors, langs: CODE_LANGS, loggedIn: !!user })}</script>
 </main>`;
   const firstSentence = (s.description ?? "").replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0].slice(0, 80).replace(/[.\s,;:]*$/, "");
-  const description = `${s.displayName} API: ${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"} as clean JSON with one key${firstSentence ? `. ${firstSentence}` : ""}. MCP-ready, free 600 requests/month.`;
+  const description = `${s.displayName} API: ${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"} as clean JSON with one key${firstSentence ? `. ${firstSentence}` : ""}. MCP-ready, free 1,000 requests/month.`;
   return layout({
     fullTitle: `${s.displayName} API: ${s.endpointCount} Endpoint${s.endpointCount === 1 ? "" : "s"} as JSON | Apizie`,
     active: "scrapers", user, body, description, ogImage: "/assets/og/api.png", markdown: true, canonical: `/api/${s.category}/${s.slug}`,

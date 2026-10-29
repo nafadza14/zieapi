@@ -67,7 +67,7 @@
             <div class="card-top"><h2 id="key-h">API key</h2>${k ? `<span class="meta">${esc(k.name)}</span>` : ""}<a class="link-sm" href="/dashboard/keys">${o.activeKeys} active</a></div>
             ${
               k
-                ? `<div class="secret-row"><code data-secret data-id="${esc(k.id)}">${esc(k.preview)}</code>${k.canReveal ? `<button class="ds-icon-btn" data-act="reveal" data-id="${esc(k.id)}" aria-label="Show key" aria-pressed="false">${eyeIcon}</button>` : ""}<button class="ds-icon-btn" data-act="copyKey" data-id="${esc(k.id)}" aria-label="Copy key">${copyIcon}</button></div>
+                ? `<div class="secret-row"><code data-secret data-id="${esc(k.id)}">${esc(k.preview)}</code>${k.canReveal ? `<button class="ds-icon-btn" data-act="reveal" data-id="${esc(k.id)}" aria-label="Show key" aria-pressed="false">${eyeIcon}</button><button class="ds-icon-btn" data-act="copyKey" data-id="${esc(k.id)}" aria-label="Copy key">${copyIcon}</button>` : ""}</div>
                    <p class="meta">Created ${c.day(k.createdAt)} · ${k.lastUsedAt ? `used ${c.ago(k.lastUsedAt)}` : "never used"}</p>`
                 : h.empty("No active key", "Create one to start calling APIs.", `<button class="btn btn-primary btn-sm" data-act="newKey">Create key</button>`)
             }
@@ -551,7 +551,7 @@
             try {
               items = JSON.parse(form.items.value);
             } catch {
-              throw new Error("Items must be valid JSON, for example [{ \"q\": \"halo\" }]");
+              throw new Error("Items must be valid JSON, for example [{ \"q\": \"hello\" }]");
             }
             if (!Array.isArray(items) || !items.length) throw new Error("Items must be a non-empty JSON array");
             return (await api("/api/me/bulk", { method: "POST", body: { project: form.project.value.trim(), endpoint: form.endpoint.value, items, idempotencyKey: form.idem.value.trim() || undefined } })).content;
@@ -735,7 +735,7 @@
           <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>$${p.priceUsd} / month</small></h2>
             <p class="meta">${b.planExpiresAt && p.id !== "free" ? `Active until ${c.day(b.planExpiresAt)}. Renew any time; time is added on top.` : "Free forever. Upgrade any time: one-time payment, no subscription."}</p>
             <div class="quota-block"><div class="row-between"><span>Monthly requests</span><b>${num(q.month.used)} / ${num(q.month.limit)}</b></div>${h.bar(q.month.used, q.month.limit)}</div></div>
-          <div class="hero-right"><a class="btn btn-primary" href="#plans">${p.id === "max" ? "Renew" : "Upgrade"}</a></div>
+          <div class="hero-right">${p.id === "free" ? `<a class="btn btn-primary" href="#plans">Upgrade</a>` : `<button class="btn btn-primary" data-act="upgrade" data-plan="${p.id}">Renew ${c.cap(p.id)}</button>`}</div>
         </section>
         <section class="ds-card" aria-labelledby="bal-h">
           <div class="card-top"><h2 id="bal-h">Pay-as-you-go balance</h2><button class="btn btn-primary btn-sm push" data-act="topupCustom">Top up</button></div>
@@ -749,7 +749,7 @@
           <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in US dollars</label><input id="tu-amt" name="amount" type="number" inputmode="decimal" min="${b.payg.minTopupUsd}" max="${b.payg.maxTopupUsd}" step="1" placeholder="$"><span class="meta">min $${b.payg.minTopupUsd}</span><button class="btn btn-ghost btn-sm" data-act="topupForm"${b.cardEnabled ? "" : " disabled"}>Top up</button></form></div>
       </section>
       <section class="ds-card" id="plans" aria-labelledby="pl-h"><div class="card-top"><h2 id="pl-h">Plans</h2><span class="meta">Each plan includes a monthly quota; your balance covers anything above it</span></div>
-        <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? h.badge("current", "Current plan") : x.id === "free" ? "" : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">${p.id === x.id ? "Renew" : "Choose"}</button>`}</div>
+        <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? (p.id === "free" ? h.badge("current", "Current plan") : `<button class="btn btn-ghost btn-sm" data-act="upgrade" data-plan="${x.id}" title="Adds time on top of your current period">Renew</button>`) : x.id === "free" ? "" : b.plans.findIndex((y) => y.id === x.id) < b.plans.findIndex((y) => y.id === p.id) ? `<span class="muted-sm">Included in ${c.cap(p.id)}</span>` : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">Upgrade</button>`}</div>
           <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceUsd ? `<p class="meta">$${x.priceUsd * 10} / year (2 months free)</p>` : ""}
           <ul class="tips small"><li>${num(x.monthly)} requests / month</li><li>${num(x.perMinute)} requests / minute</li><li>${x.logDays}-day log history</li>${x.webhooks ? "<li>Webhooks and IP allowlists</li>" : ""}${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>${num(x.maxKeys)} active API keys</li></ul></div>`).join("")}</div>
       </section>

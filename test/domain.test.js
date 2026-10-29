@@ -23,7 +23,7 @@ test("production on Vercel answers as apizie.tech even when env vars still name 
   }
   const home = await (await get(base, "/", "apizie.tech")).text();
   assert.match(home, /<link rel="canonical" href="https:\/\/apizie\.tech\/"/);
-  assert.match(home, /<meta property="og:image" content="https:\/\/apizie\.tech\/assets\/og\/home\.png\?v=4"/);
+  assert.match(home, /<meta property="og:image" content="https:\/\/apizie\.tech\/assets\/og\/home\.png\?v=5"/);
   assert.match(await (await get(base, "/robots.txt", "apizie.tech")).text(), /Sitemap: https:\/\/apizie\.tech\/sitemap\.xml/);
   const catalogPage = await (await get(base, "/api/finance/indodax", "apizie.tech")).text();
   assert.ok(catalogPage.includes("https://apizie.tech/v1/finance:indodax/"), "code samples use the brand domain");
@@ -39,6 +39,17 @@ test("old vercel.app page links redirect to the same page on apizie.tech; API, M
     assert.notEqual((await get(base, path, "zieapi.vercel.app")).status, 308, path);
   }
   assert.equal((await get(base, "/pricing", "apizie.tech")).status, 200);
+});
+
+test("www.apizie.tech pages move to apizie.tech and a www public URL is folded into the bare domain", async () => {
+  const base = await start({ VERCEL_ENV: "production", APIZIE_PUBLIC_URL: "https://www.apizie.tech" });
+  const r = await get(base, "/pricing?x=1", "www.apizie.tech");
+  assert.equal(r.status, 308);
+  assert.equal(r.headers.get("location"), "https://apizie.tech/pricing?x=1");
+  assert.notEqual((await get(base, "/mcp", "www.apizie.tech")).status, 308, "MCP keeps working on www");
+  const home = await (await get(base, "/", "apizie.tech")).text();
+  assert.match(home, /<link rel="canonical" href="https:\/\/apizie\.tech\/"/);
+  assert.ok(!home.includes("www.apizie.tech"));
 });
 
 test("preview deployments and local runs keep their own host", async () => {

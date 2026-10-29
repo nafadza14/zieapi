@@ -55,7 +55,8 @@ export function createApp(opts = {}) {
   // Production always answers as the brand domain: a *.vercel.app value (env var or Vercel's own default) is replaced by
   // CANONICAL_URL, so links, OAuth callbacks, sitemap, canonical tags and code samples never show the Vercel host.
   const isVercelProd = env.VERCEL_ENV === "production" || (env.VERCEL === "1" && !env.VERCEL_ENV);
-  const canonicalize = (u) => (isVercelProd && /\.vercel\.app$/i.test(hostOf(u)) ? CANONICAL_URL : u);
+  // www.apizie.tech is folded into the bare domain too, so canonical tags, share images and the sitemap all agree.
+  const canonicalize = (u) => (isVercelProd && (/\.vercel\.app$/i.test(hostOf(u)) || hostOf(u) === "www." + hostOf(CANONICAL_URL)) ? CANONICAL_URL : u);
   const apiUrl = canonicalize(originOf(opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (isVercelProd ? CANONICAL_URL : vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`)));
   const publicUrl = canonicalize(originOf(opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl));
   const canonicalHost = hostOf(publicUrl);
@@ -809,13 +810,14 @@ function hostOf(u) {
   }
 }
 /**
- * GET/HEAD for a web page on a *.vercel.app host while the public URL is another domain. API calls, MCP, OAuth,
+ * GET/HEAD for a web page on a *.vercel.app host (or www.<brand domain>) while the public URL is another domain. API calls, MCP, OAuth,
  * webhooks and sign-in callbacks keep working on the old host so existing clients and in-flight logins do not break.
  */
 function isOffCanonicalPage(req, url, canonicalHost) {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
   const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
-  if (!host || host === canonicalHost || !/\.vercel\.app$/.test(host) || /\.vercel\.app$/.test(canonicalHost)) return false;
+  if (!host || host === canonicalHost || /\.vercel\.app$/.test(canonicalHost)) return false;
+  if (!/\.vercel\.app$/.test(host) && host !== "www." + canonicalHost) return false;
   return !/^\/(v1|mcp|api|oauth|webhooks|\.well-known|auth\/[a-z]+\/callback)(\/|$)/.test(url.pathname);
 }
 const redirect = (to, headers = {}) => ({ status: 302, body: "", headers: { Location: to, ...headers } });

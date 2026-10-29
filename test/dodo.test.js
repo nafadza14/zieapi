@@ -140,3 +140,27 @@ test("card top-up in dollars: $10 buys 25,000 requests, credited at the same per
   const billing = (await me("/api/me/billing")).json.content;
   assert.deepEqual(billing.payg.topupsUsd.map((t) => t.usd), [5, 10, 25, 50]);
 });
+
+test("abandoned checkouts never block a new one; clicking the same option again reuses its checkout", async () => {
+  checkoutState = { payment_id: null, payment_status: null };
+  const a = (await me("/api/me/invoices", { type: "topup", usd: 7, method: "card" })).json.content;
+  const again = (await me("/api/me/invoices", { type: "topup", usd: 7, method: "card" })).json.content;
+  assert.equal(again.id, a.id, "same top-up reuses the waiting invoice");
+  for (const usd of [11, 12, 13, 14, 15, 16, 17]) assert.equal((await me("/api/me/invoices", { type: "topup", usd, method: "card" })).status, 201, `$${usd}`);
+  const open = (await app.repo.listItems("invoice", user.id)).filter((i) => i.status === "pending");
+  assert.ok(open.length <= 5);
+  const closed = await app.repo.getItem("invoice", a.id);
+  assert.equal(closed.status, "cancelled");
+  // a late payment for a closed checkout is still credited
+  const before = await app.repo.getBalance(user.id);
+  await hook({ type: "payment.succeeded", data: { payment_id: "pay_late", total_amount: closed.amount, currency: "USD", metadata: { invoice_id: closed.id, user_id: user.id } } });
+  assert.equal((await app.repo.getBalance(user.id)) - before, 7_000_000);
+});
+
+test("a lower plan cannot be bought while a higher one is still running", async () => {
+  await app.repo.updateUser(user.id, { plan: "max", planExpiresAt: new Date(Date.now() + 10 * 864e5).toISOString() });
+  const r = await me("/api/me/invoices", { type: "plan", plan: "pro", months: 1, method: "card" });
+  assert.equal(r.status, 400);
+  assert.match(r.json.errors[0].message, /lower plan after it ends/);
+  assert.equal((await me("/api/me/invoices", { type: "plan", plan: "max", months: 1, method: "card" })).status, 201, "renewing the same plan still works");
+});

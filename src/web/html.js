@@ -51,7 +51,7 @@ export function layout({ title, description = BRAND.description, body, active = 
   const fullTitle = forcedTitle ?? (title ? `${title} | Apizie` : "Apizie: One API Key for 3,700+ Public Data APIs (REST + MCP)");
   const desc = metaDescription(description);
   const canon = absUrl(canonical ?? path ?? "/");
-  const img = absUrl(ogImage) + (/\?/.test(ogImage) ? "" : "?v=4"); // bump to refresh link previews cached by social networks
+  const img = absUrl(ogImage) + (/\?/.test(ogImage) ? "" : "?v=5"); // bump to refresh link previews cached by social networks
   const v = "?v=3";
   const graph = noindex ? [] : [...siteGraph(), ...jsonLd];
   return `<!doctype html>
@@ -75,6 +75,8 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : '<meta name="ro
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(canon)}">
 <meta property="og:image" content="${esc(img)}">
+<meta property="og:image:secure_url" content="${esc(img)}">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="${esc(fullTitle)}">

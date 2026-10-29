@@ -149,12 +149,29 @@ export function createAccountApi(d) {
       const target = PLANS[body?.plan];
       const months = Math.min(12, Math.max(1, Math.round(Number(body?.months) || 1)));
       if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
+      // Buying a lower plan would cut short time already paid for on a higher one.
+      const cur = getPlan(user.plan);
+      if (cur.rank > target.rank && user.planExpiresAt && Date.parse(user.planExpiresAt) > Date.now()) throw E.invalidParams([{ path: "plan", message: `You're on ${cur.id[0].toUpperCase() + cur.id.slice(1)} until ${user.planExpiresAt.slice(0, 10)}. You can switch to a lower plan after it ends` }]);
       const priceUsd = target.priceUsd * billedMonths(months);
       cents = Math.round(priceUsd * 100);
       extra = { plan: target.id, months, priceUsd };
     }
     if (!d.dodo?.enabled) throw new HttpError(503, { content: null, message: "Checkout is not available right now. Please try again later or contact support.", errors: [] });
-    const open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
+    let open = (await repo.listItems("invoice", user.id)).filter((i) => i.status === "pending" || i.status === "awaiting_review");
+    // Clicking the same plan or top-up again reopens the checkout that is already waiting instead of stacking invoices.
+    const same = open.find((i) => i.provider === "dodo" && i.status === "pending" && i.type === type && i.amount === cents && (type === "topup" || (i.plan === extra.plan && i.months === extra.months)));
+    if (same) {
+      const synced = await syncCard(user, same);
+      if (synced.status === "pending") return startCheckout(user, synced);
+      open = open.filter((i) => i.id !== same.id);
+    }
+    // Checkouts people walked away from never block a new one: the oldest unpaid ones are closed to make room.
+    // A late payment on a closed checkout is still applied by the webhook.
+    for (const old of open.filter((i) => i.provider === "dodo" && i.status === "pending").sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))) {
+      if (open.length < 5) break;
+      if ((await syncCard(user, old)).status === "pending") await repo.patchItem("invoice", old.id, { status: "cancelled", cancelledReason: "replaced by a newer checkout" });
+      open = open.filter((i) => i.id !== old.id);
+    }
     if (open.length >= 5) throw E.invalidParams([{ path: "type", message: "You already have 5 open invoices. Pay or cancel one first" }]);
     // Card / Apple Pay / Google Pay through Dodo Payments (merchant of record: it adds the right sales tax itself).
     const inv = { id: "INV-" + ulid().slice(-10), userId: user.id, email: user.email, type, ...extra, subtotal: cents, vat: 0, base: cents, amount: cents, currency: "USD", method: "card", provider: "dodo", status: "pending", reference: null, createdAt: new Date().toISOString() };

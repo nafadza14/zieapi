@@ -283,7 +283,7 @@ test("global APIs: BYOK through /v1, per-API OpenAPI spec and filters", async ()
 test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", async () => {
   const home = await (await fetch(base + "/")).text();
   assert.match(home, /<link rel="canonical" href="http:\/\/zie\.test\/">/);
-  assert.match(home, /<meta property="og:image" content="http:\/\/zie\.test\/assets\/og\/home\.png\?v=4">/);
+  assert.match(home, /<meta property="og:image" content="http:\/\/zie\.test\/assets\/og\/home\.png\?v=5">/);
   assert.match(home, /<meta name="twitter:card" content="summary_large_image">/);
   // First headline is server-rendered word by word; the other three rotate in from data-hero-rotate.
   assert.match(home, /<h1 class="hero-title"[^>]*>.*>One<\/span> <span[^>]*>API<\/span> <span[^>]*>key<\/span> <span class="w">for<\/span>/);

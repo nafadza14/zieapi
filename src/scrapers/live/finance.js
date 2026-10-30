@@ -2280,6 +2280,23 @@ async function fred(ctx, path, params = {}) {
   if (j?.error_code) throw new ScraperError(`FRED error ${j.error_code}: ${j.error_message ?? ""}`.trim());
   return j;
 }
+// The FRED API Terms of Use: series that FRED marks as copyrighted by a third party need the owner's permission
+// for anything beyond personal use, so they are not served through Apizie. FRED flags them in the series notes.
+const fredLicence = new Map();
+export const isFredCopyrighted = (notes) => /copyright|©|all rights reserved/i.test(String(notes ?? ""));
+async function fredRedistributable(ctx, id) {
+  const k = String(id).toUpperCase();
+  const hit = fredLicence.get(k);
+  let copyrighted;
+  if (hit && hit.exp > Date.now()) copyrighted = hit.copyrighted;
+  else {
+    const j = await fred(ctx, "series", { series_id: k });
+    copyrighted = isFredCopyrighted(j?.seriess?.[0]?.notes);
+    if (fredLicence.size > 5000) fredLicence.clear();
+    fredLicence.set(k, { copyrighted, exp: Date.now() + 86400_000 });
+  }
+  if (copyrighted) throw new ScraperError(`FRED series ${k} is copyrighted by a third-party data owner, so Apizie does not redistribute it. Use the owner's licensed feed instead.`, { errors: [{ path: "series", message: "Third-party copyrighted series" }] });
+}
 const FRED_PAGE = 100;
 const fredPage = f.int("page", { default: 1, min: 1 });
 const offsetOf = (page, size = FRED_PAGE) => ((page ?? 1) - 1) * size;
@@ -2337,6 +2354,7 @@ const fredScraper = {
         f.int("length", { min: 1, max: 100000, description: "Keep only the latest N observations" }),
       ],
       handler: async (p, ctx) => {
+        await fredRedistributable(ctx, p.series ?? "DGS10");
         const j = await fred(ctx, "series/observations", {
           series_id: p.series ?? "DGS10",
           observation_start: p.from,
@@ -2360,6 +2378,7 @@ const fredScraper = {
       cacheTtl: 86400,
       fields: [seriesField, f.str("vintages", { example: "2020-01-15,2021-01-15", description: "Comma-separated vintage dates" }), f.str("from", { pattern: DATE }), f.str("to", { pattern: DATE }), f.int("length", { min: 1, max: 100000 })],
       handler: async (p, ctx) => {
+        await fredRedistributable(ctx, p.series ?? "DGS10");
         const j = await fred(ctx, "series/observations", {
           series_id: p.series ?? "DGS10",
           vintage_dates: p.vintages ? String(p.vintages).replace(/\s+/g, "") : undefined,
@@ -2516,3 +2535,6 @@ export default [
   secEdgar,
   fredScraper,
 ];
+
+// Reused by the combined official-data endpoints (live/official.js).
+export { secEdgar, fredScraper, ecb, usTreasury, gleif, worldbank, resolveCik, archiveUrl };

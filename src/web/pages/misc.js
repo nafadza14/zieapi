@@ -25,10 +25,10 @@ export function mcpPage({ user, apiUrl, totals }) {
     ["search_scrapers", "Find APIs by name, source or the data they return. Pages through the whole catalog with a cursor."],
     ["get_scraper_schema", "List an API's endpoints, or read one endpoint's parameters, verb, path, auth and status."],
     ["list_categories", "Every category with its counts."],
-    ["run_scraper", "Call any endpoint and get clean JSON. BYOK APIs take upstream_key."],
-    ["get_account", "Plan, key status and limits."],
+    ["run_scraper", "Call any endpoint and get clean JSON, with a source block to cite. BYOK APIs take upstream_key."],
+    ["get_account", "Plan, limits and this connection's permissions (read-only or read and write, allowed categories)."],
     ["get_usage", "Requests used this month and this minute."],
-    ["bulk_submit", "Submit many inputs as one bulk job (Ultra/Max)."],
+    ["bulk_submit", "Submit many inputs as one bulk job (Ultra and Max, or Finance Growth and Business for Apizie Finance)."],
     ["bulk_status", "Poll a bulk job and fetch its results."],
   ];
   const tabs = (id, list) => `<div class="code-card tabs-card" data-tabs>
@@ -36,13 +36,13 @@ export function mcpPage({ user, apiUrl, totals }) {
     ${list.map(([, code], i) => `<pre class="code" data-panel="${i}"${i ? " hidden" : ""}><code>${esc(code)}</code></pre>`).join("")}
   </div>`;
   const body = `<main>
-${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.`, "Claude, ChatGPT, Cursor, VS Code or Gemini CLI can search the catalog and call any API as a tool, with your account and your quota.")}
+${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.`, "Claude, ChatGPT, Cursor, VS Code or Gemini CLI can search the catalog and call any API as a tool, with your account and your quota. Read-only unless you allow more.")}
 <section class="wrap section-tight">
   <div class="grid-4 kv-cards"><div class="card"><span class="muted">Endpoint</span><code class="big">${esc(url)}</code></div><div class="card"><span class="muted">Server</span><b>Apizie · Streamable HTTP</b></div><div class="card"><span class="muted">Sign-in</span><b>OAuth 2.1 (no key needed)</b></div><div class="card"><span class="muted">Or use a key</span><b>Bearer · x-api-key · api-key</b></div></div>
   <div class="steps-row mt">
-    <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open a Apizie sign-in window. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
+    <div class="card"><span class="step-n">01</span><h3>Add the server</h3><p>Paste the URL into your app. Apps with OAuth (Claude.ai, ChatGPT) open an Apizie sign-in window where you choose read-only or read and write, and which categories it may use. Others take an API key from <a href="${user ? "/dashboard/keys" : "/register"}">your dashboard</a>.</p></div>
     <div class="card"><span class="step-n">02</span><h3>Ask in plain language</h3><p>“Earthquakes in the last hour”, “Bitcoin price in euros”, “Search GitHub repos about MCP”. The agent picks the tools.</p></div>
-    <div class="card"><span class="step-n">03</span><h3>Watch usage</h3><p>Every tool call shows up in your request logs and counts against your plan, exactly like REST.</p></div>
+    <div class="card"><span class="step-n">03</span><h3>Watch usage</h3><p>Every tool call shows up in your request logs, labelled with the app, and counts against your plan exactly like REST.</p></div>
   </div>
   <h2 class="display-2 mt">Connect with one click (OAuth)</h2>
   ${tabs("oauth", oauthClients)}
@@ -50,30 +50,40 @@ ${pageHead("MCP server", `Give your AI agent ${fmt(totals?.scrapers ?? 0)} APIs.
   ${tabs("key", keyClients)}
   <h2 class="display-2 mt">8 tools</h2>
   <div class="table-wrap"><table class="doc-table">${tools.map(([n, d]) => `<tr><td><code>${n}</code></td><td>${d}</td></tr>`).join("")}</table></div>
-  <div class="grid-3 mt"><div class="card"><h3>Rate limits</h3><p>Tool calls share your plan's per-minute and monthly limits with REST.</p></div><div class="card"><h3>Plan gating</h3><p>Bulk tools need Ultra or Max. Gated endpoints return <code>plan_upgrade_required</code>.</p></div><div class="card"><h3>Revoke access</h3><p>Connected apps are listed in <a href="/dashboard/keys">Dashboard → API keys</a>. Disconnect one and its tokens stop working at once.</p></div></div>
+  <div class="grid-3 mt"><div class="card"><h3>Rate limits</h3><p>Tool calls share your plan's per-minute and monthly limits with REST.</p></div><div class="card"><h3>Read-only by default</h3><p>OAuth connections and new keys can only fetch data. Endpoints that change data at a provider return <code>key_read_only</code> unless you allowed writes.</p></div><div class="card"><h3>Change or revoke access</h3><p>Connected apps are listed in <a href="/dashboard/keys">Dashboard → API keys</a>. Edit their permissions or disconnect them; tokens follow at once.</p></div></div>
 </section></main>`;
   const description = "Connect Claude, ChatGPT, Cursor, VS Code and Gemini CLI to 3,700+ APIs with the Apizie MCP server. One-click OAuth or an API key, 8 tools, same quota as REST.";
   return layout({ fullTitle: "MCP Server: 3,700+ APIs for Claude, ChatGPT & Cursor | Apizie", active: "mcp", user, body, description, ogImage: "/assets/og/mcp.png", jsonLd: [webPageLd({ name: "Apizie MCP server", description, type: "TechArticle", extra: { headline: "Connect AI agents to 3,700+ APIs with MCP" } }), breadcrumb([["Home", "/"], ["MCP server", "/mcp"]])] });
 }
 
 // ---------- OAuth consent ------------------------------------------------------
-export function consentPage({ user, client, scope, tx, redirectHost }) {
+export function consentPage({ user, client, scope, tx, redirectHost, categories = [] }) {
   const body = `<main class="auth">
 <div class="auth-glow" aria-hidden="true"></div>
 <section class="auth-card card consent">
   <a href="/" class="auth-logo" aria-label="Apizie home">${logo()}</a>
   <h1>Connect ${esc(client.client_name)}?</h1>
   <p class="muted"><b>${esc(client.client_name)}</b> wants to use Apizie as <b>${esc(user.email ?? user.name)}</b>.</p>
-  <ul class="consent-list">
-    <li>Search the catalog and run APIs through MCP</li>
-    <li>Use your plan's quota (calls appear in your logs)</li>
-    <li>Read your plan and usage</li>
-  </ul>
-  <p class="muted small">After you allow, you will be sent back to <b>${esc(redirectHost)}</b>. It cannot see your password or API keys, and you can disconnect it any time in the dashboard.</p>
-  <form method="post" action="/oauth/authorize" class="consent-actions">
+  <form method="post" action="/oauth/authorize" class="consent-form">
     <input type="hidden" name="tx" value="${esc(tx)}">
-    <button class="pill pill-outline" name="decision" value="deny">Cancel</button>
-    <button class="pill pill-white" name="decision" value="approve" autofocus>Allow</button>
+    <fieldset class="consent-perm"><legend>What it can do</legend>
+      <label class="consent-opt"><input type="radio" name="access" value="read" checked> <span><b>Read data only</b> <small>(recommended)</small><br><small class="muted">Search the catalog and fetch data. It cannot change anything at a provider.</small></span></label>
+      <label class="consent-opt"><input type="radio" name="access" value="read_write"> <span><b>Read and write</b><br><small class="muted">Also call bring-your-own-key endpoints that create, change or delete things in your own accounts.</small></span></label>
+    </fieldset>
+    ${
+      categories.length
+        ? `<fieldset class="consent-perm"><legend>Where it can go <small class="muted">(leave empty for every category)</small></legend><div class="consent-cats">${categories.map((c) => `<label><input type="checkbox" name="cat_${esc(c.slug)}" value="1"> ${esc(c.displayName)}</label>`).join("")}</div></fieldset>`
+        : ""
+    }
+    <ul class="consent-list">
+      <li>Calls use your plan's quota and appear in your logs, labelled with this app</li>
+      <li>It can read your plan and usage</li>
+    </ul>
+    <p class="muted small">After you allow, you will be sent back to <b>${esc(redirectHost)}</b>. It cannot see your password or API keys, and you can change or disconnect it any time in the dashboard (API keys).</p>
+    <div class="consent-actions">
+      <button class="pill pill-outline" name="decision" value="deny">Cancel</button>
+      <button class="pill pill-white" name="decision" value="approve" autofocus>Allow</button>
+    </div>
   </form>
   <p class="muted tiny">Scope: ${esc(scope)}</p>
 </section></main>`;
@@ -223,6 +233,7 @@ const I = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   browse: '<path d="M7 17 17 7M8 7h9v9"/>',
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>',
+  alerts: '<path d="M4 19h16M6 15l4-5 3 3 5-7"/><circle cx="18" cy="6" r="2"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
@@ -235,7 +246,7 @@ export const icon = (name, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24
 
 export const DASH_SECTIONS = [
   { group: "Overview", items: [["", "dashboard", "Overview", "Your API usage at a glance"], ["usage", "usage", "Usage", "Traffic, errors and quota across every key"], ["logs", "logs", "Logs", "Request history across your keys. Metadata only, never payloads"]] },
-  { group: "API", items: [["keys", "keys", "API keys", "One key per environment. Keep them secret, rotate any time"], ["bulk", "bulk", "Bulk jobs", "Run one endpoint over many inputs in a single request"], ["webhooks", "webhooks", "Webhooks", "Get notified when quota runs low, keys change or requests fail"]] },
+  { group: "API", items: [["keys", "keys", "API keys", "One key per environment. Keep them secret, rotate any time"], ["alerts", "alerts", "Data alerts", "Apizie Finance: a signed webhook when an official source publishes something new"], ["bulk", "bulk", "Bulk jobs", "Run one endpoint over many inputs in a single request"], ["webhooks", "webhooks", "Webhooks", "Get notified when quota runs low, keys change or requests fail"]] },
   { group: "Account", items: [["billing", "billing", "Billing", "Plan, pay-as-you-go balance and invoices"], ["affiliate", "affiliate", "Affiliate", "Earn a share of what the people you refer pay"], ["showcase", "showcase", "Showcase", "Show what you built with Apizie"], ["settings", "settings", "Settings", "Profile, security, notifications and sessions"], ["support", "support", "Support", "Get help and send us what you're seeing"]] },
 ];
 const SECTION_LIST = DASH_SECTIONS.flatMap((g) => g.items);
@@ -276,9 +287,9 @@ ${data}`;
 
 const sideLink = (href, on, ic, label, tag = "") => `<a href="${href}" class="ap-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>${ic ? icon(ic) : ""}<span>${label}</span>${tag}</a>`;
 
-export function dashboardPage({ user, section, plan, apiUrl, publicUrl, storage, quota, keyCount, unread }) {
+export function dashboardPage({ user, section, plan, financePlan = null, apiUrl, publicUrl, storage, quota, keyCount, unread }) {
   const me = SECTION_LIST.find((x) => x[0] === section) ?? SECTION_LIST[0];
-  const lock = { bulk: !plan.bulk ? "Ultra" : "", webhooks: !plan.webhooks ? "Pro" : "" };
+  const lock = { bulk: !plan.bulk && !financePlan?.bulk ? "Ultra" : "", webhooks: !plan.webhooks && !financePlan ? "Pro" : "", alerts: !financePlan ? "Finance" : "" };
   const tag = (slug) => (slug === "keys" ? `<span class="ap-count" aria-label="${keyCount} active">${keyCount}</span>` : lock[slug] ? `<span class="ds-lock">${lock[slug]}</span>` : "");
   const href = (slug) => `/dashboard${slug ? "/" + slug : ""}`;
   const pct = quota.month.limit ? Math.min(100, (quota.month.used / quota.month.limit) * 100) : 0;

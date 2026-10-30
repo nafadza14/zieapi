@@ -24,13 +24,42 @@ function throwIfUpstreamDown(res, target) {
   if (res.status === 429) throw new UpstreamError("Upstream rate-limited this request. Try again later.", { httpStatus: 429, upstreamStatus: 429, retryAfter: res.headers.get("retry-after") ?? "60", context: { url: redactUrl(target) } });
 }
 
+/**
+ * The SEC's fair-access policy asks automated clients to name themselves and give a contact email in the
+ * User-Agent, and to stay under 10 requests per second.
+ */
+export const SEC_UA = () => env("ZIE_SEC_USER_AGENT") || env("APIZIE_SEC_USER_AGENT") || "Apizie support@zieads.com";
+const uaFor = (target) => {
+  try {
+    return /(^|\.)sec\.gov$/i.test(new URL(target).hostname) ? SEC_UA() : UA;
+  } catch {
+    return UA;
+  }
+};
+
+// Per-instance pacing for sec.gov: at most 8 requests per second, under the SEC's 10/s fair-access limit.
+const SEC_RPS = 8;
+let secSlots = [];
+async function secPace() {
+  for (;;) {
+    const now = Date.now();
+    secSlots = secSlots.filter((t) => now - t < 1000);
+    if (secSlots.length < SEC_RPS) {
+      secSlots.push(now);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 1000 - (now - secSlots[0]) + 5));
+  }
+}
+
 async function doFetch(ctx, target, init = {}) {
   let res;
+  if (uaFor(target) !== UA) await secPace();
   try {
     res = await ctx.fetch(target, {
       ...init,
       signal: ctx.signal,
-      headers: { "user-agent": UA, accept: "application/json, text/plain, */*", ...(init.headers ?? {}) },
+      headers: { "user-agent": uaFor(target), accept: "application/json, text/plain, */*", ...(init.headers ?? {}) },
     });
   } catch (e) {
     if (e?.name === "AbortError" || e?.name === "ZieTimeout") throw e;

@@ -588,3 +588,13 @@ div.kv span { font-size: 12px; color: var(--dim); text-transform: capitalize; }
 .radio-row input { margin-top: 3px; }
 .radio-row span { display: grid; gap: 4px; }
 .radio-row small { color: var(--muted, #8a8f98); line-height: 1.45; }
+/* key permissions */
+.ok-chip { color: #86efac; border-color: rgba(134, 239, 172, .35); }
+.warn-chip { color: #fcd34d; border-color: rgba(252, 211, 77, .4); }
+.keycard-perm { display: grid; gap: 4px; padding: 10px 0 2px; border-top: 1px solid var(--line-2); margin-top: 10px; }
+.perm-tip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.perm-set { border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 12px; display: grid; gap: 8px; }
+.perm-set legend { padding: 0 6px; font-weight: 600; }
+.perm-opt { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.35; }
+.perm-opt input { margin-top: 4px; }
+.plain-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }

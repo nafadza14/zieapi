@@ -1,6 +1,6 @@
 // Turns a paid invoice into what the customer bought (plan time or pay-as-you-go balance), once.
 // Used by Dodo Payments (webhook or return-page check) and by the admin "approve" action for older bank invoices.
-import { PAYG, MICROS } from "../core/plans.js";
+import { PAYG, MICROS, planName, isFinancePlan } from "../core/plans.js";
 const fmtUsd = (n) => "$" + Number(n).toFixed(2);
 
 export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
@@ -27,12 +27,19 @@ export function createFulfiller({ repo, kv, webhooks, notify, affPercent }) {
       const credit = inv.creditMicros ?? (inv.requests ?? 0) * PAYG.priceMicros;
       await repo.creditBalance(u.id, credit);
       notify(u.id, "balance", "Balance topped up", `${fmtUsd(credit / MICROS)} was added to your pay-as-you-go balance.`);
+    } else if (isFinancePlan(inv.plan)) {
+      // Apizie Finance add-on: its own plan and expiry, independent of the general plan.
+      const base = u.financePlan === inv.plan && u.financeExpiresAt && Date.parse(u.financeExpiresAt) > Date.now() ? Date.parse(u.financeExpiresAt) : Date.now();
+      const until = new Date(base + inv.months * 30 * 86400000).toISOString();
+      await repo.updateUser(u.id, { financePlan: inv.plan, financeExpiresAt: until });
+      webhooks.emit(u.id, "plan.changed", { product: "finance", plan: inv.plan, planExpiresAt: until, invoice: inv.id });
+      notify(u.id, null, `Apizie ${planName(inv.plan)} is active`, `Active until ${until.slice(0, 10)}.`);
     } else {
       const base = u.plan === inv.plan && u.planExpiresAt && Date.parse(u.planExpiresAt) > Date.now() ? Date.parse(u.planExpiresAt) : Date.now();
       const until = new Date(base + inv.months * 30 * 86400000).toISOString();
       await repo.updateUser(u.id, { plan: inv.plan, planExpiresAt: until });
       webhooks.emit(u.id, "plan.changed", { plan: inv.plan, planExpiresAt: until, invoice: inv.id });
-      notify(u.id, null, `${inv.plan[0].toUpperCase() + inv.plan.slice(1)} plan is active`, `Active until ${until.slice(0, 10)}.`);
+      notify(u.id, null, `${planName(inv.plan)} plan is active`, `Active until ${until.slice(0, 10)}.`);
     }
     if (u.referredBy && affPercent > 0 && paidCents > 0) {
       const micros = Math.round((paidCents * 10_000 * affPercent) / 100);

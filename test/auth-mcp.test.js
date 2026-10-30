@@ -163,6 +163,22 @@ test("OAuth: register, consent, code + PKCE, token, MCP call, refresh, revoke", 
   assert.match(r.access_token, /^zoa_/);
   const apps = await (await get("/api/me/apps", { cookie: session })).json();
   assert.equal(apps.content[0].name, "Claude");
+  assert.equal(apps.content[0].access, "read", "the default consent is read-only");
+  assert.match(page, /name="access" value="read" checked/);
+  assert.match(page, /name="cat_official"/);
+  // a connection limited on the consent screen carries its limits into every token
+  const limited = await fetch(base + "/oauth/authorize", { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded", cookie: session }, body: new URLSearchParams({ tx, decision: "approve", access: "read", cat_official: "1" }) });
+  const lc = new URL(limited.headers.get("location")).searchParams.get("code");
+  const lt = await (await tok({ grant_type: "authorization_code", code: lc, client_id: client.client_id, code_verifier: verifier, redirect_uri: "https://claude.ai/api/mcp/auth_callback" })).json();
+  const acct = await (await mcp(lt.access_token, { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "get_account", arguments: {} } })).json();
+  assert.deepEqual(acct.result.structuredContent.key.categories, ["official"]);
+  assert.equal(acct.result.structuredContent.key.access, "read");
+  const outside = await (await mcp(lt.access_token, { jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "run_scraper", arguments: { scraper: "dev-tools:uuid", endpoint: "v4" } } })).json();
+  assert.equal(outside.result.isError, true);
+  assert.equal(outside.result.structuredContent.code, "key_scope");
+  // the owner widens it from the dashboard; the live token follows
+  const patched = await (await fetch(base + `/api/me/apps/${client.client_id}`, { method: "PATCH", headers: { cookie: session, "x-zie-csrf": "1", "content-type": "application/json" }, body: JSON.stringify({ access: "read", categories: [] }) })).json();
+  assert.deepEqual(patched.content.categories, []);
   await fetch(base + `/api/me/apps/${client.client_id}`, { method: "DELETE", headers: { cookie: session, "x-zie-csrf": "1" } });
   assert.equal((await mcp(r.access_token, { jsonrpc: "2.0", id: 3, method: "tools/list" })).status, 401);
 });

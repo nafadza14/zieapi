@@ -11,7 +11,7 @@ export const COMPANY = {
   court: "Sleman District Court (Pengadilan Negeri Sleman)",
 };
 
-export const LEGAL_UPDATED = "29 October 2026";
+export const LEGAL_UPDATED = "30 October 2026";
 
 const C = COMPANY;
 const contactBlock = [
@@ -39,10 +39,12 @@ export const LEGAL_DOCS = {
           "**Upstream Data**: data the Service returns from an Upstream Provider.",
           "**Provider Key**: a credential for an Upstream Provider that you send with a request in the `x-upstream-key` header.",
           "**Plan**: the Free plan or a paid plan described on the [Pricing](/pricing) page, including its monthly quota and rate limits.",
+          "**Apizie Finance**: the premium add-on described on the [Apizie Finance](/finance) page that gives access to official financial data (SEC EDGAR, FRED, the European Central Bank, the U.S. Treasury, GLEIF and the World Bank, and the combined endpoints built on them). A **Finance Plan** is a paid plan for it.",
         ]],
       ] },
       { h: "3. The Service", blocks: [
-        `${C.product} gives you one API key and one response format for many public data sources. We build on official public APIs, open data and publisher feeds. We do not own Upstream Data, and we do not bypass paywalls, logins or bot protection to obtain it.`,
+        `${C.product} gives you one API key and one response format for many public data sources. Apizie Finance, a paid add-on, adds official financial data (SEC EDGAR, FRED, the European Central Bank, the U.S. Treasury, GLEIF and the World Bank) with a source citation on each successful response. We build on official public APIs, open data and publisher feeds. We do not own Upstream Data, and we do not bypass paywalls, logins or bot protection to obtain it.`,
+        `${C.product} is independent. It is not affiliated with or endorsed by the SEC, the Federal Reserve, the European Central Bank, the U.S. Treasury, GLEIF or the World Bank. This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.`,
         "Upstream Providers can change, limit or switch off their services at any time. We work to keep endpoints running, but we cannot guarantee that a particular source, endpoint or field will stay available. We may add, change, rename or retire endpoints. Features marked beta, preview or planned may change or be removed without notice.",
       ] },
       { h: "4. Your account and API keys", blocks: [
@@ -58,8 +60,15 @@ export const LEGAL_DOCS = {
         "Some APIs in the catalog need your own Provider Key. When you send one in `x-upstream-key`, we forward it only to that Upstream Provider for that single request. **We never store or log Provider Keys.**",
         "You confirm that you are allowed to use the Provider Key, that your use complies with the Upstream Provider's terms, and that any fees the Upstream Provider charges are your responsibility.",
       ] },
-      { h: "6. Upstream Data and source terms", blocks: [
-        "Upstream Data belongs to its owners and is subject to their terms and licences (for example Creative Commons attribution or share-alike requirements, or open data licences). You are responsible for following those terms, including attribution, when you store, display or redistribute Upstream Data.",
+      { h: "6. Upstream Data, source terms and the Apizie Finance licence", blocks: [
+        "Upstream Data belongs to its owners and is subject to their terms and licences (for example Creative Commons attribution or share-alike requirements, or open data licences). The `source` block on each response names the publisher, links its terms and gives attribution text. You are responsible for following those terms, including attribution, when you store, display or redistribute Upstream Data.",
+        "Apizie Finance data may be used as your Finance Plan allows:",
+        ["ul", [
+          "**Finance Starter:** commercial use inside your own organisation, such as internal tools, research and analysis.",
+          "**Finance Growth and Finance Business:** use inside your own products and services offered to your customers, with the attribution text from the `source` block shown where the data appears.",
+          "**Redistribution:** selling, sublicensing or providing bulk access to the data as a data product, or offering it as an API to others, needs a separate Enterprise agreement with us.",
+        ]],
+        "We exclude data a publisher does not allow us to serve, such as FRED series marked as copyrighted by a third party.",
         "We pass Upstream Data through as received, sometimes reformatted into JSON. We do not check it for accuracy, completeness or timeliness. Do not rely on the Service as your only source for decisions where mistakes could cause harm, such as emergency alerts, medical, legal or financial decisions. Nothing returned by the Service is professional advice.",
       ] },
       { h: "7. Acceptable use", blocks: [
@@ -73,7 +82,7 @@ export const LEGAL_DOCS = {
         ]],
       ] },
       { h: "8. Plans, quotas and limits", blocks: [
-        "The Free plan includes 1,000 requests a month. Paid plans, prices and limits are shown on the [Pricing](/pricing) page. Each Plan has a monthly request quota and a per-minute rate limit.",
+        "The Free plan includes 1,000 requests a month. Paid plans, prices and limits are shown on the [Pricing](/pricing) page. Each Plan has a monthly request quota and a per-minute rate limit. Apizie Finance has no free tier: its endpoints need an active Finance Plan, which has its own monthly quota and rate limit next to your Plan.",
         ["ul", [
           "Monthly quotas reset on the 1st of each month (UTC). Unused requests do not roll over.",
           "Requests that fail because of a server-side error (HTTP 5xx) are not counted against your quota.",
@@ -86,7 +95,7 @@ export const LEGAL_DOCS = {
         ["ul", [
           "Payments are processed by Dodo Payments, which acts as the merchant of record for those sales and adds any sales tax or VAT that applies where you are at checkout. Its own terms apply to the payment itself; we never receive your full card details.",
           "A paid Plan starts once we have verified your payment. Monthly plans run for one month and yearly plans for twelve months. Yearly plans are priced at ten months.",
-          "Plans do not renew automatically. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan.",
+          "Plans do not renew automatically. The end date is shown in your dashboard; if the Plan is not renewed by then, the Account returns to the Free plan. A Finance Plan that is not renewed ends, and Apizie Finance endpoints and data alerts stop until you add one again.",
           "Pay-as-you-go top-ups are prepaid and stay on your Account while it is active.",
           "We may change prices with at least 30 days' notice. Changes never affect a period you have already paid for.",
         ]],

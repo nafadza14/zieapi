@@ -203,7 +203,7 @@ test("usage analytics: overview, ranges, per-key filter, logs, CSV export", asyn
   assert.match(csv.headers.get("content-disposition"), /attachment; filename="apizie-logs-24h-/);
   const lines = csv.text.trim().split("\n");
   assert.equal(lines.length, 6);
-  assert.match(lines[0], /^id,at,method,project,endpoint,status/);
+  assert.match(lines[0], /^id,at,method,project,endpoint,access,status/);
 
   const sup = (await c("/api/me/support")).c;
   assert.equal(sup.errors.length, 2);

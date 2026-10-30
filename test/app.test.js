@@ -294,15 +294,43 @@ test("SEO + GEO: metadata, JSON-LD, robots, sitemap, markdown twins, icons", asy
   // Global landing page: no Indonesia-only copy, and hero logos are keyless live APIs only.
   const visible = home.replace(/<script[\s\S]*?<\/script>/g, "");
   assert.doesNotMatch(visible, /Indonesia|BMKG|Kemenag|sholat|Borobudur/i);
+  // The landing page stays the original general one: Finance has its own page, linked from the navbar and footer.
+  assert.doesNotMatch(visible, /Official financial data, cited|id="official"/);
+  assert.match(/<header[\s\S]*?<\/header>/.exec(visible)?.[0] ?? "", /href="\/finance"/);
+  assert.match(visible, /<footer[\s\S]*href="\/finance"/);
   const full = createApp({ logger: null, quiet: true, env: {}, kv: new MemoryKV() }); // the real live scrapers
   await new Promise((r) => full.server.listen(0, "127.0.0.1", r));
-  const fullHome = await (await fetch(`http://127.0.0.1:${full.server.address().port}/`)).text();
+  const fullBase = `http://127.0.0.1:${full.server.address().port}`;
+  const fullHome = await (await fetch(fullBase + "/")).text();
+  const official = await fetch(fullBase + "/finance");
+  const officialHtml = await official.text();
+  const officialMd = await (await fetch(fullBase + "/finance.md")).text();
+  const legacy = await fetch(fullBase + "/official-data", { redirect: "manual" });
+  const pricingHtml = await (await fetch(fullBase + "/pricing")).text();
   await new Promise((r) => full.server.close(r));
   assert.equal((fullHome.match(/class="brand-marquee/g) ?? []).length, 3);
   assert.match(fullHome, /class="brand-marquee rev"/);
   assert.doesNotMatch(fullHome.replace(/<script[\s\S]*?<\/script>/g, ""), /Indonesia|BMKG|Kemenag|sholat|Borobudur/i);
   const { HERO_BRANDS } = await import("../src/web/brands.js");
   for (const b of HERO_BRANDS) assert.equal(full.catalog.find(b.key)?.status, "live", `${b.name} is live`);
+  // The Apizie Finance landing page carries the market-specific story.
+  assert.equal(official.status, 200);
+  assert.match(officialHtml, /<link rel="canonical" href="[^"]*\/finance">/);
+  assert.match(officialHtml, /<h1 class="hero-title"[^>]*>.*>Official-source<\/span> <span[^>]*>data<\/span>/);
+  assert.match(officialHtml, /og\/finance\.png/);
+  assert.match(officialHtml, /Apizie Finance/);
+  assert.match(officialHtml, /\$49/);
+  const officialVisible = officialHtml.replace(/<script[\s\S]*?<\/script>/g, "");
+  for (const name of ["SEC EDGAR", "FRED", "ECB Data Portal", "U.S. Treasury Fiscal Data", "GLEIF LEI", "World Bank Open Data"]) assert.ok(officialVisible.includes(name), name);
+  assert.match(officialVisible, /not affiliated with or endorsed by the SEC/);
+  assert.match(officialMd, /^# Apizie Finance/);
+  assert.equal(legacy.status, 302);
+  assert.equal(legacy.headers.get("location"), "/finance");
+  // General pricing stays on /pricing; Finance pricing lives only on /finance
+  for (const price of ["$9", "$29", "$99"]) assert.ok(pricingHtml.includes(`<b>$${price.slice(1)}</b>`), price);
+  assert.ok(!pricingHtml.includes("<b>$199</b>"), "no Finance plans on the general pricing page");
+  assert.match(officialHtml, /id="pricing"/);
+  for (const price of ["$49", "$199", "$499"]) assert.ok(officialHtml.includes(`<b>${price}</b>`), price);
   const graphs = [...home.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)].map((m) => JSON.parse(m[1]));
   const types = graphs.flatMap((g) => g["@graph"].map((n) => n["@type"]));
   for (const t of ["Organization", "WebSite", "SoftwareApplication", "FAQPage"]) assert.ok(types.includes(t), t);

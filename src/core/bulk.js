@@ -2,7 +2,8 @@
 // concurrency; the job record is persisted so GET /v1/bulk/:id works afterwards.
 
 import { E, HttpError } from "./envelope.js";
-import { getPlan, maxPlan, planAllows } from "./plans.js";
+import { getPlan, getFinancePlan, maxPlan, planAllows } from "./plans.js";
+import { isFinanceKey } from "./sources.js";
 import { ulid, stableStringify, sha256 } from "./util.js";
 
 export class BulkManager {
@@ -14,9 +15,13 @@ export class BulkManager {
     const { scraper, endpoint } = this.catalog.resolve(projectKey, endpointSlug);
     if (!scraper) throw E.notFound(`Invalid project key "${projectKey}"`);
     if (!endpoint) throw E.notFound(`Endpoint "${endpointSlug}" not found on ${projectKey}`);
-    const plan = getPlan(caller.plan);
-    if (!plan.bulk) throw E.planGate("ultra", `${this.publicUrl}/pricing`);
-    const required = maxPlan(scraper.minPlan, endpoint.minPlan);
+    // Apizie Finance endpoints use the Finance plan (bulk on Finance Growth and Business) and the Finance quota.
+    const finance = isFinanceKey(scraper.key);
+    if (finance && !caller.financePlan)
+      throw E.coded(403, "finance_plan_required", `${scraper.key} is part of Apizie Finance. Add a Finance plan to use it: ${this.publicUrl}/finance#pricing`, { upgrade_url: `${this.publicUrl}/finance#pricing`, product: "finance" });
+    const plan = finance ? getFinancePlan(caller.financePlan) : getPlan(caller.plan);
+    if (!plan.bulk) throw finance ? E.coded(403, "plan_upgrade_required", "Bulk jobs on Apizie Finance need Finance Growth or Business.", { required_plan: "fin_growth", upgrade_url: `${this.publicUrl}/finance#pricing` }) : E.planGate("ultra", `${this.publicUrl}/pricing`);
+    const required = finance ? null : maxPlan(scraper.minPlan, endpoint.minPlan);
     if (!planAllows(caller.plan, required)) throw E.planGate(required, `${this.publicUrl}/pricing`);
     if (!endpoint.bulkEnabled) throw E.coded(403, "bulk_not_enabled", "Bulk submit is not enabled for this endpoint.");
     if (!Array.isArray(rawItems) || !rawItems.length) throw E.invalidParams([{ path: "items", message: "items must be a non-empty array" }]);
@@ -36,7 +41,7 @@ export class BulkManager {
 
     let ticket;
     try {
-      ticket = await this.limiter.reserve(caller.owner, caller.plan, items.length);
+      ticket = await this.limiter.reserve(caller.owner, caller.plan, items.length, finance ? { finance: caller.financePlan } : undefined);
     } catch (e) {
       if (e instanceof HttpError && e.status === 429 && e.body?.content?.window === "month")
         throw new HttpError(429, { error: { code: "quota_exceeded", message: "Monthly quota exceeded for this bulk submission." }, used: e.body.content.used, limit: e.body.content.limit, requested: items.length }, e.headers);

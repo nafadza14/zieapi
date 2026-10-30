@@ -1,6 +1,7 @@
 // Catalog = seed structure (all sources/endpoints) merged with live implementations.
 // Endpoint status: "live" (handler here), "upstream" (forwarded via ZIE_UPSTREAM_URL) or "planned".
 
+import { isFinanceKey } from "./sources.js";
 import { stableId } from "./util.js";
 import { maxPlan } from "./plans.js";
 import { SEED_CATEGORIES, SEED_SCRAPERS } from "../catalog/seed.js";
@@ -18,7 +19,8 @@ const CATEGORY_BLURBS = {
   "dev-tools": "DNS, WHOIS, hashing and other developer utilities.",
   downloader: "Media download helpers.",
   esport: "Players, teams and tournaments.",
-  finance: "Stocks, crypto, FX, gold and macro data, IDX first.",
+  official: "Apizie Finance (premium): combined, cited data from SEC EDGAR, FRED, ECB, U.S. Treasury, GLEIF and the World Bank.",
+  finance: "Stocks, crypto, FX, gold and macro data, plus the Apizie Finance official sources.",
   food: "Recipes, menus and food products.",
   games: "Game profiles and game data.",
   health: "Medical vocabularies, WHO and public-health data.",
@@ -38,12 +40,31 @@ const CATEGORY_BLURBS = {
   "web-tools": "Fetch, inspect and transform web pages.",
 };
 
+// Read or write: does calling this endpoint change anything at the provider? Apizie's own sources only read.
+// Bring-your-own-key APIs follow the provider's HTTP method, except operations whose name says they only read
+// (list, get, describe, search…), which are common as POST in cloud APIs. Any other POST, PUT, PATCH or DELETE
+// counts as a write.
+const READ_VERBS = /^(list|get|describe|search|query|lookup|look-up|find|fetch|retrieve|read|check|validate|verify|estimate|preview|calculate|count|batch-?get|show|view|head|detect|translate|recognize|predict|classify|analy[sz]e|summarize|compare|resolve|explain|evaluate)(\b|[-_ A-Z])/i;
+export function accessOf(upstreamMethod, ep = {}) {
+  if (!upstreamMethod) return "read";
+  const m = String(upstreamMethod).toUpperCase();
+  if (m === "GET" || m === "HEAD" || m === "OPTIONS") return "read";
+  if (m !== "POST") return "write"; // PUT, PATCH, DELETE always change something
+  if (READ_VERBS.test(String(ep.slug ?? "")) || READ_VERBS.test(String(ep.displayName ?? "").trim())) return "read";
+  return "write";
+}
+
+// Apizie Finance (premium add-on): the six official sources and the combined official:* endpoints.
+export const isOfficialKey = (key) => isFinanceKey(key);
+
 const titleCase = (s) => s.replace(/(^|-)([a-z])/g, (_, a, b) => (a ? " " : "") + b.toUpperCase());
 
 export class Catalog {
   constructor({ live = [], upstream = false, seed = true, directory = true } = {}) {
     this.upstream = upstream;
-    this.categories = [...SEED_CATEGORIES, ...DIRECTORY_CATEGORIES.filter((d) => !SEED_CATEGORIES.some((c) => c.slug === d.slug))].map((c) => ({ ...c, iconUrl: null, description: c.description ?? CATEGORY_BLURBS[c.slug] ?? "" }));
+    // Apizie Finance's combined endpoints (official:company, official:macro) live in their own category.
+    const official = { slug: "official", displayName: "Apizie Finance", color: "#c4b5fd", description: CATEGORY_BLURBS.official };
+    this.categories = [...SEED_CATEGORIES, official, ...DIRECTORY_CATEGORIES.filter((d) => !SEED_CATEGORIES.some((c) => c.slug === d.slug))].map((c) => ({ ...c, iconUrl: null, description: c.description ?? CATEGORY_BLURBS[c.slug] ?? "" }));
     this.map = new Map();
     if (seed) for (const s of SEED_SCRAPERS) this._addSeed(s);
     for (const def of live) this._addLive(def);
@@ -148,6 +169,7 @@ export class Catalog {
       exampleResponse: ep.exampleResponse ?? null,
       handler,
       status: handler ? "live" : this.upstream ? "upstream" : "planned",
+      access: ep.access ?? accessOf(ep.upstreamMethod, ep),
     };
   }
 
@@ -170,6 +192,8 @@ export class Catalog {
   // ---- public read models ----------------------------------------------------
   listItem(s, st = { requests: 0, success: 0 }, disabled) {
     return {
+      official: isOfficialKey(s.key),
+      premium: isOfficialKey(s.key) ? "finance" : null,
       id: s.id,
       slug: s.slug,
       category: s.category,
@@ -230,6 +254,7 @@ export class Catalog {
         description: e.description,
         method: e.method,
         ...(e.upstreamMethod && e.upstreamMethod !== e.method ? { upstreamMethod: e.upstreamMethod } : {}),
+        access: e.access ?? "read",
         paramsSchema: Object.fromEntries(e.fields.map((f) => [f.name, f.type])),
         fields: this.schemaFields(e),
         cacheTtl: e.cacheTtl,

@@ -3,7 +3,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from "node:crypto";
 import { sha256, ulid, stableId, monthKey, dayKey } from "../core/util.js";
-import { PLANS, PAYG, microsFromLegacyTenths } from "../core/plans.js";
+import { PLANS, FINANCE_PLANS, PAYG, FINANCE_PAYG, microsFromLegacyTenths, activeFinancePlan } from "../core/plans.js";
 
 const J = (s) => (s ? JSON.parse(s) : null);
 const S = (o) => JSON.stringify(o);
@@ -11,7 +11,7 @@ export const KEY_PREFIX = "apz_";
 export const LEGACY_KEY_PREFIXES = ["zie_"]; // keys issued before the Apizie rebrand keep working
 const SESSION_DAYS = 30;
 const LOG_CAP = 5000;
-export const DEFAULT_PREFS = { quotaWarning: true, quotaExceeded: true, balance: true, affiliate: true, product: false, payg: false, lowBalanceAlert: true };
+export const DEFAULT_PREFS = { quotaWarning: true, quotaExceeded: true, balance: true, affiliate: true, dataAlerts: true, product: false, payg: false, lowBalanceAlert: true };
 
 export class Repo {
   constructor(kv, { vaultSecret = null, hotCacheMs = 15_000 } = {}) {
@@ -110,6 +110,10 @@ export class Repo {
     if (u.plan !== "free" && u.planExpiresAt && Date.parse(u.planExpiresAt) < Date.now()) return "free";
     return PLANS[u.plan] ? u.plan : "free";
   }
+  /** Apizie Finance plan in force, or null (none or expired). */
+  financePlanOf(u) {
+    return activeFinancePlan(u);
+  }
 
   // ---------- sessions -------------------------------------------------------
   async createSession(userId, meta = {}) {
@@ -157,9 +161,13 @@ export class Repo {
   }
 
   // ---------- api keys -------------------------------------------------------
-  async createKey(userId, { name = "default", ipAllowlist = [] } = {}) {
+  /**
+   * New keys are read-only unless write access is asked for. `scope.categories` limits a key to some categories
+   * (empty = all). Keys created before permissions existed have no `access` and keep full access.
+   */
+  async createKey(userId, { name = "default", ipAllowlist = [], access = "read", scope = null } = {}) {
     const secret = KEY_PREFIX + randomBytes(24).toString("base64url");
-    const rec = { id: ulid(), userId, name, hash: sha256(secret), preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, sealed: this.seal(secret), status: "active", ipAllowlist, createdAt: new Date().toISOString(), lastUsedAt: null };
+    const rec = { id: ulid(), userId, name, hash: sha256(secret), preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, sealed: this.seal(secret), status: "active", ipAllowlist, access: access === "read_write" ? "read_write" : "read", scope: scope?.categories?.length ? { categories: [...new Set(scope.categories)].slice(0, 50) } : null, createdAt: new Date().toISOString(), lastUsedAt: null };
     await this.kv.set(`key:${rec.hash}`, S(rec));
     await this.kv.set(`key_id:${rec.id}`, rec.hash);
     await this.kv.sadd(`user_keys:${userId}`, rec.id);
@@ -169,12 +177,20 @@ export class Repo {
     if (!spec) return;
     for (const part of String(spec).split(",").map((s) => s.trim()).filter(Boolean)) {
       const i = part.indexOf(":");
-      const [plan, secret] = i > 0 ? [part.slice(0, i), part.slice(i + 1)] : ["free", part];
+      // "plan:secret", or "plan+fin_growth:secret" for a server key that also has Apizie Finance.
+      const [planSpec, secret] = i > 0 ? [part.slice(0, i), part.slice(i + 1)] : ["free", part];
+      const [plan, financePlan = null] = planSpec.split("+");
       if (!PLANS[plan]) throw new Error(`APIZIE_KEYS: unknown plan "${plan}"`);
+      if (financePlan && !FINANCE_PLANS[financePlan]) throw new Error(`APIZIE_KEYS: unknown Finance plan "${financePlan}"`);
       if (![KEY_PREFIX, ...LEGACY_KEY_PREFIXES].some((x) => secret.startsWith(x)) || secret.length < 16) throw new Error(`APIZIE_KEYS: keys must start with ${KEY_PREFIX} and be ≥16 chars`);
       const hash = sha256(secret);
-      this.envKeys.set(hash, { id: stableId(hash), userId: null, plan, name: `env-${plan}`, hash, preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, status: "active", ipAllowlist: [], createdAt: null });
+      this.envKeys.set(hash, { id: stableId(hash), userId: null, plan, financePlan, name: `env-${plan}`, hash, preview: `${secret.slice(0, 8)}…${secret.slice(-4)}`, status: "active", ipAllowlist: [], createdAt: null });
     }
+  }
+  async lastWriteAt(keyIds) {
+    if (!keyIds.length) return {};
+    const vals = await this.kv.mget(keyIds.map((id) => `kwrite:${id}`));
+    return Object.fromEntries(keyIds.map((id, i) => [id, vals[i] || null]));
   }
   async getKeyBySecret(secret) {
     const hash = sha256(secret);
@@ -309,6 +325,11 @@ export class Repo {
     if (ownerId) await this.kv.sadd(`${kind}s:${ownerId}`, obj.id);
     return obj;
   }
+  async removeItem(kind, id, ownerId = null) {
+    await this.kv.del(`${kind}:${id}`);
+    await this.kv.srem(`${kind}s`, id);
+    if (ownerId) await this.kv.srem(`${kind}s:${ownerId}`, id);
+  }
   async getItem(kind, id) {
     return J(await this.kv.get(`${kind}:${id}`));
   }
@@ -375,8 +396,8 @@ export class Repo {
   }
 
   // ---------- pay-as-you-go balance (micro-dollars) ------------------------------
-  /** Moves a counter written in the old unit (tenths of a rupiah) to its micro-dollar key, once. */
-  async _migrateLegacy(oldKey, newKey) {
+  /** Moves a counter written in an older unit to its new key, once, converting the amount. */
+  async _migrateLegacy(oldKey, newKey, convert = microsFromLegacyTenths) {
     const old = Number(await this.kv.get(oldKey)) || 0;
     if (!old) return;
     const taken = await this.kv.incrby(oldKey, -old); // only one caller sees the full amount disappear
@@ -384,7 +405,7 @@ export class Repo {
       await this.kv.incrby(oldKey, old);
       return;
     }
-    await this.kv.incrby(newKey, microsFromLegacyTenths(old));
+    await this.kv.incrby(newKey, Math.round(convert(old)));
   }
   async getBalance(userId) {
     await this._migrateLegacy(`bal:${userId}`, `balu:${userId}`);
@@ -393,29 +414,33 @@ export class Repo {
   async creditBalance(userId, micros) {
     return this.kv.incrby(`balu:${userId}`, Math.round(micros));
   }
-  /** Debit n requests from the balance when the owner opted in. Returns the new balance, or null when not allowed. */
-  async tryPaygDebit(owner, n) {
+  /**
+   * Debit n requests from the balance when the owner opted in. Returns the new balance, or null when not allowed.
+   * General requests cost PAYG.priceMicros each; Apizie Finance requests cost FINANCE_PAYG.priceMicros and are
+   * counted separately (`paygf:`) so statements can price them.
+   */
+  async tryPaygDebit(owner, n, { finance = false } = {}) {
     if (!owner || owner.startsWith("key_")) return null;
     const prefs = await this.getPrefs(owner);
     if (!prefs.payg) return null;
     await this._migrateLegacy(`bal:${owner}`, `balu:${owner}`);
-    const cost = n * PAYG.priceMicros;
+    const cost = n * (finance ? FINANCE_PAYG.priceMicros : PAYG.priceMicros);
     const after = await this.kv.incrby(`balu:${owner}`, -cost);
     if (after < 0) {
       await this.kv.incrby(`balu:${owner}`, cost);
       return null;
     }
-    await this.kv.incrby(`payg:${owner}:${dayKey()}`, n, 120 * 86400);
+    await this.kv.incrby(`${finance ? "paygf" : "payg"}:${owner}:${dayKey()}`, n, 120 * 86400);
     return after;
   }
-  async refundPayg(owner, n) {
-    await this.kv.batch([["INCRBY", `balu:${owner}`, n * PAYG.priceMicros], ["INCRBY", `payg:${owner}:${dayKey()}`, -n]]);
+  async refundPayg(owner, n, { finance = false } = {}) {
+    await this.kv.batch([["INCRBY", `balu:${owner}`, n * (finance ? FINANCE_PAYG.priceMicros : PAYG.priceMicros)], ["INCRBY", `${finance ? "paygf" : "payg"}:${owner}:${dayKey()}`, -n]]);
   }
   async paygUsage(userId, days = 90) {
     const list = [];
     for (let i = 0; i < days; i++) list.push(dayKey(new Date(Date.now() - i * 86400000)));
-    const vals = await this.kv.mget(list.map((d) => `payg:${userId}:${d}`));
-    return list.map((d, i) => ({ date: d, requests: Number(vals[i]) || 0 })).filter((x) => x.requests > 0);
+    const [vals, fin] = await Promise.all([this.kv.mget(list.map((d) => `payg:${userId}:${d}`)), this.kv.mget(list.map((d) => `paygf:${userId}:${d}`))]);
+    return list.map((d, i) => ({ date: d, requests: Number(vals[i]) || 0, financeRequests: Number(fin[i]) || 0 })).filter((x) => x.requests > 0 || x.financeRequests > 0);
   }
 
   // ---------- webhook deliveries ---------------------------------------------------

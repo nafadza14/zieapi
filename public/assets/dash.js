@@ -18,6 +18,9 @@
   // Invoice amounts: card invoices (Dodo Payments) are in US cents, bank transfer invoices in rupiah.
   const money = (n, currency) => (currency === "USD" ? "$" + (Number(n ?? 0) / 100).toFixed(2) : idr(n));
   // Dollar amounts (balance, earnings, payouts): two decimals, thousands separators.
+  // General plans plus the Apizie Finance add-on (fin_*).
+  const PLAN_NAMES = { free: "Free", pro: "Pro", ultra: "Ultra", max: "Max", admin: "Admin", fin_starter: "Finance Starter", fin_growth: "Finance Growth", fin_business: "Finance Business" };
+  const planName = (id) => PLAN_NAMES[id] ?? cap(id);
   const usd = (n) => "$" + Number(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pct = (v) => (v === null || v === undefined ? "–" : `${Number.isInteger(Number(v)) ? Number(v) : Number(v).toFixed(1)}%`);
   const ms = (v) => (v === null || v === undefined ? "–" : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`);
@@ -423,7 +426,7 @@
   }
 
   // ---- router --------------------------------------------------------------------------------
-  const ctx = { D, root, actionsBar, state, h, num, compact, idr, money, usd, pct, ms, ago, dt, day, time, cap, plural, tz, lineChart, heatmap, hbars, spark, openModal, confirmModal, upgradePrompt, rangeControl, keyControl, rangeAllowed, api, esc, toast, $, $$, store };
+  const ctx = { D, root, actionsBar, state, h, num, compact, idr, money, usd, planName, pct, ms, ago, dt, day, time, cap, plural, tz, lineChart, heatmap, hbars, spark, openModal, confirmModal, upgradePrompt, rangeControl, keyControl, rangeAllowed, api, esc, toast, $, $$, store };
   const setHandlers = (map) => {
     handlers = map;
   };

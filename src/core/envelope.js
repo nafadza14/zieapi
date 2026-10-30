@@ -4,9 +4,9 @@
 
 export const nowIso = () => new Date().toISOString();
 
-/** Successful scraper run. */
-export function okRun(project, data) {
-  return { project, data, timestamp: nowIso() };
+/** Successful scraper run. `source` cites where the data came from (see core/sources.js). */
+export function okRun(project, data, source = null) {
+  return source ? { project, data, source, timestamp: nowIso() } : { project, data, timestamp: nowIso() };
 }
 
 /** Catalog / account style success. */
@@ -42,7 +42,7 @@ export const E = {
       {
         error: {
           code: "plan_upgrade_required",
-          message: `This endpoint requires the ${cap(requiredPlan)} plan.`,
+          message: `This endpoint requires the ${planLabel(requiredPlan)} plan.`,
         },
         required_plan: requiredPlan,
         upgrade_url: upgradeUrl,
@@ -54,6 +54,8 @@ export const E = {
   internal: (message = "Internal error") => new HttpError(500, errBody(message)),
 };
 
+const PLAN_LABELS = { free: "Free", pro: "Starter", ultra: "Growth", max: "Business" };
+const planLabel = (id) => PLAN_LABELS[id] ?? cap(id);
 function cap(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }

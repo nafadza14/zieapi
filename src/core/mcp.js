@@ -4,7 +4,7 @@
 // lists an API's endpoints. Auth: Authorization: Bearer | x-api-key | api-key.
 
 import { HttpError } from "./envelope.js";
-import { getPlan } from "./plans.js";
+import { getPlan, getFinancePlan } from "./plans.js";
 
 export const MCP_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 const MAX_TEXT = 120_000; // keep tool results small enough for any MCP client
@@ -16,7 +16,7 @@ export const MCP_TOOLS = [
     name: "search_scrapers",
     title: "Search the catalog",
     annotations: { title: "Search the catalog", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    description: "Find APIs by name, source, tag or the data they return (news, finance, research, open data, cloud and 3,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
+    description: "Find APIs by name, source, tag or the data they return (news, finance, research, open data, cloud and 3,300+ global APIs). Returns catalog items with key 'category:slug', status (live = works now, byok = needs the provider's own key), premium ('finance' = needs an Apizie Finance plan) and endpointCount. Results are paged: pass nextCursor back as cursor to get the next page; when nextCursor is null you have seen all `total` matches.",
     inputSchema: {
       type: "object",
       properties: {
@@ -55,7 +55,7 @@ export const MCP_TOOLS = [
     name: "run_scraper",
     title: "Run an endpoint",
     annotations: { title: "Run an endpoint", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    description: "Call any endpoint and return clean JSON. Counts against your per-minute and monthly limits.",
+    description: "Call any endpoint and return clean JSON with a `source` block to cite. Apizie Finance endpoints (official:company, official:macro, finance:sec-edgar, finance:fred, finance:ecb, finance:us-treasury, finance:gleif, finance:worldbank) need an active Finance plan and use the Finance quota. Counts against your per-minute and monthly limits.",
     inputSchema: {
       type: "object",
       required: ["scraper", "endpoint"],
@@ -85,7 +85,7 @@ export const MCP_TOOLS = [
     name: "bulk_submit",
     title: "Submit a bulk job",
     annotations: { title: "Submit a bulk job", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    description: "Submit many inputs for one endpoint as a single bulk job (Ultra/Max plans). Returns jobId to poll.",
+    description: "Submit many inputs for one endpoint as a single bulk job (Ultra/Max plans, or Finance Growth/Business for Apizie Finance endpoints). Returns jobId to poll.",
     inputSchema: {
       type: "object",
       required: ["scraper", "endpoint", "items"],
@@ -134,8 +134,12 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
         case "search_scrapers": {
           const limit = Math.min(50, Math.max(1, Number(args.limit) || 10));
           const disabled = await repo.disabledScrapers();
-          const r = catalog.list({ q: args.query, cat: args.category, status: args.status, cursor: args.cursor, limit }, {}, disabled);
-          return toolResult({ ...r, items: r.items.map(slimItem) });
+          const allowed = caller.scope?.categories?.length ? caller.scope.categories : null;
+          if (allowed && args.category && !allowed.includes(args.category)) return toolResult({ total: 0, items: [], nextCursor: null, note: `This connection is limited to: ${allowed.join(", ")}.` });
+          const cat = args.category ?? (allowed?.length === 1 ? allowed[0] : undefined);
+          const r = catalog.list({ q: args.query, cat, status: args.status, cursor: args.cursor, limit }, {}, disabled);
+          const items = (allowed ? r.items.filter((i) => allowed.includes(i.category)) : r.items).map(slimItem);
+          return toolResult({ ...r, items, ...(allowed ? { note: `This connection is limited to: ${allowed.join(", ")}.` } : {}) });
         }
         case "get_scraper_schema": {
           const key = String(args.scraper ?? "");
@@ -150,7 +154,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
               scraper: d.key, displayName: d.displayName, description: d.description, status: d.status, auth: d.auth, provider: d.provider, sourceUrl: d.sourceUrl,
               note: d.status === "byok" ? "Needs your own provider key: pass it as upstream_key to run_scraper." : d.status === "planned" ? "Listed in the catalog but not callable on this server yet." : undefined,
               total: eps.length,
-              endpoints: eps.slice(off, off + limit).map((e) => ({ slug: e.slug, displayName: e.displayName, method: e.method, ...(e.upstreamMethod ? { upstreamMethod: e.upstreamMethod } : {}), status: e.status, minPlan: e.minPlan ?? null, description: e.description ? String(e.description).slice(0, 200) : null })),
+              endpoints: eps.slice(off, off + limit).map((e) => ({ slug: e.slug, displayName: e.displayName, method: e.method, ...(e.upstreamMethod ? { upstreamMethod: e.upstreamMethod } : {}), access: e.access ?? "read", status: e.status, minPlan: e.minPlan ?? null, description: e.description ? String(e.description).slice(0, 200) : null })),
               nextCursor: off + limit < eps.length ? String(off + limit) : null,
             });
           }
@@ -166,8 +170,13 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
             minPlan: ep.minPlan,
             bulkEnabled: ep.bulkEnabled,
             status: ep.status,
+            access: ep.access ?? "read",
             auth: d.auth ?? null,
-            note: d.auth ? "This API needs your own credentials: pass them as upstream_key to run_scraper." : ep.status === "planned" ? "Listed in the catalog but not callable on this server yet." : undefined,
+            note:
+              ep.access === "write" && caller.access === "read"
+                ? "This endpoint changes data at the provider and this connection is read-only, so run_scraper will refuse it."
+                : d.auth ? "This API needs your own credentials: pass them as upstream_key to run_scraper." : ep.status === "planned" ? "Listed in the catalog but not callable on this server yet." : undefined,
+            citation: "Successful results include a `source` block (publisher, official URL, retrieval time, licence). Cite it when you use the data.",
             fields: ep.fields,
             exampleResponse: ep.exampleResponse,
           });
@@ -181,12 +190,13 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
         case "get_account": {
           const p = getPlan(caller.plan);
           return toolResult({
-            key: { id: caller.keyId, preview: caller.keyPreview }, user: caller.user ? { id: caller.user.id, name: caller.user.name, email: caller.user.email } : null,
+            key: { id: caller.keyId, preview: caller.keyPreview, access: caller.access ?? "read_write", categories: caller.scope?.categories ?? [] }, user: caller.user ? { id: caller.user.id, name: caller.user.name, email: caller.user.email } : null,
             plan: { id: p.id, monthly: p.monthly, perMinute: p.perMinute, bulk: p.bulk, bulkCap: p.bulkCap, webhooks: p.webhooks, minCacheTtl: p.minCacheTtl },
+            finance: caller.financePlan ? (({ id, name, monthly, perMinute, bulk, bulkCap, alerts, licence }) => ({ id, name, monthly, perMinute, bulk, bulkCap, alerts, licence }))(getFinancePlan(caller.financePlan)) : null,
           });
         }
         case "get_usage":
-          return toolResult(await limiter.snapshot(caller.owner, caller.plan));
+          return toolResult({ ...(await limiter.snapshot(caller.owner, caller.plan)), finance: await limiter.financeSnapshot(caller.owner, caller.financePlan) });
         case "bulk_submit": {
           return toolResult(await bulk.submit(caller, String(args.scraper ?? ""), String(args.endpoint ?? ""), args.items, args.idempotency_key));
         }
@@ -218,7 +228,7 @@ export function createMcpHandler({ catalog, repo, executor, limiter, bulk, versi
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "apizie", title: "Apizie", version },
           instructions:
-            "Apizie is one gateway to 1,900+ public data APIs. Workflow: search_scrapers to find a source (page with cursor until nextCursor is null to see everything), get_scraper_schema with only scraper to list its endpoints, get_scraper_schema with scraper and endpoint to read the parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Every call counts against the user's Apizie quota (see get_usage).",
+            "Apizie is one gateway to thousands of public data APIs. Results include a `source` block; cite it (publisher, url, retrievedAt) when you answer. If the user has Apizie Finance (see get_account), official financial data is available with full citations: run_scraper with official:company/profile (company by ticker, CIK or LEI), official:macro/us, official:macro/euro-area or official:macro/country. Without it those calls return finance_plan_required. Workflow: search_scrapers to find a source (page with cursor until nextCursor is null), get_scraper_schema with only scraper to list its endpoints, get_scraper_schema with scraper and endpoint to read parameters, then run_scraper. Project keys look like 'category:slug'. Items with status 'byok' need the user's own provider key, passed as upstream_key. Endpoints with access 'write' change data at the provider and are refused on read-only connections. Every call counts against the user's Apizie quota (see get_usage).",
         });
       }
       case "notifications/initialized":
@@ -305,7 +315,7 @@ function shrink(data, originalChars) {
   return { value: wrapped, note };
 }
 
-const slimItem = (i) => ({ key: i.key, displayName: i.displayName, description: i.description ? String(i.description).slice(0, 240) : null, category: i.category, status: i.status, endpointCount: i.endpointCount, liveEndpoints: i.liveEndpoints, auth: i.auth, provider: i.provider, origin: i.origin, minPlan: i.minPlan, tags: (i.tags ?? []).slice(0, 8) });
+const slimItem = (i) => ({ key: i.key, displayName: i.displayName, description: i.description ? String(i.description).slice(0, 240) : null, category: i.category, status: i.status, endpointCount: i.endpointCount, liveEndpoints: i.liveEndpoints, auth: i.auth, provider: i.provider, origin: i.origin, minPlan: i.minPlan, ...(i.premium ? { premium: i.premium } : {}), tags: (i.tags ?? []).slice(0, 8) });
 
 function codeFor(status) {
   return (

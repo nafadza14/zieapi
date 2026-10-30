@@ -2,7 +2,7 @@
 // Reads the platform-wide hourly rollups (ah:_g:<hour>, see core/analytics.js) plus users and invoices.
 
 import { loadHours, summarize, systemStatus, RANGES, GLOBAL_LOG } from "../core/analytics.js";
-import { PLANS, billedMonths } from "../core/plans.js";
+import { PLANS, FINANCE_PLANS, billedMonths } from "../core/plans.js";
 
 const DAY = 86400_000;
 const HOUR = 3600_000;
@@ -74,12 +74,20 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
       // customers
       const byPlan = { free: 0, pro: 0, ultra: 0, max: 0 };
       let mrrUsd = 0;
+      let financeMrrUsd = 0;
+      let financeSubscribers = 0;
       for (const u of users) {
         const p = repo.effectivePlan(u);
         byPlan[p] = (byPlan[p] ?? 0) + 1;
         if (p !== "free" && u.status !== "suspended") mrrUsd += PLANS[p]?.priceUsd ?? 0;
+        const f = repo.financePlanOf(u);
+        if (f && u.status !== "suspended") {
+          financeMrrUsd += FINANCE_PLANS[f]?.priceUsd ?? 0;
+          financeSubscribers++;
+        }
       }
-      const paying = users.filter((u) => paidPlan(u) && u.status !== "suspended").length;
+      mrrUsd += financeMrrUsd;
+      const paying = users.filter((u) => (paidPlan(u) || repo.financePlanOf(u)) && u.status !== "suspended").length;
       const newUsers = users.filter((u) => inRange(u.createdAt, r.from, r.to));
       const prevNewUsers = users.filter((u) => inRange(u.createdAt, prevFrom, r.from)).length;
       const signups = daySeries(r.from, r.to, r.tz);
@@ -141,6 +149,8 @@ export function createAdminAnalytics({ repo, kv, catalog, storage, version, env 
           previous: r.range === "90d" ? null : prevRevenue,
           change: r.range === "90d" ? null : delta(revenue, prevRevenue),
           mrrUsd,
+          financeMrrUsd,
+          financeSubscribers,
           arpuUsd: paying ? mrrUsd / paying : 0,
           series: [...revSeries].map(([t, amount]) => ({ t, amount })),
           paidCount: paidIn(r.from, r.to).length,

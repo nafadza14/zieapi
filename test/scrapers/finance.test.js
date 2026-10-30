@@ -362,18 +362,25 @@ test("sec-edgar concept + search", async () => {
 test("fred needs key, then fetches observations", async () => {
   const prev = process.env.FRED_API_KEY;
   delete process.env.FRED_API_KEY;
-  const fetch = mockFetch([["series/observations", { units: "lin", observations: [{ date: "2026-10-22", value: "4.05" }, { date: "2026-10-21", value: "." }] }]]);
+  const fetch = mockFetch([
+    ["fred/series?", { seriess: [{ id: "DGS10", notes: "Treasury constant maturity yields." }] }],
+    ["series/observations", { units: "lin", observations: [{ date: "2026-10-22", value: "4.05" }, { date: "2026-10-21", value: "." }] }],
+  ]);
   await assert.rejects(run(defs, "finance:fred", "series-observations", {}, fetch), /FRED_API_KEY/);
   process.env.FRED_API_KEY = "abc123";
   try {
     const out = await run(defs, "finance:fred", "series-observations", { series: "DGS10", frequency: "Monthly", length: 2 }, fetch);
-    const u = new URL(fetch.calls[0].url);
+    const u = new URL(fetch.calls.at(-1).url);
     assert.equal(u.origin + u.pathname, "https://api.stlouisfed.org/fred/series/observations");
     assert.equal(u.searchParams.get("api_key"), "abc123");
     assert.equal(u.searchParams.get("file_type"), "json");
     assert.equal(u.searchParams.get("frequency"), "m");
     assert.equal(u.searchParams.get("sort_order"), "desc");
     assert.deepEqual(out.observations, [{ date: "2026-10-21", value: null }, { date: "2026-10-22", value: 4.05 }]);
+    // a series FRED marks as copyrighted by a third party is refused, never fetched
+    const cr = mockFetch([["fred/series?", { seriess: [{ id: "SP500", notes: "Copyright, 2016, S&P Dow Jones Indices LLC. All rights reserved." }] }]]);
+    await assert.rejects(run(defs, "finance:fred", "series-observations", { series: "SP500" }, cr), /copyrighted by a third-party/);
+    assert.ok(!cr.calls.some((c) => c.url.includes("series/observations")));
   } finally {
     if (prev === undefined) delete process.env.FRED_API_KEY;
     else process.env.FRED_API_KEY = prev;

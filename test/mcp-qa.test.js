@@ -35,7 +35,7 @@ before(async () => {
   let u = await app.repo.createUser({ email: "qa@example.test", name: "qa" });
   u = await app.repo.updateUser(u.id, { plan: "max", planExpiresAt: new Date(Date.now() + 864e5).toISOString() });
   owner = u.id;
-  key = (await app.repo.createKey(u.id, { name: "qa" })).secret;
+  key = (await app.repo.createKey(u.id, { name: "qa", access: "read_write" })).secret;
 });
 after(() => new Promise((r) => app.server.close(r)));
 

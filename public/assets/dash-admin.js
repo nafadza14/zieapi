@@ -8,6 +8,7 @@
   const PAGE = 50;
 
   const planOptions = (cur) => ["free", "pro", "ultra", "max"].map((p) => `<option value="${p}"${p === cur ? " selected" : ""}>${p}</option>`).join("");
+  const financeOptions = (cur) => [["none", "No Finance"], ["fin_starter", "Finance Starter"], ["fin_growth", "Finance Growth"], ["fin_business", "Finance Business"]].map(([v, l]) => `<option value="${v}"${v === (cur ?? "none") ? " selected" : ""}>${l}</option>`).join("");
 
   // ===== Shared monitoring helpers ===========================================================
   const RW = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days", "90d": "last 90 days" };
@@ -111,8 +112,8 @@
             <section class="ds-card"><div class="card-top"><h2>Customers</h2><a class="link-sm push" href="/admin/users">All</a></div>
               <div class="row-between"><b class="stat-value">${num(cu.paying)}</b><span class="meta">paying of ${num(cu.total)} · ${c.pct(cu.conversion === null ? null : Math.round(cu.conversion * 1000) / 10)} conversion</span></div>
               <div class="planmix">${["free", "pro", "ultra", "max"].map((p) => `<span class="pm-seg pm-${p}" style="flex:${cu.byPlan[p] || 0}" title="${c.cap(p)}: ${num(cu.byPlan[p])}"></span>`).join("")}</div>
-              <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.cap(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
-              <p class="meta">MRR ${usd(rv.mrrUsd)} at list price · ARPU ${usd(rv.arpuUsd)}${cu.suspended ? ` · ${num(cu.suspended)} suspended` : ""}</p>
+              <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.planName(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
+              <p class="meta">MRR ${usd(rv.mrrUsd)} at list price${rv.financeMrrUsd ? ` (Finance ${usd(rv.financeMrrUsd)}, ${num(rv.financeSubscribers)} subscribers)` : ""} · ARPU ${usd(rv.arpuUsd)}${cu.suspended ? ` · ${num(cu.suspended)} suspended` : ""}</p>
             </section>
           </div>
         </div>
@@ -352,12 +353,12 @@
           <section class="ds-card"><div class="card-top"><h2>Paid per day</h2><span class="meta push">${num(rv.paidCount)} invoices · ${rw}</span></div>${rv.inRange ? barChart(c, rv.series.map((x) => ({ t: x.t, v: x.amount })), { fmt: c.usd, label: "Revenue" }) : h.empty("No payments in this range", "Approved invoices count on the day they are marked paid.")}</section>
           <section class="ds-card"><div class="card-top"><h2>Plan mix</h2></div>
             <div class="planmix">${["free", "pro", "ultra", "max"].map((p) => `<span class="pm-seg pm-${p}" style="flex:${cu.byPlan[p] || 0}"></span>`).join("")}</div>
-            <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.cap(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
+            <ul class="pm-legend">${["free", "pro", "ultra", "max"].map((p) => `<li><i class="pm-${p}"></i>${c.planName(p)} <b>${num(cu.byPlan[p])}</b></li>`).join("")}</ul>
           </section>
         </div>
         <div class="grid-2">
           <section class="ds-card"><div class="card-top"><h2>Waiting for your confirmation</h2><a class="link-sm push" href="/admin/invoices">Review</a></div>${
-            rv.awaitingReview.length ? `<ul class="mini-list">${rv.awaitingReview.map((i) => `<li><a href="/admin/invoices"><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : `${c.cap(i.plan)} × ${i.months} mo`}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.ago(i.createdAt)}</small></a></li>`).join("")}</ul>` : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing to confirm.</p>`
+            rv.awaitingReview.length ? `<ul class="mini-list">${rv.awaitingReview.map((i) => `<li><a href="/admin/invoices"><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : `${c.planName(i.plan)} × ${i.months} mo`}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.ago(i.createdAt)}</small></a></li>`).join("")}</ul>` : `<p class="all-clear"><span class="pulse ok" aria-hidden="true"></span>Nothing to confirm.</p>`
           }</section>
           <section class="ds-card"><div class="card-top"><h2>Latest payments</h2></div>${
             rv.recentPaid.length ? `<ul class="mini-list">${rv.recentPaid.map((i) => `<li><span>${esc(i.email ?? i.id)} · ${i.type === "topup" ? "top-up" : c.cap(i.plan ?? "plan")}</span><b>${c.money(i.amount, i.currency)}</b><small>${c.day(i.paidAt)}</small></li>`).join("")}</ul>` : `<p class="muted-sm">No paid invoices yet.</p>`
@@ -403,7 +404,7 @@
       const rows = list.slice(page * PAGE, (page + 1) * PAGE).map(
         (u) => `<tr>
           <td><b>${esc(u.name)}</b><br><span class="muted-sm">${esc(u.email)}</span></td>
-          <td>${h.badge(u.effectivePlan)}${u.planExpiresAt && u.plan !== "free" ? `<br><span class="muted-sm">until ${day(u.planExpiresAt)}</span>` : ""}</td>
+          <td>${h.badge(u.effectivePlan)}${u.planExpiresAt && u.plan !== "free" ? `<br><span class="muted-sm">until ${day(u.planExpiresAt)}</span>` : ""}${u.effectiveFinancePlan ? `<br>${h.badge("finance", c.planName(u.effectiveFinancePlan))} <span class="muted-sm">until ${day(u.financeExpiresAt)}</span>` : ""}</td>
           <td class="num">${num(u.usedThisMonth)}</td>
           <td>${u.role === "admin" ? h.badge("admin") : ""}${h.badge(u.status ?? "active")}</td>
           <td class="hide-sm">${day(u.createdAt)}</td>
@@ -445,6 +446,8 @@
           body: `<div class="form-grid">
             <label class="field">Plan<select name="plan">${planOptions(u.plan)}</select></label>
             <label class="field">Days active<input name="days" type="number" min="1" max="3650" value="30"><span class="hint">Only used when the plan changes to a paid plan.</span></label>
+            <label class="field">Apizie Finance<select name="financePlan">${financeOptions(u.effectiveFinancePlan ? u.financePlan : null)}</select></label>
+            <label class="field">Finance days<input name="financeDays" type="number" min="1" max="3650" value="30"><span class="hint">Only used when the Finance plan changes.</span></label>
             <label class="field">Role<select name="role"><option value="user"${u.role !== "admin" ? " selected" : ""}>user</option><option value="admin"${u.role === "admin" ? " selected" : ""}>admin</option></select></label>
             <label class="field">Status<select name="status"><option value="active"${u.status !== "suspended" ? " selected" : ""}>active</option><option value="suspended"${u.status === "suspended" ? " selected" : ""}>suspended</option></select></label>
           </div>`,
@@ -452,6 +455,7 @@
           onSubmit: async (f) => {
             const body = { role: f.role.value, status: f.status.value };
             if (f.plan.value !== u.plan) Object.assign(body, { plan: f.plan.value, days: Number(f.days.value) });
+            if (f.financePlan.value !== ((u.effectiveFinancePlan ? u.financePlan : null) ?? "none")) Object.assign(body, { financePlan: f.financePlan.value, financeDays: Number(f.financeDays.value) });
             await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "PATCH", body });
             return true;
           },
@@ -472,7 +476,7 @@
     let filter = "awaiting_review";
     const draw = () => {
       const list = all.filter((i) => filter === "all" || i.status === filter || (filter === "awaiting_review" && i.status === "pending"));
-      const what = (i) => (i.type === "topup" ? `Top-up ${c.money(i.subtotal, i.currency)}` : `${c.cap(i.plan)} × ${i.months} mo`);
+      const what = (i) => (i.type === "topup" ? `Top-up ${c.money(i.subtotal, i.currency)}` : `${c.planName(i.plan)} × ${i.months} mo`);
       $list.innerHTML = list.length
         ? h.table(
             ["Invoice", "Customer", "For", "Amount", "Status", ""],

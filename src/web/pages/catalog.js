@@ -16,7 +16,7 @@ ${pageHead("Catalog", `Browse all ${fmt(totals.scrapers)} APIs`, `${fmt(totals.e
       <select data-sort aria-label="Sort"><option value="popular">Most used</option><option value="name">Name A–Z</option><option value="endpoints">Most endpoints</option></select>
     </div>
     <div class="filter-chips" role="group" aria-label="Filters">
-      <button class="fchip on" data-filter="">All</button><button class="fchip" data-filter="live">Live now</button><button class="fchip" data-filter="bulk">Bulk support</button><button class="fchip" data-filter="global">Global APIs</button><button class="fchip" data-filter="nokey">No key needed</button><button class="fchip" data-filter="indonesian">Indonesian sources</button>
+      <button class="fchip on" data-filter="">All</button><button class="fchip" data-filter="official">Apizie Finance</button><button class="fchip" data-filter="live">Live now</button><button class="fchip" data-filter="bulk">Bulk support</button><button class="fchip" data-filter="global">Global APIs</button><button class="fchip" data-filter="nokey">No key needed</button><button class="fchip" data-filter="indonesian">Indonesian sources</button>
     </div>
     <div class="mobile-cats">${categories.map((c) => `<button class="cat-chip" data-cat="${esc(c.slug)}" style="--c:${esc(c.color)}"><i></i>${esc(c.displayName)}</button>`).join("")}</div>
     <p class="result-count" data-count aria-live="polite"></p>
@@ -67,13 +67,14 @@ export function scraperPage({ user, s, category, apiUrl, epSlug }) {
     <div class="dh-actions">${statusBadge(s.status)}<button class="pill pill-outline pill-sm" data-mcp-open>Use from MCP</button></div>
   </div>
   ${s.description ? `<p class="lead">${esc(s.description)}</p>` : ""}
+  ${s.premium === "finance" ? `<div class="source-combined card premium-note"><div><span class="eyebrow">Apizie Finance · Premium</span><p>This source is part of Apizie Finance: official financial data with the source on every answer. It needs a Finance plan (from $49 a month) next to your Apizie plan. Calls without one return <code>finance_plan_required</code> and are not billed.</p></div><a class="pill pill-white pill-sm" href="/finance#pricing">See Finance plans →</a></div>` : ""}
   <div class="tags">${s.tags.map((t) => `<a href="/scrapers?q=${esc(t)}" class="tag">${esc(t)}</a>`).join("")}</div>
   <div class="dh-stats"><span><b>${s.endpointCount}</b> endpoints</span>${s.status === "byok" ? `<span><b>${s.endpointCount}</b> with your key</span>` : `<span><b>${s.liveEndpoints}</b> live</span>`}<span><b>${fmt(s.totalRequests)}</b> calls</span>${s.hasBulk ? "<span><b>Bulk</b> supported</span>" : ""}</div>
 </section>
 <div class="wrap detail-body">
   <aside class="ep-list" aria-label="Endpoints">
     <label class="ep-select-label">Endpoint<select data-ep-select aria-label="Endpoint">${s.endpoints.map((e) => `<option value="${esc(e.slug)}"${e.slug === ep.slug ? " selected" : ""}>${esc(e.displayName)}</option>`).join("")}</select></label>
-    <ul>${s.endpoints.map((e) => `<li><a href="?endpoint=${esc(e.slug)}" data-ep="${esc(e.slug)}" class="${e.slug === ep.slug ? "on" : ""}"><span class="m m-${e.method.toLowerCase()}">${e.method}</span><span class="ep-name">${esc(e.displayName)}</span><i class="dot-${e.status}" title="${e.status}"></i></a></li>`).join("")}</ul>
+    <ul>${s.endpoints.map((e) => `<li><a href="?endpoint=${esc(e.slug)}" data-ep="${esc(e.slug)}" class="${e.slug === ep.slug ? "on" : ""}"><span class="m m-${e.method.toLowerCase()}">${e.method}</span><span class="ep-name">${esc(e.displayName)}</span>${e.access === "write" ? '<small class="ep-write" title="Changes data at the provider. Needs a key with write access.">write</small>' : ""}<i class="dot-${e.status}" title="${e.status}"></i></a></li>`).join("")}</ul>
   </aside>
   <section class="ep-main" data-ep-main></section>
 </div>

@@ -2,7 +2,8 @@
 // Every route the dashboard calls lives here; app.js only resolves the session and CSRF.
 
 import { E, HttpError, okContent } from "../core/envelope.js";
-import { PLANS, PAYG, MICROS, getPlan, planAllows, requestsForUsd, billedMonths } from "../core/plans.js";
+import { PLANS, PAYG, MICROS, getPlan, planAllows, requestsForUsd, billedMonths, planName, FINANCE_PLANS, FINANCE_PAYG, getFinancePlan, isFinancePlan } from "../core/plans.js";
+import { WATCH_TYPES, watchTypeList, parseWatch } from "../core/watches.js";
 
 const MIN_PAYOUT_USD = 10;
 import { RANGES, loadHours, summarize, systemStatus } from "../core/analytics.js";
@@ -44,10 +45,17 @@ export function createAccountApi(d) {
   const { repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, affPercent, support, storage, notify, cookie, SESSION_COOKIE, isHttps } = d;
   const kv = repo.kv;
   const memo = new Map();
+  const publicWatch = ({ userId, fingerprint, ...w }) => ({ ...w, typeLabel: WATCH_TYPES[w.type]?.label ?? w.type });
+  const defaultWatchName = ({ type, params }) => {
+    const t = WATCH_TYPES[type]?.label ?? type;
+    const what = params.company ?? params.series ?? (params.indicator ? `${params.indicator} (${params.country})` : null);
+    return what ? `${t}: ${what}` : t;
+  };
 
   const json = (status, body, headers = {}) => ({ status, body, headers: { "Cache-Control": "private, no-store", ...headers } });
   const ok = (content, message) => json(200, okContent(content, message));
   const planOf = (user) => repo.effectivePlan(user);
+  const financeOf = (user) => repo.financePlanOf(user);
 
   function rangeParams(user, q) {
     const range = RANGES[q.range] ? q.range : "7d";
@@ -74,7 +82,16 @@ export function createAccountApi(d) {
     return out;
   }
 
-  const publicKey = (k) => ({ id: k.id, name: k.name, preview: k.preview, status: k.status === "disabled" ? "revoked" : k.status, ipAllowlist: k.ipAllowlist ?? [], createdAt: k.createdAt, lastUsedAt: k.lastUsedAt, revokedAt: k.revokedAt ?? null, canReveal: !!k.sealed && !!repo.vault });
+  // access: "read" (default for new keys) or "read_write". Keys made before permissions existed have no stored
+  // value and keep full access; they are flagged `legacyAccess` so the dashboard can suggest read-only.
+  const publicKey = (k) => ({ id: k.id, name: k.name, preview: k.preview, status: k.status === "disabled" ? "revoked" : k.status, ipAllowlist: k.ipAllowlist ?? [], access: k.access ?? "read_write", legacyAccess: !k.access, categories: k.scope?.categories ?? [], createdAt: k.createdAt, lastUsedAt: k.lastUsedAt, revokedAt: k.revokedAt ?? null, canReveal: !!k.sealed && !!repo.vault });
+  const knownCategory = (c) => catalog.categoryList({ withEmpty: true }).some((x) => x.slug === c);
+  const parseCategories = (v) => {
+    const list = (Array.isArray(v) ? v : String(v ?? "").split(/[\s,]+/)).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+    const bad = list.find((c) => !knownCategory(c));
+    if (bad) throw E.invalidParams([{ path: "categories", message: `Unknown category: ${bad}` }]);
+    return [...new Set(list)].slice(0, 50);
+  };
 
   async function quota(user) {
     const plan = planOf(user);
@@ -85,7 +102,9 @@ export function createAccountApi(d) {
     const elapsed = (Date.now() - start) / (end - start);
     // Straight-line projection of this month's usage; only shown once there is enough of the month to project from.
     const projected = elapsed > 0.03 && snap.month.used ? Math.round((snap.month.used / elapsed / snap.month.limit) * 100) : null;
-    return { ...snap, plan: getPlan(plan), projectedPercent: projected, resetsAt: new Date(end).toISOString() };
+    const fin = financeOf(user);
+    const finance = fin ? { ...(await limiter.financeSnapshot(user.id, fin)), plan: getFinancePlan(fin), expiresAt: user.financeExpiresAt ?? null } : null;
+    return { ...snap, plan: getPlan(plan), projectedPercent: projected, resetsAt: new Date(end).toISOString(), finance };
   }
 
   async function keysWithUsage(user) {
@@ -93,6 +112,7 @@ export function createAccountApi(d) {
     const now = Date.now();
     const from = Math.max(now - 30 * DAY, (Date.parse(user.createdAt) || 0) - HOUR);
     const hours = keys.length ? await loadHours(kv, user.id, from, now) : [];
+    const writes = await repo.lastWriteAt(keys.map((k) => k.id));
     return keys.map((k) => {
       const spark = Array(30).fill(0);
       let total = 0;
@@ -103,7 +123,7 @@ export function createAccountApi(d) {
         const i = 29 - Math.floor((now - t) / DAY);
         if (i >= 0 && i < 30) spark[i] += v;
       }
-      return { ...publicKey(k), requests30d: total, spark };
+      return { ...publicKey(k), requests30d: total, spark, lastWriteAt: writes[k.id] ?? null };
     });
   }
 
@@ -113,7 +133,7 @@ export function createAccountApi(d) {
     const need = RANGE_PLAN[range];
     if (need && !planAllows(plan.id, need)) throw E.planGate(need, `${publicUrl}/dashboard/billing?plan=${need}`);
     const cutoff = Date.now() - Math.min(RANGES[range], plan.logDays * DAY);
-    const status = ["success", "error"].includes(q.status) ? q.status : "all";
+    const status = ["success", "error", "write", "blocked"].includes(q.status) ? q.status : "all";
     const terms = String(q.q ?? "").toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
     const keyId = q.key && q.key !== "all" ? q.key : null;
     const all = await repo.getLogs(user.id, { limit: 5000, offset: 0 });
@@ -129,6 +149,8 @@ export function createAccountApi(d) {
       if (l.status >= 400) err++;
       if (status === "success" && l.status >= 400) continue;
       if (status === "error" && l.status < 400) continue;
+      if (status === "write" && l.access !== "write") continue;
+      if (status === "blocked" && l.code !== "key_read_only" && l.code !== "key_scope") continue;
       rows.push(l);
     }
     return { rows, req, err, range, status, retentionDays: plan.logDays, since: new Date(cutoff).toISOString() };
@@ -146,12 +168,15 @@ export function createAccountApi(d) {
       cents = Math.round(usd * 100);
       extra = { usd, requests, creditMicros: requests * PAYG.priceMicros };
     } else {
-      const target = PLANS[body?.plan];
+      // Two schemes: general plans (pro, ultra, max) and the Apizie Finance add-on (fin_starter, fin_growth, fin_business).
+      const finance = isFinancePlan(body?.plan);
+      const target = finance ? FINANCE_PLANS[body.plan] : PLANS[body?.plan];
       const months = Math.min(12, Math.max(1, Math.round(Number(body?.months) || 1)));
-      if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max" }]);
+      if (!target || target.id === "free") throw E.invalidParams([{ path: "plan", message: "Choose pro, ultra or max, or a Finance plan: fin_starter, fin_growth or fin_business" }]);
       // Buying a lower plan would cut short time already paid for on a higher one.
-      const cur = getPlan(user.plan);
-      if (cur.rank > target.rank && user.planExpiresAt && Date.parse(user.planExpiresAt) > Date.now()) throw E.invalidParams([{ path: "plan", message: `You're on ${cur.id[0].toUpperCase() + cur.id.slice(1)} until ${user.planExpiresAt.slice(0, 10)}. You can switch to a lower plan after it ends` }]);
+      const cur = finance ? getFinancePlan(financeOf(user)) : getPlan(user.plan);
+      const curUntil = finance ? user.financeExpiresAt : user.planExpiresAt;
+      if (cur && cur.rank > target.rank && curUntil && Date.parse(curUntil) > Date.now()) throw E.invalidParams([{ path: "plan", message: `You're on ${planName(cur.id)} until ${curUntil.slice(0, 10)}. You can switch to a lower plan after it ends` }]);
       const priceUsd = target.priceUsd * billedMonths(months);
       cents = Math.round(priceUsd * 100);
       extra = { plan: target.id, months, priceUsd };
@@ -206,7 +231,7 @@ export function createAccountApi(d) {
       id: i.id,
       kind: i.type === "topup" ? "topup" : "plan",
       date: i.createdAt,
-      item: i.type === "topup" ? `Balance top-up (≈ ${(i.requests ?? 0).toLocaleString("en-US")} requests)` : `${cap(i.plan)} plan · ${i.months} month${i.months > 1 ? "s" : ""}`,
+      item: i.type === "topup" ? `Balance top-up (≈ ${(i.requests ?? 0).toLocaleString("en-US")} requests)` : `${planName(i.plan)} plan · ${i.months} month${i.months > 1 ? "s" : ""}`,
       method: i.method === "card" ? "Card (Dodo Payments)" : "Bank transfer",
       // Older bank-transfer invoices were in rupiah; they are shown at their US dollar list price.
       currency: "USD",
@@ -216,9 +241,17 @@ export function createAccountApi(d) {
       status: i.status,
       reference: i.reference,
     }));
-    const usage = (await repo.paygUsage(user.id, 90)).map((u) => {
-      const cents = -(u.requests * PAYG.priceMicros) / 10_000;
-      return { id: `USE-${u.date}`, kind: "usage", date: `${u.date}T23:59:59.000Z`, item: `${u.requests.toLocaleString("en-US")} requests over quota`, method: "Balance", currency: "USD", subtotal: cents, vat: 0, total: cents, status: "settled" };
+    const usage = (await repo.paygUsage(user.id, 90)).flatMap((u) => {
+      const rows = [];
+      if (u.requests) {
+        const cents = -(u.requests * PAYG.priceMicros) / 10_000;
+        rows.push({ id: `USE-${u.date}`, kind: "usage", date: `${u.date}T23:59:59.000Z`, item: `${u.requests.toLocaleString("en-US")} requests over quota`, method: "Balance", currency: "USD", subtotal: cents, vat: 0, total: cents, status: "settled" });
+      }
+      if (u.financeRequests) {
+        const cents = -(u.financeRequests * FINANCE_PAYG.priceMicros) / 10_000;
+        rows.push({ id: `USEF-${u.date}`, kind: "usage", date: `${u.date}T23:59:58.000Z`, item: `${u.financeRequests.toLocaleString("en-US")} Apizie Finance requests over quota`, method: "Balance", currency: "USD", subtotal: cents, vat: 0, total: cents, status: "settled" });
+      }
+      return rows;
     });
     return [...inv, ...usage].sort((a, b) => (a.date < b.date ? 1 : -1));
   }
@@ -227,7 +260,7 @@ export function createAccountApi(d) {
     const plan = getPlan(planOf(user));
     const hooks = await repo.getWebhooks(user.id);
     return {
-      enabled: plan.webhooks,
+      enabled: plan.webhooks || !!financeOf(user),
       events: WEBHOOK_EVENTS,
       hooks: hooks.map(({ secret, ...h }) => ({ ...h, enabled: h.enabled !== false, secretPreview: secret.slice(0, 10) + "…" })),
       deliveries: (await repo.listDeliveries(user.id, 50)).map(({ payload, ...dl }) => ({ ...dl, payload })),
@@ -235,7 +268,7 @@ export function createAccountApi(d) {
   }
 
   const requireWebhooks = (user) => {
-    if (!getPlan(planOf(user)).webhooks) throw E.planGate("pro", `${publicUrl}/dashboard/billing?plan=pro`);
+    if (!getPlan(planOf(user)).webhooks && !financeOf(user)) throw E.planGate("pro", `${publicUrl}/dashboard/billing?plan=pro`);
   };
   const checkTarget = async (url, path = "url") => {
     try {
@@ -352,7 +385,7 @@ export function createAccountApi(d) {
     }
     if (p === "/api/me/logs/export" && m === "GET") {
       const f = await filteredLogs(user, q);
-      const cols = ["id", "at", "method", "project", "endpoint", "status", "ms", "keyName", "key", "source", "ip", "cache", "billed", "code", "error"];
+      const cols = ["id", "at", "method", "project", "endpoint", "access", "status", "ms", "keyName", "key", "source", "ip", "cache", "billed", "code", "error"];
       const cell = (v) => {
         const s = v === null || v === undefined ? "" : String(v);
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -372,7 +405,9 @@ export function createAccountApi(d) {
       if (keys.filter((k) => k.status === "active").length >= max) throw E.invalidParams([{ path: "name", message: `Your plan allows ${max} active keys. Revoke one or upgrade.` }]);
       if (keys.length >= 100) throw E.invalidParams([{ path: "name", message: "Delete some revoked keys first" }]);
       const name = String(body?.name ?? "").trim().slice(0, 60) || `Key ${keys.length + 1}`;
-      const { secret, rec } = await repo.createKey(user.id, { name });
+      const access = body?.access === "read_write" ? "read_write" : "read";
+      const categories = body?.categories !== undefined ? parseCategories(body.categories) : [];
+      const { secret, rec } = await repo.createKey(user.id, { name, access, scope: categories.length ? { categories } : null });
       webhooks.emit(user.id, "key.created", { keyId: rec.id, name: rec.name });
       return json(201, okContent({ key: secret, record: publicKey(rec) }, "Created. Copy this key now."));
     }
@@ -397,6 +432,14 @@ export function createAccountApi(d) {
       if (!mm[3] && m === "PATCH") {
         const patch = {};
         if (body?.name !== undefined) patch.name = String(body.name).trim().slice(0, 60) || k.name;
+        if (body?.access !== undefined) {
+          if (!["read", "read_write"].includes(body.access)) throw E.invalidParams([{ path: "access", message: "read | read_write" }]);
+          patch.access = body.access;
+        }
+        if (body?.categories !== undefined) {
+          const categories = parseCategories(body.categories);
+          patch.scope = categories.length ? { categories } : null;
+        }
         if (body?.status !== undefined) {
           if (body.status === "revoked" || body.status === "disabled") {
             patch.status = "revoked";
@@ -408,7 +451,7 @@ export function createAccountApi(d) {
           } else throw E.invalidParams([{ path: "status", message: "active | revoked" }]);
         }
         if (body?.ipAllowlist !== undefined) {
-          if (!getPlan(plan).webhooks) throw E.planGate("pro", `${publicUrl}/dashboard/billing?plan=pro`);
+          if (!getPlan(plan).webhooks && !financeOf(user)) throw E.planGate("pro", `${publicUrl}/dashboard/billing?plan=pro`);
           const list = (Array.isArray(body.ipAllowlist) ? body.ipAllowlist : String(body.ipAllowlist).split(/[\s,]+/)).map((s) => String(s).trim()).filter(Boolean);
           const bad = list.find((r) => !validRule(r));
           if (bad) throw E.invalidParams([{ path: "ipAllowlist", message: `Not an IP or IPv4 CIDR: ${bad}` }]);
@@ -419,6 +462,12 @@ export function createAccountApi(d) {
       }
     }
     if (p === "/api/me/apps" && m === "GET") return ok(await oauth.listGrants(user.id));
+    if ((mm = /^\/api\/me\/apps\/([^/]+)$/.exec(p)) && m === "PATCH") {
+      const id = decodeURIComponent(mm[1]);
+      if (!(await oauth.listGrants(user.id)).some((g) => g.clientId === id)) throw E.notFound("App not found");
+      if (body?.access !== undefined && !["read", "read_write"].includes(body.access)) throw E.invalidParams([{ path: "access", message: "read | read_write" }]);
+      return ok(await oauth.updateGrant(user.id, id, { access: body?.access, categories: body?.categories !== undefined ? parseCategories(body.categories) : [] }));
+    }
     if ((mm = /^\/api\/me\/apps\/([^/]+)$/.exec(p)) && m === "DELETE") {
       await oauth.revokeGrant(user.id, decodeURIComponent(mm[1]));
       return ok({ ok: true });
@@ -439,6 +488,50 @@ export function createAccountApi(d) {
       return json(201, okContent(job));
     }
     if ((mm = /^\/api\/me\/bulk\/([^/]+)$/.exec(p)) && m === "GET") return ok(await bulk.status({ owner: user.id }, mm[1]));
+
+    // ---- data alerts (watches on official sources): part of Apizie Finance -------------------
+    if (p === "/api/me/alerts" && m === "GET") {
+      const items = (await repo.listItems("watch", user.id)).map(publicWatch);
+      const fin = getFinancePlan(financeOf(user));
+      return ok({ limit: fin?.alerts ?? 0, plan: fin?.id ?? null, financePlan: fin?.id ?? null, types: watchTypeList(), items, schedule: "Checked about once a day, and whenever you press Check now." });
+    }
+    if (p === "/api/me/alerts" && m === "POST") {
+      const fin = getFinancePlan(financeOf(user));
+      const limit = fin?.alerts ?? 0;
+      if (!limit) throw E.coded(403, "finance_plan_required", "Data alerts are part of Apizie Finance. Add a Finance plan to create them.", { upgrade_url: `${publicUrl}/finance#pricing`, product: "finance" });
+      const mine = await repo.listItems("watch", user.id);
+      if (mine.length >= limit) throw E.invalidParams([{ path: "type", message: `Your Finance plan includes ${limit} data alerts. Remove one or upgrade for more.` }]);
+      let parsed;
+      try {
+        parsed = parseWatch(body);
+      } catch (e) {
+        throw E.invalidParams([{ path: "params", message: e.message }]);
+      }
+      const name = String(body?.name ?? "").trim().slice(0, 80) || defaultWatchName(parsed);
+      const w = await repo.put("watch", { id: "al_" + ulid().slice(-12).toLowerCase(), userId: user.id, name, ...parsed, enabled: true, createdAt: new Date().toISOString(), changes: 0 }, user.id);
+      // The first check records the current state, so the next change is what alerts.
+      const first = d.watcher ? await d.watcher.check(w) : { watch: w };
+      return json(201, okContent(publicWatch(first.watch), first.error ? `Alert saved, but the first check failed: ${first.error}` : "Alert saved"));
+    }
+    if ((mm = /^\/api\/me\/alerts\/([a-z0-9_]+)(\/check)?$/.exec(p))) {
+      const w = await repo.getItem("watch", mm[1]);
+      if (!w || w.userId !== user.id) throw E.notFound("Alert not found");
+      if (mm[2] && m === "POST") {
+        if (w.lastCheckedAt && Date.now() - Date.parse(w.lastCheckedAt) < 60_000) throw E.invalidParams([{ path: "id", message: "Checked less than a minute ago. Try again shortly." }]);
+        const r = await d.watcher.check(w);
+        return ok({ ...publicWatch(r.watch), changed: r.changed, error: r.error ?? null });
+      }
+      if (!mm[2] && m === "PATCH") {
+        const patch = {};
+        if (typeof body?.enabled === "boolean") patch.enabled = body.enabled;
+        if (typeof body?.name === "string") patch.name = body.name.trim().slice(0, 80) || w.name;
+        return ok(publicWatch(await repo.patchItem("watch", w.id, patch)));
+      }
+      if (!mm[2] && m === "DELETE") {
+        await repo.removeItem("watch", w.id, user.id);
+        return ok({ deleted: true });
+      }
+    }
 
     // ---- webhooks ----------------------------------------------------------------------
     if (p === "/api/me/webhooks" && m === "GET") return ok(await webhookView(user));
@@ -531,6 +624,7 @@ export function createAccountApi(d) {
         planExpiresAt: user.planExpiresAt,
         quota: qt,
         plans: Object.values(PLANS),
+        finance: { plan: getFinancePlan(financeOf(user)), storedPlan: user.financePlan ?? null, expiresAt: user.financeExpiresAt ?? null, plans: Object.values(FINANCE_PLANS), usdPer1k: FINANCE_PAYG.usdPer1k },
         currency: "USD",
         balance: balance / MICROS, // US dollars
         balanceRequests: Math.floor(balance / PAYG.priceMicros),

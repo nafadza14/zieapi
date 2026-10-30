@@ -6,7 +6,7 @@ import { ulid, sleep } from "./util.js";
 import { getPlan } from "./plans.js";
 import { assertPublicUrl } from "../scrapers/ssrf.js";
 
-export const WEBHOOK_EVENTS = ["bulk.completed", "bulk.failed", "key.created", "key.revoked", "key.disabled", "quota.warning", "quota.exceeded", "balance.low", "invoice.paid", "request.error", "plan.changed", "webhook.test"];
+export const WEBHOOK_EVENTS = ["bulk.completed", "bulk.failed", "key.created", "key.revoked", "key.disabled", "quota.warning", "quota.exceeded", "balance.low", "invoice.paid", "request.error", "plan.changed", "data.changed", "key.blocked", "webhook.test"];
 
 export const signPayload = (secret, raw) => "sha256=" + createHmac("sha256", secret).update(raw).digest("hex");
 export function verifySignature(secret, raw, header) {
@@ -18,8 +18,8 @@ export function verifySignature(secret, raw, header) {
 export const newWebhookSecret = () => "whsec_" + randomBytes(24).toString("base64url");
 
 export class WebhookDispatcher {
-  constructor(repo, { fetchImpl = globalThis.fetch, retries = 2, backoffMs = 400, logger = null, planOf, lookup = null, allowPrivate = false } = {}) {
-    Object.assign(this, { repo, fetchImpl, retries, backoffMs, logger, planOf, lookup, allowPrivate });
+  constructor(repo, { fetchImpl = globalThis.fetch, retries = 2, backoffMs = 400, logger = null, planOf, financeOf = null, lookup = null, allowPrivate = false } = {}) {
+    Object.assign(this, { repo, fetchImpl, retries, backoffMs, logger, planOf, financeOf, lookup, allowPrivate });
     this.pending = new Set();
   }
 
@@ -33,7 +33,8 @@ export class WebhookDispatcher {
     if (!owner) return;
     const p = (async () => {
       const plan = this.planOf ? await this.planOf(owner) : "free";
-      if (!getPlan(plan).webhooks) return;
+      // Webhooks come with paid general plans and with any Apizie Finance plan (data alerts deliver through them).
+      if (!getPlan(plan).webhooks && !(this.financeOf && (await this.financeOf(owner)))) return;
       const hooks = await this.repo.getWebhooks(owner);
       await Promise.all(hooks.filter((h) => h.enabled !== false && (h.events?.includes(event) || h.events?.includes("*"))).map((h) => this.deliver(h, event, data, { owner })));
     })().catch((e) => this.logger?.warn?.("webhook emit failed: " + e.message));

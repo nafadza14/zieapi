@@ -177,11 +177,12 @@
     const badge = (s) => ({ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Off" })[s] ?? "";
     const fmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n));
     const iconHtml = (s) => { const m = esc(s.displayName.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"); return s.iconUrl ? `<span class="sc-icon has-img"><img src="${esc(s.iconUrl)}" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.parentNode.classList.remove('has-img');this.parentNode.textContent='${m}'"></span>` : `<span class="sc-icon" style="--c:#8b8ba7">${m}</span>`; };
-    const cardHtml = (s) => `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}"><div class="sc-top">${iconHtml(s)}<span class="badge badge-${esc(s.status)}">${badge(s.status)}</span></div><h3>${esc(s.displayName)}</h3><p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p><div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div></a>`;
+    const cardHtml = (s) => `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}"><div class="sc-top">${iconHtml(s)}${s.premium === "finance" ? '<span class="badge badge-premium" title="Part of Apizie Finance, a premium add-on">Finance</span>' : `<span class="badge badge-${esc(s.status)}">${badge(s.status)}</span>`}</div><h3>${esc(s.displayName)}</h3><p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p><div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div></a>`;
     const colors = Object.fromEntries($$(".cat-item[data-cat]").map((b) => [b.dataset.cat, getComputedStyle(b).getPropertyValue("--c")]));
     const render = () => {
       let rows = items.filter((s) => {
         if (state.cat && s.category !== state.cat) return false;
+        if (state.filter === "official" && !s.official) return false;
         if (state.filter === "live" && s.status !== "live") return false;
         if (state.filter === "bulk" && !s.hasBulk) return false;
         if (state.filter === "indonesian" && !s.indonesian) return false;

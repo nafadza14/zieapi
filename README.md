@@ -7,9 +7,15 @@
 
 # Apizie
 
-**One API key for hundreds of public data sources, Indonesia first.**
+**One API key for thousands of public data sources. Plus Apizie Finance: official financial data with citations for AI agents.**
 
-Apizie is a complete, self-hostable public-data API platform with zero runtime dependencies (Node.js ≥ 20). It includes:
+Apizie turns thousands of public APIs into clean JSON behind one API key, with an MCP server for Claude, ChatGPT and Cursor. **Apizie Finance** is a premium add-on: SEC EDGAR, FRED, the ECB, the U.S. Treasury, GLEIF and the World Bank through one REST API and one MCP server, where every answer carries its source (publisher, official URL, retrieval time, licence, attribution).
+
+It is a complete, self-hostable platform with zero runtime dependencies (Node.js ≥ 20). It includes:
+
+- **Apizie Finance (premium):** the six sources (`finance:sec-edgar`, `finance:fred`, `finance:ecb`, `finance:us-treasury`, `finance:gleif`, `finance:worldbank`) plus combined, cited endpoints in `official:company` and `official:macro`. They need an active Finance plan (`user.financePlan`, checked in `src/core/executor.js`), use their own quota (`fin:<owner>` counters in `src/core/limits.js`) and answer `403 finance_plan_required` otherwise. Provenance lives in `src/core/sources.js`; licence guards include the FRED third-party-copyright filter and SEC fair-access pacing.
+- **Data alerts (Finance):** watch new SEC filings, FRED series, the Treasury curve, ECB rates or World Bank values and get a signed `data.changed` webhook (`src/core/watches.js`, daily Vercel cron at `/api/cron/watches`).
+- **Key permissions:** new keys and MCP connections are read-only by default, can be limited to categories, and refused calls are never billed.
 
 - **Website:** a landing page with the animated globe hero, a searchable catalog, a page per scraper with a "Try it" console and code samples, pricing, docs, the MCP page, a showcase, a status page, issue reporting and legal pages.
 - **Accounts:** email/password sign-in plus GitHub, Google and Discord OAuth.
@@ -67,6 +73,9 @@ To run the tests: `npm test` (138 tests).
    | `APIZIE_SUPPORT_EMAIL`, `APIZIE_DISCORD_URL` | optional, shown on the Support page |
    | `RESEND_API_KEY`, `APIZIE_EMAIL_FROM` | optional, also email dashboard notifications |
    | `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET` | optional OAuth; callback = `{APIZIE_PUBLIC_URL}/auth/{provider}/callback` |
+   | `FRED_API_KEY` | free key from fred.stlouisfed.org, needed for every FRED endpoint and `official:macro/us` |
+   | `CRON_SECRET` | any long random string; Vercel Cron sends it to `/api/cron/watches` to run data alerts |
+   | `APIZIE_SEC_USER_AGENT` | optional; the User-Agent sent to sec.gov (default `Apizie support@zieads.com`) |
 
 4. Deploy, open the site, sign up with the admin email, then open **/admin/setup**: every check should be green or "Review".
 
@@ -78,7 +87,7 @@ All options are listed in [`.env.example`](.env.example).
 |---|---|
 | Call | `GET` or `POST /v1/{category}:{scraper}/{endpoint}[/{path-params}]` |
 | Auth | `x-api-key: apz_…` (or `Authorization: Bearer …`, or `api-key: …`) |
-| Success | `{ "project", "data", "timestamp" }` |
+| Success | `{ "project", "data", "source", "timestamp" }` (`source` = publisher, url, apiUrl, retrievedAt, license, attribution) |
 | Errors | `{ "content", "message", "errors" }`; plan, bulk and quota errors use `{ "error": { "code", "message" } }` |
 | Limits | `X-RateLimit-Remaining`, `X-RateLimit-Remaining-Month`, `Retry-After`. A 5xx is refunded. |
 | Bulk | `POST …/{endpoint}/bulk` `{items:[…]}` + `Idempotency-Key`; `GET /v1/bulk/{id}` |
@@ -86,7 +95,9 @@ All options are listed in [`.env.example`](.env.example).
 | Machine docs | `/openapi.json`, `/category/{slug}/openapi.json`, `/llms.txt`, `/llms-full.txt` |
 | MCP | `POST /mcp` with tools `search_scrapers`, `get_scraper_schema`, `list_categories`, `run_scraper`, `get_account`, `get_usage`, `bulk_submit`, `bulk_status` |
 
-Plans are defined in `src/core/plans.js`. Every price is in USD and paid by card through Dodo Payments. The research behind the numbers is in [`docs/PRICING.md`](docs/PRICING.md).
+Plans are defined in `src/core/plans.js`. Every price is in USD and paid by card through Dodo Payments. There are two schemes; the research behind them is in [`docs/PRICING.md`](docs/PRICING.md).
+
+**General plans** (whole public catalog):
 
 | Plan | Price / month | Yearly (2 months free) | Req/month | Req/min |
 |---|---|---|---|---|
@@ -95,20 +106,31 @@ Plans are defined in `src/core/plans.js`. Every price is in USD and paid by card
 | Ultra | $29 | $290 | 200,000 | 5,000 |
 | Max | $99 | $990 | 1,000,000 | 15,000 |
 
-Pay-as-you-go above the quota: $0.40 per 1,000 requests ($0.0004 per request) from a prepaid USD balance.
+Pay-as-you-go above the quota: $0.40 per 1,000 requests from a prepaid USD balance.
+
+**Apizie Finance** (premium add-on, its own quota, no free tier; ids `fin_starter`, `fin_growth`, `fin_business`):
+
+| Plan | Price / month | Yearly | Finance req/month | Licence | Data alerts |
+|---|---|---|---|---|---|
+| Finance Starter | $49 | $490 | 100,000 | Commercial use inside your company | 5 |
+| Finance Growth | $199 | $1,990 | 1,000,000 | Use in your own product, with attribution | 50 |
+| Finance Business | $499 | $4,990 | 5,000,000 | Use in your own product, with attribution | 200 |
+
+Finance overage: $1.00 per 1,000 requests from the same balance. Admins can grant Finance from Admin → Customers. Server keys in `ZIE_KEYS` can carry it too: `max+fin_growth:apz_...`.
 
 ## Dashboard
 
-`/dashboard` has eleven sections, all backed by `/api/me/*` (`src/dashboard/account.js`):
+`/dashboard` has twelve sections, all backed by `/api/me/*` (`src/dashboard/account.js`):
 
 | Section | What works |
 |---|---|
 | Dashboard | requests in range, traffic-by-hour heatmap (your timezone), API key with reveal/copy, monthly quota with projection, requests today, success rate, p95 latency, errors 24h, requests over time, recent requests, top endpoints, categories, errors by status. Range 24H/7D/30D (Pro)/90D (Ultra) and a per-key filter. |
 | Usage | totals, 24h numbers, per-key usage table, request sources, top endpoints |
 | Logs | search (status, endpoint, key, request ID), success/error filter, range, key filter, detail panel with replay cURL, pagination, CSV export. Metadata only, never payloads. |
-| API keys | create (limit per plan), reveal again, copy, rename, IP allowlist with IPv4 CIDR (Pro+), revoke (permanent), delete, 30-day sparkline, connected MCP apps, code samples in 6 languages |
-| Bulk jobs (Ultra) | submit from the dashboard with an API/endpoint picker, job list with filters, per-item results, JSON download |
-| Webhooks (Pro) | up to 5 endpoints, event selection, test, delivery history with payload, redeliver, on/off, rotate secret. Private and localhost targets are refused. |
+| API keys | create (limit per plan) with read-only or read and write access and category limits, reveal again, copy, rename, IP allowlist with IPv4 CIDR (Pro+), last-write time and a one-click "make read-only" suggestion, revoke, delete, 30-day sparkline, connected MCP apps with editable permissions, code samples in 6 languages |
+| Data alerts (Finance) | watch SEC filings, FRED series, the Treasury curve, ECB rates or World Bank values; check now; on/off; signed `data.changed` webhooks |
+| Bulk jobs (Ultra, or Finance Growth) | submit from the dashboard with an API/endpoint picker, job list with filters, per-item results, JSON download |
+| Webhooks (Pro, or any Finance plan) | up to 5 endpoints, event selection, test, delivery history with payload, redeliver, on/off, rotate secret. Private and localhost targets are refused. |
 | Billing | plan, pay-as-you-go balance, USD top-ups ($5 to $5,000), plan checkout for 1 to 12 months, transactions |
 | Affiliate | referral link (`/?ref=code`, 30-day cookie), clicks, sign-ups, paying customers, commission history, move to balance, payout via PayPal or SWIFT (min $10) |
 | Showcase, Settings, Support | project submissions; profile photo, name, password, notification switches, active sessions, delete account; support form prefilled from your latest errors |

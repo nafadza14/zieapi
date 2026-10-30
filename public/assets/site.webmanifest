@@ -1,7 +1,7 @@
 {
   "name": "Apizie",
   "short_name": "Apizie",
-  "description": "One API key for 3,700+ public data APIs, with an MCP server for AI agents.",
+  "description": "Official-source data for AI agents: SEC EDGAR, FRED, ECB, U.S. Treasury, GLEIF and World Bank in one API and MCP server. Every answer comes with its source.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#05050A",

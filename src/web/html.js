@@ -13,6 +13,7 @@ export const logo = (cls = "") => `<span class="logo ${cls}"><svg viewBox="0 0 7
 const NAV = [
   ["/", "Home", "home"],
   ["/scrapers", "Scrapers", "scrapers"],
+  ["/finance", "Finance", "finance"],
   ["/pricing", "Pricing", "pricing"],
   ["/docs", "Docs", "docs"],
   ["/mcp", "MCP", "mcp"],
@@ -36,7 +37,7 @@ export function footer() {
   <div class="footer-top">
     <div class="footer-brand">${logo()}<p>One key, one response shape. We keep the scrapers working.</p></div>
     <div class="footer-cols">
-      <div><h4>Product</h4><a href="/scrapers">Scrapers</a><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/mcp">MCP server</a><a href="/showcase">Showcase</a><a href="/status">Status</a></div>
+      <div><h4>Product</h4><a href="/scrapers">Scrapers</a><a href="/pricing">Pricing</a><a href="/finance">Apizie Finance</a><a href="/docs">Docs</a><a href="/mcp">MCP server</a><a href="/showcase">Showcase</a><a href="/status">Status</a></div>
       <div><h4>Developers</h4><a href="/docs/quickstart">Quickstart</a><a href="/mcp">MCP for AI agents</a><a href="/docs#machine-readable">For AI tools</a><a href="https://github.com/nafadza14/zieapi" rel="noopener">GitHub</a></div>
       <div><h4>Support</h4><a href="/report">Report an issue</a><a href="/docs/errors">Error codes</a><a href="mailto:support@zieads.com">Contact</a></div>
       <div><h4>Legal</h4><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/cookies">Cookies</a><a href="/aup">Acceptable use</a><a href="/refund">Refunds</a></div>

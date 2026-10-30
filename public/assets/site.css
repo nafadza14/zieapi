@@ -527,3 +527,41 @@ h2.display-2.mt { margin: 64px 0 18px; }
 @media (max-width: 900px) { .legal-wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; } .legal-side { position: static; order: -1; } .legal-links { grid-auto-flow: column; overflow-x: auto; } .legal-links a { white-space: nowrap; } .legal-toc ol { columns: 1; } }
 .machine-note { margin-top: 28px; }
 .pay-note { text-align: center; font-size: 14px; margin: 18px auto 0; }
+.consent-form { display: grid; gap: 12px; text-align: left; }
+.consent-perm { border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 10px 12px; margin: 0; display: grid; gap: 8px; }
+.consent-perm legend { padding: 0 6px; font-weight: 600; font-size: .9rem; }
+.consent-opt { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.35; }
+.consent-opt input { margin-top: 4px; }
+.consent-cats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; font-size: .9rem; }
+.consent-cats label { display: flex; gap: 6px; align-items: center; }
+.ep-write { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #fcd34d; border: 1px solid rgba(252,211,77,.4); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+/* official sources */
+.source-strip { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 14px auto 0; max-width: 860px; }
+.source-strip a { display: grid; gap: 2px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(255,255,255,.03); text-align: left; transition: border-color .2s, background .2s; }
+.source-strip a:hover { border-color: rgba(196,181,253,.5); background: rgba(196,181,253,.06); }
+.source-strip b { font-size: .95rem; }
+.source-strip small { color: var(--t3, #9a9ab0); font-size: .78rem; }
+@media (max-width: 720px) { .source-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.source-grid .source-card { display: grid; gap: 6px; align-content: start; }
+.source-card h3 a { color: inherit; }
+.source-card .sc-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.source-combined { display: flex; gap: 20px; align-items: center; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; }
+.source-combined > div { max-width: 720px; }
+.small { font-size: .9rem; }
+.src-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.src-table th, .src-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
+.enterprise-band { display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 18px; }
+
+/* ---------- pricing: two schemes (general + Apizie Finance) ---------- */
+.scheme-switch { display: inline-flex; gap: 4px; padding: 5px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); margin-bottom: 8px; }
+.scheme-switch a { padding: 8px 18px; border-radius: 999px; color: var(--muted); text-decoration: none; display: inline-flex; gap: 8px; align-items: center; }
+.scheme-switch a.on, .scheme-switch a:hover { background: #fff; color: #0a0a12; }
+.scheme-switch .pill-new { font-size: 10px; }
+#general .quota-toggle { margin: 4px 0 24px; }
+.finance-pricing { scroll-margin-top: 90px; }
+.finance-pricing .section-head .lead { max-width: 760px; margin: 14px auto 0; }
+.plans.plans-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1100px) { .plans.plans-3 { grid-template-columns: 1fr; } }
+.plan-kicker { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #c4b5fd; margin-bottom: 2px; }
+.badge-premium { background: rgba(196, 181, 253, .16); color: #c4b5fd; }
+.mt { margin-top: 32px; }

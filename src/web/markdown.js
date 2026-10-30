@@ -1,7 +1,7 @@
 // Markdown twins of public pages, served at <path>.md or with Accept: text/markdown.
 // AI assistants and agents read these far more reliably than the JS-enhanced HTML.
 
-import { PLANS, PLAN_COPY } from "../core/plans.js";
+import { PLANS, PLAN_COPY, LICENCE_COPY, FINANCE_PLANS, FINANCE_PAYG } from "../core/plans.js";
 import { BRAND, apiSummary, apiFaq, htmlToMd } from "./seo.js";
 
 const n = (x) => Number(x ?? 0).toLocaleString("en-US");
@@ -100,5 +100,43 @@ export function categoryMd({ category, items, publicUrl }) {
 > ${category.description} ${category.scrapers} APIs, ${category.endpoints} endpoints, one API key.
 
 ${items.map((i) => `- [${i.displayName}](${publicUrl}/api/${i.category}/${i.slug}) \`${i.key}\`: ${i.endpointCount} endpoints, ${i.status}${i.description ? `. ${i.description.slice(0, 140)}` : ""}`).join("\n")}
+`;
+}
+
+// Apizie Finance page twin (/finance.md).
+export function financeMd({ totals, publicUrl, apiUrl, faq, official = [] }) {
+  return `# Apizie Finance: official-source data for AI agents
+
+> Apizie Finance is a premium Apizie service. It serves data from six official publishers (SEC EDGAR, FRED, ECB, U.S. Treasury, GLEIF and World Bank) through one REST API and one MCP server. Every answer carries its source: publisher, official link, retrieval time, licence and attribution text.
+
+Apizie serves normalized data from six official publishers through one REST API and an MCP server. Every successful response includes a \`source\` block: publisher, official URL, retrieval time, licence and attribution text, so an AI agent can cite it.
+
+## Official sources
+${official.map((s) => `- [${s.name}](${publicUrl}/sources/${s.id}) (${s.publisher}): ${s.covers}. Licence: ${s.license}.`).join("\n")}
+
+Combined endpoints: \`official:company/profile\` (SEC EDGAR + GLEIF: profile, filings, LEI, annual financials linked to filings), \`official:macro/us\`, \`official:macro/euro-area\`, \`official:macro/country\`.
+
+## Use it
+- REST: \`GET ${apiUrl}/v1/{category}:{source}/{endpoint}?param=value\` with header \`x-api-key\`
+- Response: \`{ project, data, source, timestamp }\`; errors \`{ content, message, errors }\`
+- MCP: \`${apiUrl}/mcp\` (Streamable HTTP, OAuth 2.1 or API key) for Claude, ChatGPT, Cursor, VS Code, Gemini CLI
+- Keys are read-only by default and can be limited to categories.
+- Data alerts: signed \`data.changed\` webhooks for new SEC filings, FRED updates, Treasury curves, ECB rate changes and World Bank values.
+
+\`\`\`
+curl "${apiUrl}/v1/official:company/profile?company=AAPL" -H "x-api-key: $APIZIE_KEY"
+\`\`\`
+
+## Pricing (premium add-on, no free tier)
+${Object.values(FINANCE_PLANS).map((p) => `- ${p.name}: $${p.priceUsd}/month, ${n(p.monthly)} requests/month, ${LICENCE_COPY[p.licence].toLowerCase()}, ${p.alerts} data alerts`).join("\n")}
+- Runs next to any Apizie plan with its own quota. Pay-as-you-go above the Finance quota: $${FINANCE_PAYG.usdPer1k.toFixed(2)} per 1,000 requests. Enterprise (redistribution, SLA): contact us.
+
+## Also on Apizie
+${n(totals.scrapers)} more public and bring-your-own-key APIs behind the same key (${totals.categories} categories). Bring-your-own-key APIs use your provider key, sent per request and never stored.
+
+## FAQ
+${faq.map(([q, a]) => `### ${q}\n${a}`).join("\n\n")}
+
+Apizie is independent and not affiliated with or endorsed by the SEC, the Federal Reserve, the ECB, the U.S. Treasury, GLEIF or the World Bank. This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.
 `;
 }

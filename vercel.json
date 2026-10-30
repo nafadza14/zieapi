@@ -5,9 +5,21 @@
   "buildCommand": "npm test",
   "outputDirectory": "public",
   "functions": {
-    "api/apizie.js": { "maxDuration": 60, "includeFiles": "{public/**,src/catalog/openapi/**}" }
+    "api/apizie.js": {
+      "maxDuration": 60,
+      "includeFiles": "{public/**,src/catalog/openapi/**}"
+    }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/apizie?__path=$1" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/apizie?__path=$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/watches",
+      "schedule": "17 6 * * *"
+    }
   ]
 }

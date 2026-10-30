@@ -1,3 +1,4 @@
+import { OFFICIAL_SOURCES } from "./sources.js";
 // OpenAPI 3.1 + llms.txt generated from the live catalog (no hand-written drift).
 
 import { maxPlan } from "./plans.js";
@@ -29,6 +30,7 @@ export function buildOpenApi(catalog, { apiUrl, version, category = null, only =
           summary: e.displayName,
           description: e.description ?? undefined,
           tags: [s.category],
+          "x-apizie-access": e.access ?? "read",
           parameters: params,
           ...(bodyFields.length
             ? {
@@ -64,7 +66,7 @@ export function buildOpenApi(catalog, { apiUrl, version, category = null, only =
   }
   return {
     openapi: "3.1.0",
-    info: { title: category ? `Apizie: ${category}` : "Apizie", version, description: "One API key, one envelope, many public data sources." },
+    info: { title: category ? `Apizie: ${category}` : "Apizie", version, description: "One API key, one envelope, many public data sources. Success responses include a `source` block to cite. Apizie Finance endpoints (SEC EDGAR, FRED, ECB, U.S. Treasury, GLEIF, World Bank, official:*) need a Finance plan." },
     servers: [{ url: apiUrl }],
     security: [{ ApiKeyAuth: [] }],
     paths,
@@ -74,7 +76,27 @@ export function buildOpenApi(catalog, { apiUrl, version, category = null, only =
         RunEnvelope: {
           type: "object",
           required: ["project", "data", "timestamp"],
-          properties: { project: { type: "string", example: "dev-tools:hash" }, data: {}, timestamp: { type: "string", format: "date-time" } },
+          properties: {
+            project: { type: "string", example: "official:company" },
+            data: {},
+            source: {
+              type: "object",
+              description: "Where the data came from. Cite it.",
+              properties: {
+                official: { type: "boolean" },
+                provider: { type: "string", example: "SEC EDGAR" },
+                publisher: { type: "string", example: "U.S. Securities and Exchange Commission" },
+                url: { type: "string", format: "uri", description: "A page a person can open to check the value" },
+                apiUrl: { type: "string", format: "uri", description: "The official API URL that was called (credentials removed)" },
+                retrievedAt: { type: "string", format: "date-time" },
+                license: { type: "string" },
+                licenseUrl: { type: "string", format: "uri" },
+                attribution: { type: "string" },
+                notice: { type: "string" },
+              },
+            },
+            timestamp: { type: "string", format: "date-time" },
+          },
         },
         ErrorEnvelope: {
           type: "object",
@@ -104,21 +126,25 @@ export function buildLlmsTxt(catalog, { apiUrl, publicUrl, category = null, full
   const lines = [
     category ? `# Apizie: ${catName(catalog, category)} APIs` : "# Apizie",
     "",
-    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools, cloud and 3,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card.`,
+    `> Apizie is one API key for ${t.scrapers} public data APIs (${t.endpoints} endpoints, ${t.categories} categories): finance and crypto, news, research, developer tools, cloud and 3,300+ global APIs, all returned as clean JSON. Includes an MCP server for Claude, ChatGPT and Cursor. Free plan: 1,000 requests/month, no credit card. Apizie Finance, a premium add-on, serves official data from SEC EDGAR, FRED, the ECB, the U.S. Treasury, GLEIF and the World Bank with a \`source\` block (publisher, official URL, retrieval time, licence, attribution) on every answer.`,
+    "",
+    "## Apizie Finance (premium add-on, from $49/month): official sources",
+    ...OFFICIAL_SOURCES.map((o) => `- [${o.name}](${publicUrl}/sources/${o.id}) (${o.publisher}), project \`${o.project}\`: ${o.covers}`),
+    "- Combined, cited: `official:company/profile` (SEC EDGAR + GLEIF), `official:macro/us`, `official:macro/euro-area`, `official:macro/country`",
     "",
     "## Use it",
     `- Base URL: ${apiUrl}`,
     "- Auth: header `x-api-key: apz_...` (also `Authorization: Bearer` or `api-key`). Free key: " + `${publicUrl}/register`,
     "- Call: `GET|POST /v1/{category}:{api}/{endpoint}?param=value`",
-    "- Success: `{ project, data, timestamp }`",
+    "- Success: `{ project, data, source, timestamp }`. `source` = { official, provider, publisher, url, apiUrl, retrievedAt, license, licenseUrl, attribution }",
     "- Error: `{ content, message, errors }` (bulk/plan errors: `{ error: { code, message } }`)",
     "- Limits: headers `X-RateLimit-Remaining`, `X-RateLimit-Remaining-Month`, `Retry-After` on 429; 5xx are refunded",
-    "- APIs marked (your key) need the provider's own key in `x-upstream-key`",
+    "- APIs marked (your key) need the provider's own key in `x-upstream-key`. Endpoints that change data at a provider need a key with write access (new keys are read-only).",
     "",
     "## Key pages",
     `- [MCP server setup](${publicUrl}/mcp): ${apiUrl}/mcp, Streamable HTTP, OAuth 2.1 or API key, 8 tools`,
     `- [Docs](${publicUrl}/docs) · [Quickstart](${publicUrl}/docs/quickstart) · [Errors](${publicUrl}/docs/errors) · [Bring your own key](${publicUrl}/docs/byok)`,
-    `- [Pricing](${publicUrl}/pricing): Free 1,000/month, Pro $9, Ultra $29, Max $99 per month (2 months free yearly)`,
+    `- [Pricing](${publicUrl}/pricing): Free 1,000/month, Pro $9, Ultra $29, Max $99 per month (2 months free yearly). Apizie Finance: Starter $49, Growth $199, Business $499 per month ([details](${publicUrl}/finance))`,
     `- [OpenAPI 3.1](${apiUrl}/openapi.json) · [Full catalog for LLMs](${publicUrl}/llms-full.txt)`,
     "- Any catalog or docs page has a Markdown twin: append `.md` (for example /api/search-tools/wikipedia.md)",
     "",

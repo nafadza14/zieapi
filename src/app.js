@@ -20,15 +20,16 @@ import { createAccountApi } from "./dashboard/account.js";
 import { setupReport } from "./dashboard/setup.js";
 import { buildOpenApi, buildLlmsTxt } from "./core/openapi.js";
 import { E, HttpError, okContent, errBody } from "./core/envelope.js";
-import { PLANS, PAYG, MICROS, getPlan, microsFromLegacyTenths } from "./core/plans.js";
+import { PLANS, PAYG, MICROS, getPlan, microsFromLegacyTenths, isFinancePlan, getFinancePlan } from "./core/plans.js";
 import { ulid, monthKey } from "./core/util.js";
 import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
 import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
 import { supabaseAuthConfig, pkcePair, supabaseAuthorizeUrl, supabaseExchange } from "./auth/supabase.js";
 import liveScrapers from "./scrapers/index.js";
 import { runWithSeo, robotsTxt, BUILD_DATE } from "./web/seo.js";
-import { homeMd, apiMd, pricingMd, docMd, categoryMd } from "./web/markdown.js";
+import { homeMd, financeMd, apiMd, pricingMd, docMd, categoryMd } from "./web/markdown.js";
 import { HOME_FAQ } from "./web/pages/home.js";
+import { financePage, FINANCE_FAQ } from "./web/pages/finance.js";
 import { PRICING_FAQ } from "./web/pages/pricing.js";
 import { DOC_PAGES } from "./web/pages/docs.js";
 
@@ -39,6 +40,9 @@ import { docsPage, DOC_SLUGS } from "./web/pages/docs.js";
 import { createAdminAnalytics } from "./dashboard/admin-analytics.js";
 import { createFulfiller } from "./billing/fulfill.js";
 import { dodoConfig, createDodo, verifyDodoWebhook, DodoError } from "./billing/dodo.js";
+import { createWatcher } from "./core/watches.js";
+import { OFFICIAL_SOURCES, officialById, AFFILIATION_NOTE } from "./core/sources.js";
+import { sourcesIndexPage, sourcePage, sourcesMd } from "./web/pages/sources.js";
 import { mcpPage, showcasePage, reportPage, statusPage, legalPage, authPage, notFoundPage, dashboardPage, adminPage, consentPage, oauthErrorPage, DASH_SLUGS, ADMIN_SLUGS } from "./web/pages/misc.js";
 
 export const VERSION = "2.0.0";
@@ -87,7 +91,8 @@ export function createApp(opts = {}) {
     if (owner?.startsWith("key_")) return [...repo.envKeys.values()].find((k) => `key_${k.id}` === owner)?.plan ?? "free";
     return repo.effectivePlan(await repo.getUser(owner));
   };
-  const webhooks = new WebhookDispatcher(repo, { fetchImpl: opts.webhookFetch ?? globalThis.fetch, backoffMs: opts.webhookBackoffMs ?? 400, logger, planOf: planOfOwner, lookup: opts.lookup ?? null, allowPrivate: env.ZIE_WEBHOOKS_ALLOW_PRIVATE === "1" });
+  const financeOfOwner = async (owner) => (owner && !owner.startsWith("key_") ? repo.financePlanOf(await repo.getUser(owner)) : null);
+  const webhooks = new WebhookDispatcher(repo, { fetchImpl: opts.webhookFetch ?? globalThis.fetch, backoffMs: opts.webhookBackoffMs ?? 400, logger, planOf: planOfOwner, financeOf: financeOfOwner, lookup: opts.lookup ?? null, allowPrivate: env.ZIE_WEBHOOKS_ALLOW_PRIVATE === "1" });
   const emailFetch = opts.emailFetch ?? globalThis.fetch;
   /** In-app notification (and email when RESEND_API_KEY is set), gated by the user's preferences. */
   const notify = (userId, pref, title, text, extra = {}) => {
@@ -106,21 +111,23 @@ export function createApp(opts = {}) {
   };
   const limiter = new Limiter(repo, {
     now: opts.now,
-    onUsage: (owner, plan, before, after) => {
-      const p = getPlan(plan);
+    onUsage: (owner, plan, before, after, { finance = false } = {}) => {
+      const p = typeof plan === "object" && plan ? plan : getPlan(plan);
+      const what = finance ? "Apizie Finance quota" : "monthly quota";
+      const extra = finance ? { product: "finance" } : {};
       const warnAt = Math.floor(p.monthly * 0.8);
       if (before < warnAt && after >= warnAt) {
-        webhooks.emit(owner, "quota.warning", { used: after, limit: p.monthly, percent: 80 });
-        notify(owner, "quotaWarning", "80% of your monthly quota used", `You have used ${after.toLocaleString("en-US")} of ${p.monthly.toLocaleString("en-US")} requests this month.`);
+        webhooks.emit(owner, "quota.warning", { used: after, limit: p.monthly, percent: 80, ...extra });
+        notify(owner, "quotaWarning", `80% of your ${what} used`, `You have used ${after.toLocaleString("en-US")} of ${p.monthly.toLocaleString("en-US")} ${finance ? "Finance " : ""}requests this month.`);
       }
       if (before < p.monthly && after >= p.monthly) {
-        webhooks.emit(owner, "quota.exceeded", { used: after, limit: p.monthly });
-        notify(owner, "quotaExceeded", "Monthly quota used up", "New requests return 429 until the 1st (UTC). Upgrade, or turn on pay-as-you-go in Billing.");
+        webhooks.emit(owner, "quota.exceeded", { used: after, limit: p.monthly, ...extra });
+        notify(owner, "quotaExceeded", `${finance ? "Apizie Finance quota" : "Monthly quota"} used up`, "New requests return 429 until the 1st (UTC). Upgrade, or turn on pay-as-you-go in Billing.");
       }
     },
-    onPayg: (owner, balanceMicros) => {
+    onPayg: (owner, balanceMicros, cost = PAYG.priceMicros) => {
       const threshold = PAYG.lowBalanceUsd * MICROS;
-      if (balanceMicros < threshold && balanceMicros + PAYG.priceMicros >= threshold) {
+      if (balanceMicros < threshold && balanceMicros + cost >= threshold) {
         webhooks.emit(owner, "balance.low", { balance: balanceMicros / MICROS, threshold: PAYG.lowBalanceUsd, currency: "USD" });
         repo.getPrefs(owner).then((pr) => pr.lowBalanceAlert && notify(owner, "balance", "Balance is running low", `Your pay-as-you-go balance is $${(balanceMicros / MICROS).toFixed(2)}.`)).catch(() => {});
       }
@@ -149,7 +156,9 @@ export function createApp(opts = {}) {
   };
 
   // ---------- helpers --------------------------------------------------------
-  const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), keyId: null, keyPreview: "dashboard", keyName: "Dashboard", ip: clientIp(req), user, source });
+  /** The six official sources with their live endpoint counts, for the site and docs. */
+  const officialSources = () => OFFICIAL_SOURCES.map((src) => ({ ...src, endpoints: catalog.find(src.project)?.endpoints.length ?? 0 }));
+  const userCaller = (user, req, source = "playground") => ({ owner: user.id, plan: repo.effectivePlan(user), financePlan: repo.financePlanOf(user), keyId: null, keyPreview: "dashboard", keyName: "Dashboard", ip: clientIp(req), user, source });
   const isAdmin = (u) => u?.role === "admin" || (u?.email && adminEmails.has(u.email));
   const adminAnalytics = createAdminAnalytics({ repo, kv, catalog, storage, version: VERSION, env });
   const fulfill = createFulfiller({ repo, kv, webhooks, notify, affPercent });
@@ -196,7 +205,8 @@ export function createApp(opts = {}) {
     return json(200, okContent({ ignored: type }));
   }
 
-  const accountApi = createAccountApi({ dodo, fulfill, kv, repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
+  const watcher = createWatcher({ repo, executor, webhooks, notify, planOf: planOfOwner, financeOf: financeOfOwner, logger });
+  const accountApi = createAccountApi({ watcher, dodo, fulfill, kv, repo, catalog, limiter, bulk, webhooks, oauth, publicUrl, apiUrl, affPercent, support, storage, emailEnabled: !!(env.RESEND_API_KEY && env.ZIE_EMAIL_FROM), notify, cookie, SESSION_COOKIE, isHttps, isAdmin, publicUser: (u) => publicUser(u) });
   const requireUser = (ctx) => {
     if (!ctx.user) throw E.unauthorized("Sign in required");
     return ctx.user;
@@ -418,6 +428,16 @@ export function createApp(opts = {}) {
     // ----- payment provider webhooks ---------------------------------------------------
     if (p === "/webhooks/dodo" && m === "POST") return dodoWebhook(req, body);
 
+    // ----- scheduled jobs: data alerts ---------------------------------------------------
+    // Vercel Cron calls this with "Authorization: Bearer $CRON_SECRET". An admin session can run it by hand.
+    if (p === "/api/cron/watches" && (m === "GET" || m === "POST")) {
+      const secret = env.CRON_SECRET ?? env.ZIE_CRON_SECRET ?? null;
+      const auth = String(req.headers.authorization ?? "");
+      const byCron = secret && auth === `Bearer ${secret}`;
+      if (!byCron && !(ctx.user && isAdmin(ctx.user))) throw E.unauthorized("Cron secret or admin session required");
+      return json(200, okContent(await watcher.runDue()), { "Cache-Control": "no-store" });
+    }
+
     // ----- MCP -------------------------------------------------------------------
     if (p === "/mcp" && (m === "POST" || /text\/event-stream/.test(req.headers.accept ?? "") || m === "DELETE")) {
       const r = await mcp(req, body);
@@ -446,7 +466,7 @@ export function createApp(opts = {}) {
         if (v.redirect) return redirect(v.redirect);
         if (!user) return redirect(`/login?next=${encodeURIComponent(p + ctx.url.search)}`);
         const tx = signState(Buffer.from(JSON.stringify({ ...v.params, uid: user.id, exp: Date.now() + 600_000 })).toString("base64url"));
-        return htmlOut(consentPage({ user, client: v.client, scope: v.params.scope, tx, redirectHost: safeHost(v.params.redirect_uri) }));
+        return htmlOut(consentPage({ user, client: v.client, scope: v.params.scope, tx, redirectHost: safeHost(v.params.redirect_uri), categories: CONSENT_CATEGORIES.map((slug) => catalog.categoryList({ withEmpty: true }).find((c) => c.slug === slug)).filter(Boolean) }));
       }
       if (p === "/oauth/authorize" && m === "POST") {
         const raw = checkState(String(body?.tx ?? ""));
@@ -454,7 +474,9 @@ export function createApp(opts = {}) {
         if (!params || params.exp < Date.now()) return htmlOut(oauthErrorPage({ user, message: "This request expired. Start the connection again from your app." }), 400);
         if (!user || user.id !== params.uid) return redirect("/login");
         const { uid, exp, ...rest } = params;
-        return redirect(body?.decision === "approve" ? await oauth.approve(user, rest) : oauth.deny(rest));
+        // What the app may do: read-only unless the user ticks write access; optionally limited to some categories.
+        const perms = { access: body?.access === "read_write" ? "read_write" : "read", categories: Object.keys(body ?? {}).filter((k) => k.startsWith("cat_") && body[k]).map((k) => k.slice(4)).filter((c) => catalog.categoryList({ withEmpty: true }).some((x) => x.slug === c)) };
+        return redirect(body?.decision === "approve" ? await oauth.approve(user, { ...rest, ...perms }) : oauth.deny(rest));
       }
     } catch (e) {
       if (e instanceof OAuthError || e instanceof HttpError) return json(e.status === 401 ? 401 : 400, oauthErrorBody(e), noStore);
@@ -469,8 +491,8 @@ export function createApp(opts = {}) {
     caller.upstreamAuth = upstreamAuthFrom(req.headers);
     const noStore = { "Cache-Control": "no-store, private" };
     let mm;
-    if (p === "/v1/me" && m === "GET") return json(200, okContent({ user: caller.user ? publicUser(caller.user) : null, key: { id: caller.keyId, preview: caller.keyPreview }, plan: getPlan(caller.plan) }), noStore);
-    if (p === "/v1/usage" && m === "GET") return json(200, okContent(await limiter.snapshot(caller.owner, caller.plan)), noStore);
+    if (p === "/v1/me" && m === "GET") return json(200, okContent({ user: caller.user ? publicUser(caller.user) : null, key: { id: caller.keyId, preview: caller.keyPreview }, plan: getPlan(caller.plan), financePlan: caller.financePlan ? getFinancePlan(caller.financePlan) : null }), noStore);
+    if (p === "/v1/usage" && m === "GET") return json(200, okContent({ ...(await limiter.snapshot(caller.owner, caller.plan)), finance: await limiter.financeSnapshot(caller.owner, caller.financePlan) }), noStore);
     if ((mm = /^\/v1\/bulk\/([^/]+)$/.exec(p))) {
       if (m !== "GET") throw E.methodNotAllowed("GET");
       return json(200, await bulk.status(caller, mm[1]), noStore);
@@ -515,7 +537,7 @@ export function createApp(opts = {}) {
       let users = await repo.listUsers();
       if (q.q) users = users.filter((u) => `${u.email} ${u.name}`.toLowerCase().includes(q.q.toLowerCase()));
       const usage = await Promise.all(users.map((u) => repo.getMonth(u.id)));
-      return json(200, okContent(users.slice(0, 500).map((u, i) => ({ ...publicUser(u), effectivePlan: repo.effectivePlan(u), usedThisMonth: usage[i] }))));
+      return json(200, okContent(users.slice(0, 500).map((u, i) => ({ ...publicUser(u), effectivePlan: repo.effectivePlan(u), effectiveFinancePlan: repo.financePlanOf(u), usedThisMonth: usage[i] }))));
     }
     if ((mm = /^\/api\/admin\/users\/([^/]+)$/.exec(p)) && m === "PATCH") {
       const patch = {};
@@ -523,11 +545,15 @@ export function createApp(opts = {}) {
         patch.plan = body.plan;
         patch.planExpiresAt = body.plan === "free" ? null : new Date(Date.now() + (Number(body.days) || 30) * 86400000).toISOString();
       }
+      // Apizie Finance add-on: "none" removes it, a fin_* id grants it for `days` (default 30).
+      if (body?.financePlan === "none" || body?.financePlan === null) Object.assign(patch, { financePlan: null, financeExpiresAt: null });
+      else if (body?.financePlan && isFinancePlan(body.financePlan)) Object.assign(patch, { financePlan: body.financePlan, financeExpiresAt: new Date(Date.now() + (Number(body.financeDays ?? body.days) || 30) * 86400000).toISOString() });
       if (body?.role && ["user", "admin"].includes(body.role)) patch.role = body.role;
       if (body?.status && ["active", "suspended"].includes(body.status)) patch.status = body.status;
       const u = await repo.updateUser(mm[1], patch);
       if (!u) throw E.notFound("User not found");
       if (patch.plan) webhooks.emit(u.id, "plan.changed", { plan: u.plan, planExpiresAt: u.planExpiresAt });
+      if ("financePlan" in patch) webhooks.emit(u.id, "plan.changed", { product: "finance", plan: u.financePlan, planExpiresAt: u.financeExpiresAt });
       return json(200, okContent(publicUser(u)));
     }
     if (p === "/api/admin/invoices" && m === "GET") return json(200, okContent(await repo.listItems("invoice")));
@@ -611,8 +637,14 @@ export function createApp(opts = {}) {
     if (wantsMd) {
       const base = p.replace(/\/llms\.txt$/, "").replace(/\.md$/, "").replace(/^\/index$/, "/") || "/";
       const md = (s) => ({ status: 200, body: s, headers: { "content-type": "text/markdown; charset=utf-8", "Cache-Control": "public, max-age=300, s-maxage=3600", "X-Robots-Tag": "noindex", Link: `<${publicUrl}${base}>; rel="canonical"` } });
-      if (base === "/") return md(homeMd({ totals, categories: catalog.categoryList(), publicUrl, apiUrl, faq: HOME_FAQ }));
+      if (base === "/") return md(homeMd({ totals, categories: catalog.categoryList().filter((c) => c.slug !== "indonesia"), publicUrl, apiUrl, faq: HOME_FAQ }));
+      if (base === "/finance") return md(financeMd({ totals, publicUrl, apiUrl, faq: FINANCE_FAQ, official: officialSources() }));
       if (base === "/pricing") return md(pricingMd({ faq: PRICING_FAQ, publicUrl }));
+      if (base === "/sources" || /^\/sources\/[a-z0-9-]+$/.test(base)) {
+        const all = officialSources();
+        const one = base === "/sources" ? null : all.find((o) => `/sources/${o.id}` === base);
+        if (base === "/sources" || one) return md(sourcesMd({ sources: one ? [one] : all, publicUrl, apiUrl }));
+      }
       if (base === "/docs" || (mm = /^\/docs\/([a-z0-9-]+)$/.exec(base))) {
         const page = DOC_PAGES.find((d) => d.slug === (base === "/docs" ? "" : mm[1]));
         if (page) return md(docMd({ page, apiUrl }));
@@ -642,6 +674,22 @@ export function createApp(opts = {}) {
       const top = all.filter((i) => i.origin !== "directory" && !local(i)).slice(0, 8);
       const categories = catalog.categoryList().filter((c) => c.slug !== "indonesia");
       return html(homePage({ user, totals, categories, top, global, liveKeys, apiUrl, publicUrl }));
+    }
+    // Apizie Finance: landing page for the premium official-data service (linked from home, nav and pricing).
+    if (p === "/finance") {
+      const all = await items();
+      const pick = (keys) => keys.map((k) => all.find((i) => i.key === k)).filter(Boolean);
+      const global = pick(["search-tools:wikipedia", "search-tools:arxiv", "news:guardian", "business:github-api-github"]);
+      return html(financePage({ user, totals, official: officialSources(), combined: catalog.find("official:company")?.endpoints.length + catalog.find("official:macro")?.endpoints.length || 0, global, apiUrl, publicUrl }));
+    }
+    if (p === "/official" || p === "/official-data") return redirect("/finance");
+    if (p === "/sources") {
+      const combined = ["official:company", "official:macro"].flatMap((k) => (catalog.find(k)?.endpoints ?? []).map((e) => ({ key: k, slug: e.slug, description: e.description })));
+      return html(sourcesIndexPage({ user, sources: officialSources(), combined }));
+    }
+    if ((mm = /^\/sources\/([a-z0-9-]+)$/.exec(p))) {
+      const one = officialSources().find((o) => o.id === mm[1]);
+      if (one) return html(sourcePage({ user, source: one, endpoints: catalog.find(one.project)?.endpoints ?? [], apiUrl }));
     }
     if (p === "/scrapers" || p === "/playground") return html(scrapersPage({ user, totals, categories: catalog.categoryList(), items: await items(), q: q.q ?? "", cat: q.cat ?? "" }));
     if ((mm = /^\/category\/([a-z0-9-]+)$/.exec(p))) {
@@ -683,7 +731,7 @@ export function createApp(opts = {}) {
       const [snap, keys, notes] = await Promise.all([limiter.snapshot(user.id, plan.id), repo.listKeys(user.id), repo.listNotifications(user.id, 1)]);
       const now = new Date();
       const resetsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
-      return html(dashboardPage({ user: { ...user, role: isAdmin(user) ? "admin" : user.role }, section, plan, apiUrl, publicUrl, storage, quota: { ...snap, resetsAt }, keyCount: keys.filter((k) => k.status === "active").length, unread: notes.unread }));
+      return html(dashboardPage({ user: { ...user, role: isAdmin(user) ? "admin" : user.role }, section, plan, financePlan: getFinancePlan(repo.financePlanOf(user)), apiUrl, publicUrl, storage, quota: { ...snap, resetsAt }, keyCount: keys.filter((k) => k.status === "active").length, unread: notes.unread }));
     }
     if (p === "/admin" || (mm = /^\/admin\/([a-z]+)$/.exec(p))) {
       if (!user) return redirect(`/login?next=${encodeURIComponent(p)}`);
@@ -700,7 +748,7 @@ export function createApp(opts = {}) {
   const smDay = () => BUILD_DATE.slice(0, 10);
   const urlset = (urls) => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(([u, f, pr]) => `<url><loc>${publicUrl}${u}</loc><lastmod>${smDay()}</lastmod><changefreq>${f}</changefreq><priority>${pr}</priority></url>`).join("\n")}\n</urlset>\n`;
   const sitePages = () => [
-    ["/", "daily", "1.0"], ["/scrapers", "daily", "0.9"], ["/mcp", "weekly", "0.9"], ["/pricing", "weekly", "0.8"], ["/docs", "weekly", "0.8"],
+    ["/", "daily", "1.0"], ["/finance", "weekly", "0.95"], ["/sources", "weekly", "0.9"], ...OFFICIAL_SOURCES.map((o) => [`/sources/${o.id}`, "weekly", "0.9"]), ["/scrapers", "daily", "0.8"], ["/mcp", "weekly", "0.9"], ["/pricing", "weekly", "0.8"], ["/docs", "weekly", "0.8"],
     ...DOC_SLUGS.filter(Boolean).map((s) => [`/docs/${s}`, "weekly", "0.7"]),
     ["/showcase", "weekly", "0.4"], ["/status", "daily", "0.3"],
     ...catalog.categoryList().map((c) => [`/category/${c.slug}`, "weekly", "0.7"]),
@@ -781,7 +829,7 @@ export function createApp(opts = {}) {
   }
 
   const server = createServer(handler);
-  return { server, handler, repo, kv, catalog, limiter, executor, bulk, webhooks, apiUrl, publicUrl, serverless };
+  return { server, handler, repo, kv, catalog, limiter, executor, bulk, webhooks, watcher, apiUrl, publicUrl, serverless };
 }
 
 // ---------- helpers -------------------------------------------------------------
@@ -801,6 +849,8 @@ function upstreamAuthFrom(h) {
 }
 const text = (s) => ({ status: 200, body: s, headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=600" } });
 export const CANONICAL_URL = "https://apizie.tech";
+// Categories offered on the MCP consent screen to limit what a connected app can reach.
+const CONSENT_CATEGORIES = ["official", "finance", "open-data", "news", "research", "ai", "dev-tools", "cloud"];
 function hostOf(u) {
   try {
     return new URL(u).hostname.toLowerCase();
@@ -839,7 +889,7 @@ const safeDecode = (s) => {
   }
 };
 const topN = (obj, n) => Object.entries(obj ?? {}).map(([project, requests]) => ({ project, requests: Number(requests) })).sort((a, b) => b.requests - a.requests).slice(0, n);
-const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, avatar: u.avatar, role: u.role, plan: u.plan, planExpiresAt: u.planExpiresAt, status: u.status, createdAt: u.createdAt, hasPassword: !!u.passwordHash });
+const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, avatar: u.avatar, role: u.role, plan: u.plan, planExpiresAt: u.planExpiresAt, financePlan: u.financePlan ?? null, financeExpiresAt: u.financeExpiresAt ?? null, status: u.status, createdAt: u.createdAt, hasPassword: !!u.passwordHash });
 const publicKey = ({ hash, ...k }) => k;
 function corsHeaders() {
   return {

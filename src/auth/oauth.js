@@ -203,6 +203,7 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
     const code = "zac_" + rand(24);
     await kv.set(`oacode:${code}`, JSON.stringify({ ...params, userId: user.id, at: Date.now() }), { ex: CODE_TTL });
     await kv.sadd(`oagrants:${user.id}`, params.client_id);
+    await kv.set(`oagrantperm:${user.id}:${params.client_id}`, JSON.stringify({ access: params.access ?? "read", categories: params.categories ?? [] }));
     const u = new URL(params.redirect_uri);
     u.searchParams.set("code", code);
     if (params.state) u.searchParams.set("state", params.state);
@@ -215,10 +216,10 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
   }
 
   // ---------- tokens --------------------------------------------------------------
-  async function issue(userId, client, scope) {
+  async function issue(userId, client, scope, perms = {}) {
     const access = "zoa_" + rand(32);
     const refresh = "zor_" + rand(32);
-    const rec = { userId, clientId: client.client_id, clientName: client.client_name, scope, at: Date.now() };
+    const rec = { userId, clientId: client.client_id, clientName: client.client_name, scope, at: Date.now(), ...(perms.access ? { access: perms.access } : {}), ...(perms.categories?.length ? { categories: perms.categories } : {}) };
     const ah = sha(access);
     const rh = sha(refresh);
     await kv.set(`oat:${ah}`, JSON.stringify(rec), { ex: ACCESS_TTL });
@@ -245,7 +246,7 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
       if (!body.code_verifier || b64sha(String(body.code_verifier)) !== rec.code_challenge) throw new OAuthError(400, "invalid_grant", "PKCE verification failed");
       const user = await repo.getUser(rec.userId);
       if (!user || user.status !== "active") throw new OAuthError(400, "invalid_grant", "Account disabled");
-      return issue(user.id, client, rec.scope);
+      return issue(user.id, client, rec.scope, { access: rec.access, categories: rec.categories });
     }
     if (grant === "refresh_token") {
       const key = `oar:${sha(String(body.refresh_token ?? ""))}`;
@@ -254,7 +255,7 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
       await kv.del(key); // rotate
       const user = await repo.getUser(rec.userId);
       if (!user || user.status !== "active") throw new OAuthError(400, "invalid_grant", "Account disabled");
-      return issue(user.id, client, rec.scope);
+      return issue(user.id, client, rec.scope, { access: rec.access, categories: rec.categories });
     }
     throw new OAuthError(400, "unsupported_grant_type", "Use authorization_code or refresh_token");
   }
@@ -277,9 +278,24 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
     for (const id of ids) {
       const c = await getClient(id);
       const toks = await kv.smembers(`oatoks:${userId}:${id}`);
-      out.push({ clientId: id, name: c?.client_name ?? id, redirect: c?.redirect_uris?.[0] ?? null, tokens: toks.length });
+      const perm = await getJson(`oagrantperm:${userId}:${id}`);
+      out.push({ clientId: id, name: c?.client_name ?? id, redirect: c?.redirect_uris?.[0] ?? null, tokens: toks.length, access: perm?.access ?? "read_write", categories: perm?.categories ?? [] });
     }
     return out;
+  }
+
+  /** Change what a connected app may do. Applies to its current tokens and to every token refreshed later. */
+  async function updateGrant(userId, clientId, { access, categories }) {
+    const perm = { access: access === "read_write" ? "read_write" : "read", categories: categories ?? [] };
+    await kv.set(`oagrantperm:${userId}:${clientId}`, JSON.stringify(perm));
+    for (const k of await kv.smembers(`oatoks:${userId}:${clientId}`)) {
+      const rec = await getJson(k);
+      if (!rec) continue;
+      const ttl = k.startsWith("oat:") ? ACCESS_TTL : REFRESH_TTL;
+      const left = Math.max(60, Math.round(ttl - (Date.now() - (rec.at ?? Date.now())) / 1000));
+      await kv.set(k, JSON.stringify({ ...rec, access: perm.access, categories: perm.categories }), { ex: left });
+    }
+    return perm;
   }
 
   async function revokeGrant(userId, clientId) {
@@ -287,11 +303,12 @@ export function createOAuth({ repo, apiUrl, publicUrl, fetchImpl = globalThis.fe
     for (const k of toks) await kv.del(k);
     await kv.del(`oatoks:${userId}:${clientId}`);
     await kv.srem(`oagrants:${userId}`, clientId);
+    await kv.del(`oagrantperm:${userId}:${clientId}`);
   }
 
   const wwwAuthenticate = (extra = "") => `Bearer realm="apizie", resource_metadata="${apiUrl}/.well-known/oauth-protected-resource/mcp", scope="mcp"${extra}`;
 
-  return { metadata, register, getClient, validateAuthorize, approve, deny, token, revoke, resolveAccessToken, listGrants, revokeGrant, wwwAuthenticate, issuer, resource };
+  return { metadata, register, getClient, validateAuthorize, approve, deny, token, revoke, resolveAccessToken, listGrants, updateGrant, revokeGrant, wwwAuthenticate, issuer, resource };
 }
 
 /** Body for an OAuth error HttpError (RFC 6749 shape), used by the router. */

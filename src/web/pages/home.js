@@ -160,7 +160,7 @@ export function homePage({ user, totals, categories, top, global = [], liveKeys 
 
 export function scraperCard(s) {
   return `<a class="card scraper-card" href="/api/${esc(s.category)}/${esc(s.slug)}">
-  <div class="sc-top">${sourceIcon(s)}<span class="badge badge-${esc(s.status)}">${{ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span></div>
+  <div class="sc-top">${sourceIcon(s)}${s.premium === "finance" ? '<span class="badge badge-premium" title="Part of Apizie Finance, a premium add-on">Finance</span>' : `<span class="badge badge-${esc(s.status)}">${{ live: "Live", byok: "Your key", upstream: "Upstream", planned: "Planned", disabled: "Off" }[s.status] ?? ""}</span>`}</div>
   <h3>${esc(s.displayName)}</h3>
   <p class="sc-key">${esc(s.category)}:${esc(s.slug)}</p>
   <div class="sc-meta"><span>${s.endpointCount} endpoint${s.endpointCount === 1 ? "" : "s"}</span>${s.totalRequests ? `<span>${fmt(s.totalRequests)} calls</span>` : ""}${s.hasBulk ? "<span>Bulk</span>" : ""}</div>
@@ -210,7 +210,11 @@ function headlineWords(lines) {
   );
 }
 function heroTitle(apiCount) {
-  const all = HEADLINES(apiCount).map((h) => ({ lines: headlineWords(h.lines), sub: h.sub }));
+  return rotatingTitle(HEADLINES(apiCount));
+}
+/** Rotating hero title (also used by the Apizie Finance page). */
+export function rotatingTitle(headlines) {
+  const all = headlines.map((h) => ({ lines: headlineWords(h.lines), sub: h.sub }));
   const line = (words, cls) => `<span class="hl-line rise ${cls}">${words.map((w) => `<span class="w"${w.c ? ` style="color:${w.c}"` : ""}>${esc(w.t)}</span>`).join(" ")}</span>`;
   return `<h1 class="hero-title" data-hero-rotate="${esc(JSON.stringify(all))}" aria-live="off">${line(all[0].lines[0], "r2")}${line(all[0].lines[1], "r3")}</h1>
     <p class="hero-sub rise r4" data-hero-sub>${esc(all[0].sub)}</p>`;

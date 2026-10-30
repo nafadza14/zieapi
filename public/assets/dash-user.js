@@ -8,7 +8,7 @@
 
   const firstName = (n) => String(n ?? "").split(/\s+/)[0] || "there";
   const keyLabel = (l) => (l.keyName ? `${l.keyName}` : l.key ?? "–");
-  const sampleUrl = (c) => `${c.D.apiUrl}/v1/search-tools:wikipedia/search?query=Eiffel%20Tower`;
+  const sampleUrl = (c) => `${c.D.apiUrl}/v1/official:company/profile?company=AAPL`;
 
   // ===== Dashboard ============================================================================
   S.dashboard = async (c) => {
@@ -73,11 +73,12 @@
             }
           </section>
           <section class="ds-card" aria-labelledby="q-h">
-            <div class="card-top"><h2 id="q-h">Monthly quota</h2><span class="meta push">${c.cap(q.plan.id)} plan</span></div>
+            <div class="card-top"><h2 id="q-h">Monthly quota</h2><span class="meta push">${c.planName(q.plan.id)} plan</span></div>
             <div class="row-between"><b class="stat-value">${usedPct}%</b><span class="meta">${num(q.month.used)} / ${num(q.month.limit)}</span></div>
             ${h.bar(q.month.used, q.month.limit)}
             <p class="meta">Resets ${resets}${q.projectedPercent !== null ? ` · on pace for ${q.projectedPercent}%` : ""}${o.balance > 0 ? ` · balance ${c.usd(o.balance)}` : ""}</p>
             ${usedPct >= 80 ? `<a class="btn btn-ghost btn-sm" href="/dashboard/billing#plans">Raise your limit</a>` : ""}
+            ${q.finance ? `<div class="quota-block"><div class="row-between"><span>Apizie Finance · ${esc(q.finance.plan.name.replace("Finance ", ""))}</span><span class="meta">${num(q.finance.month.used)} / ${num(q.finance.month.limit)}</span></div>${h.bar(q.finance.month.used, q.finance.month.limit)}</div>` : ""}
           </section>
         </div>
       </div>
@@ -140,12 +141,25 @@
       c.toast(err.status === 409 ? "This older key can't be shown again. Create a new key to copy it." : err.status ? err.message : "Your browser blocked copying. Show the key and copy it by hand.");
     }
   }
+  // ---- key permissions (shared by keys and connected apps) -----------------------------------
+  const PERM_CATS = [["official", "Official data"], ["finance", "Finance"], ["open-data", "Open data"], ["news", "News"], ["research", "Research"], ["ai", "AI"], ["dev-tools", "Dev tools"], ["cloud", "Cloud"]];
+  const permFields = (c, cur = {}) => {
+    const rw = cur.access === "read_write";
+    const cats = cur.categories ?? [];
+    return `<fieldset class="field perm-set"><legend>Access</legend>
+        <label class="perm-opt"><input type="radio" name="access" value="read" ${rw ? "" : "checked"}> <span><b>Read-only</b> (recommended)<br><small class="meta">Fetch data. Endpoints that create, change or delete things at a provider are refused.</small></span></label>
+        <label class="perm-opt"><input type="radio" name="access" value="read_write" ${rw ? "checked" : ""}> <span><b>Read and write</b><br><small class="meta">Also allow bring-your-own-key endpoints that change data in your own accounts.</small></span></label></fieldset>
+      <fieldset class="field perm-set"><legend>Allowed categories <small class="meta">(none ticked = all)</small></legend><div class="checks">${PERM_CATS.map(([v, l]) => `<label><input type="checkbox" name="cat" value="${v}" ${cats.includes(v) ? "checked" : ""}> ${c.esc(l)}</label>`).join("")}</div></fieldset>`;
+  };
+  const readPerms = (form) => ({ access: form.querySelector("input[name=access]:checked")?.value ?? "read", categories: [...form.querySelectorAll("input[name=cat]:checked")].map((x) => x.value) });
+  const permLabel = (x) => `${x.access === "read_write" ? '<span class="chip warn-chip">Read and write</span>' : '<span class="chip ok-chip">Read-only</span>'}${x.categories?.length ? x.categories.map((cat) => `<span class="chip">${cat}</span>`).join("") : '<span class="chip">All categories</span>'}`;
+
   async function newKeyFlow(c, after) {
     const created = await c.openModal({
       title: "Create an API key",
-      body: `<label class="field">Name<input name="name" maxlength="60" placeholder="e.g. production, staging, my-bot" autofocus></label><p class="hint">Use one key per environment so you can revoke one without touching the others.</p>`,
+      body: `<label class="field">Name<input name="name" maxlength="60" placeholder="e.g. production, staging, research-agent" autofocus></label>${permFields(c)}<p class="hint">Use one key per environment or agent, so you can revoke one without touching the others.</p>`,
       submit: "Create key",
-      onSubmit: async (form) => (await c.api("/api/me/keys", { method: "POST", body: { name: form.name.value } })).content,
+      onSubmit: async (form) => (await c.api("/api/me/keys", { method: "POST", body: { name: form.name.value, ...readPerms(form) } })).content,
     });
     if (!created) return;
     await c.openModal({
@@ -187,7 +201,7 @@
       </section>
       <div class="grid-main">
         <section class="ds-card" aria-labelledby="uk-h"><div class="card-top"><h2 id="uk-h">Usage by API key</h2></div>
-          <p class="meta">Monthly quota · ${num(q.month.limit)} requests (${c.cap(q.plan.id)})</p>
+          <p class="meta">Monthly quota · ${num(q.month.limit)} requests (${c.planName(q.plan.id)})</p>
           ${h.bar(q.month.used, q.month.limit)}
           <div class="row-between meta"><b>${num(q.month.used)} used</b><span>${num(q.month.remaining)} left · resets ${new Date(q.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</span></div>
           ${
@@ -230,8 +244,8 @@
         <aside class="ds-card detail-card" aria-label="Request details" data-detail>${h.empty("Request details show up here", "Pick a request on the left.")}</aside>
       </div>`;
     const segs = () => {
-      $("[data-seg-status]", c.root).innerHTML = h.seg("status", [["all", "All"], ["success", "Success"], ["error", "Errors"]], f.status);
-      $("[data-seg-range]", c.root).innerHTML = h.seg("logRange", [["24h", "24h"], ["7d", "7d"], ["30d", "30d", c.rangeAllowed("30d") ? "" : "Pro"], ["90d", "90d", c.rangeAllowed("90d") ? "" : "Ultra"]], f.range);
+      $("[data-seg-status]", c.root).innerHTML = h.seg("status", [["all", "All"], ["success", "Success"], ["error", "Errors"], ["write", "Writes"], ["blocked", "Blocked"]], f.status);
+      $("[data-seg-range]", c.root).innerHTML = h.seg("logRange", [["24h", "24h"], ["7d", "7d"], ["30d", "30d", c.rangeAllowed("30d") ? "" : "Starter"], ["90d", "90d", c.rangeAllowed("90d") ? "" : "Growth"]], f.range);
       c.$("[data-export]")?.setAttribute("href", exportHref());
     };
     const sync = () => {
@@ -239,7 +253,7 @@
       for (const k of ["q", "status", "range"]) f[k] && f[k] !== "all" ? u.searchParams.set(k, f[k]) : u.searchParams.delete(k);
       history.replaceState(null, "", u);
     };
-    const row = (l, i) => `<tr class="${selected === i ? "on" : ""}"><td><button type="button" class="row-btn" data-act="pick" data-i="${i}" aria-label="Details for ${esc(l.project)}/${esc(l.endpoint)} at ${c.time(l.at)}">${c.dt(l.at, { second: "2-digit" })}</button></td><td>${h.status(l.status)}</td><td class="ep"><span class="m">${esc(l.method ?? "GET")}</span> ${esc(l.project)}/${esc(l.endpoint)}</td><td>${c.ms(l.ms)}</td><td class="hide-sm">${esc(keyLabel(l))}</td><td class="hide-sm">${esc(l.source ?? "rest")}</td></tr>`;
+    const row = (l, i) => `<tr class="${selected === i ? "on" : ""}"><td><button type="button" class="row-btn" data-act="pick" data-i="${i}" aria-label="Details for ${esc(l.project)}/${esc(l.endpoint)} at ${c.time(l.at)}">${c.dt(l.at, { second: "2-digit" })}</button></td><td>${h.status(l.status)}</td><td class="ep"><span class="m">${esc(l.method ?? "GET")}</span> ${esc(l.project)}/${esc(l.endpoint)}${l.access === "write" ? ' <span class="chip warn-chip">write</span>' : ""}${l.code === "key_read_only" || l.code === "key_scope" ? ' <span class="chip">blocked</span>' : ""}</td><td>${c.ms(l.ms)}</td><td class="hide-sm">${esc(keyLabel(l))}</td><td class="hide-sm">${esc(l.source ?? "rest")}</td></tr>`;
     const detail = (l) => {
       const curl = l.source === "mcp" ? null : `curl "${c.D.apiUrl}/v1/${l.project}/${l.endpoint}" \\\n  -H "x-api-key: $APIZIE_KEY"`;
       return `<div class="card-top"><h2>${h.status(l.status)} ${esc(l.project)}/${esc(l.endpoint)}</h2></div>
@@ -250,6 +264,7 @@
           <dt>Latency</dt><dd>${c.ms(l.ms)}${l.cache ? ` · cache ${esc(l.cache)}` : ""}</dd>
           <dt>Key</dt><dd>${esc(keyLabel(l))}${l.key && l.keyName ? ` <code>${esc(l.key)}</code>` : ""}</dd>
           <dt>Source</dt><dd>${esc(l.source ?? "rest")}</dd>
+          <dt>Access</dt><dd>${l.access === "write" ? "Write (changes data at the provider)" : l.access === "read" ? "Read" : "–"}${l.code === "key_read_only" ? " · refused: key is read-only" : l.code === "key_scope" ? " · refused: outside the key's categories" : ""}</dd>
           <dt>IP</dt><dd>${esc(l.ip ?? "–")}</dd>
           <dt>Billed</dt><dd>${l.billed ? "Yes" : "No"}${l.status >= 500 ? " (5xx is refunded)" : ""}</dd>
           ${l.error ? `<dt>Error</dt><dd class="err-text">${esc(l.error)}${l.code ? ` <code>${esc(l.code)}</code>` : ""}</dd>` : ""}
@@ -339,8 +354,8 @@
     setActions(`<button class="btn btn-primary" data-act="newKey">New key</button>`);
     const langs = {
       cURL: (k) => `curl "${sampleUrl(c)}" \\\n  -H "x-api-key: ${k}"`,
-      JavaScript: (k) => `const res = await fetch("${sampleUrl(c)}", {\n  headers: { "x-api-key": "${k}" },\n});\nconst { data } = await res.json();`,
-      Python: (k) => `import requests\n\nr = requests.get(\n    "${c.D.apiUrl}/v1/search-tools:wikipedia/search",\n    params={"query": "Eiffel Tower"},\n    headers={"x-api-key": "${k}"},\n)\nprint(r.json()["data"])`,
+      JavaScript: (k) => `const res = await fetch("${sampleUrl(c)}", {\n  headers: { "x-api-key": "${k}" },\n});\nconst { data, source } = await res.json(); // source: publisher, url, retrievedAt`,
+      Python: (k) => `import requests\n\nr = requests.get(\n    "${c.D.apiUrl}/v1/official:company/profile",\n    params={"company": "AAPL"},\n    headers={"x-api-key": "${k}"},\n)\nbody = r.json()\nprint(body["data"]["name"], body["source"]["attribution"])`,
       Go: (k) => `req, _ := http.NewRequest("GET", "${sampleUrl(c)}", nil)\nreq.Header.Set("x-api-key", "${k}")\nres, _ := http.DefaultClient.Do(req)`,
       PHP: (k) => `$ch = curl_init("${sampleUrl(c)}");\ncurl_setopt($ch, CURLOPT_HTTPHEADER, ["x-api-key: ${k}"]);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\n$data = json_decode(curl_exec($ch), true)["data"];`,
       MCP: (k) => `claude mcp add --transport http apizie ${c.D.apiUrl}/mcp \\\n  --header "x-api-key: ${k}"`,
@@ -363,10 +378,13 @@
         <div class="kc-usage"><span class="stat-label">Requests · 30d</span><b>${num(k.requests30d)}</b></div>
         ${c.spark(k.spark)}
       </div>
+      <div class="keycard-perm"><span class="stat-label">Permissions</span><div class="chips">${permLabel(k)}</div>
+        ${k.status === "active" && k.access === "read_write" && (!k.lastWriteAt || Date.now() - Date.parse(k.lastWriteAt) > 30 * 864e5) ? `<p class="perm-tip">This key has not changed data at any provider in the last 30 days.${k.legacyAccess ? " It was created before read-only keys existed." : ""} <button class="btn btn-ghost btn-sm" data-act="makeReadOnly" data-id="${esc(k.id)}">Make it read-only</button></p>` : ""}
+        ${k.lastWriteAt ? `<p class="meta">Last write ${c.ago(k.lastWriteAt)}</p>` : ""}</div>
       <div class="keycard-foot">
         <div><span class="stat-label">IP allowlist</span><p class="meta">${k.ipAllowlist.length ? k.ipAllowlist.map((x) => `<code>${esc(x)}</code>`).join(" ") : "Any IP (no restriction)"}</p></div>
         <div class="ds-row push">
-          ${k.status === "active" ? `<button class="btn btn-ghost btn-sm" data-act="rename" data-id="${esc(k.id)}">Rename</button><button class="btn btn-ghost btn-sm" data-act="allowlist" data-id="${esc(k.id)}"${data.allowlist ? "" : ' data-locked="Pro"'}>Edit allowlist${data.allowlist ? "" : ' <span class="lock-tag">Pro</span>'}</button><button class="btn btn-danger-ghost btn-sm" data-act="revoke" data-id="${esc(k.id)}">Revoke</button>` : `<span class="meta">Revoked ${c.day(k.revokedAt)}</span><button class="btn btn-danger-ghost btn-sm" data-act="del" data-id="${esc(k.id)}">Delete</button>`}
+          ${k.status === "active" ? `<button class="btn btn-ghost btn-sm" data-act="rename" data-id="${esc(k.id)}">Rename</button><button class="btn btn-ghost btn-sm" data-act="perms" data-id="${esc(k.id)}">Permissions</button><button class="btn btn-ghost btn-sm" data-act="allowlist" data-id="${esc(k.id)}"${data.allowlist ? "" : ' data-locked="Starter"'}>Edit allowlist${data.allowlist ? "" : ' <span class="lock-tag">Starter</span>'}</button><button class="btn btn-danger-ghost btn-sm" data-act="revoke" data-id="${esc(k.id)}">Revoke</button>` : `<span class="meta">Revoked ${c.day(k.revokedAt)}</span><button class="btn btn-danger-ghost btn-sm" data-act="del" data-id="${esc(k.id)}">Delete</button>`}
         </div>
       </div>
     </article>`;
@@ -383,16 +401,17 @@
           </div>
           ${items.length ? items.map(card).join("") : `<div class="ds-card">${data.items.length ? h.empty("No keys match", "Try another filter.") : h.empty("No API keys yet", "Create your first key to call any API in the catalog.", `<button class="btn btn-primary btn-sm" data-act="newKey">Create key</button>`)}</div>`}
           <section class="ds-card" aria-labelledby="apps-h"><div class="card-top"><h2 id="apps-h">Connected MCP apps</h2><a class="link-sm" href="/mcp">How to connect →</a></div>
-            ${apps.length ? h.table(["App", "Returns to", "Tokens", ""], apps.map((a) => `<tr><td><b>${esc(a.name)}</b></td><td class="meta">${esc(a.redirect ? a.redirect.replace(/^(https?:\/\/[^/]+).*$/, "$1") : "")}</td><td>${a.tokens}</td><td><button class="btn btn-danger-ghost btn-sm" data-act="disconnect" data-id="${esc(a.clientId)}">Disconnect</button></td></tr>`)) : `<p class="muted-sm">Apps you connect with OAuth (Claude, ChatGPT) appear here and don't need an API key.</p>`}
+            ${apps.length ? h.table(["App", "Returns to", "Permissions", ""], apps.map((a) => `<tr><td><b>${esc(a.name)}</b></td><td class="meta">${esc(a.redirect ? a.redirect.replace(/^(https?:\/\/[^/]+).*$/, "$1") : "")}</td><td><div class="chips">${permLabel(a)}</div></td><td class="ds-row"><button class="btn btn-ghost btn-sm" data-act="appPerms" data-id="${esc(a.clientId)}">Permissions</button><button class="btn btn-danger-ghost btn-sm" data-act="disconnect" data-id="${esc(a.clientId)}">Disconnect</button></td></tr>`)) : `<p class="muted-sm">Apps you connect with OAuth (Claude, ChatGPT) appear here and don't need an API key. You choose read-only or read and write when you connect them.</p>`}
           </section>
         </div>
         <aside class="stack">
-          <section class="ds-card" aria-labelledby="auth-h"><h2 id="auth-h">Authenticate</h2><p class="meta">Send your key in the <code>x-api-key</code> header. Every endpoint uses the same key and returns <code>{ project, data, timestamp }</code>.</p>
+          <section class="ds-card" aria-labelledby="auth-h"><h2 id="auth-h">Authenticate</h2><p class="meta">Send your key in the <code>x-api-key</code> header. Every endpoint uses the same key and returns <code>{ project, data, source, timestamp }</code>, where <code>source</code> cites the official publisher and URL.</p>
             ${h.seg("lang", Object.keys(langs).map((l) => [l, l]), lang)}
             <div data-sample>${h.code(langs[lang](example), lang)}</div></section>
           <section class="ds-card" aria-labelledby="safe-h"><h2 id="safe-h">Key safety</h2><ul class="tips">
-            <li><b>One key per environment.</b> Revoke a leaked key without downtime elsewhere.</li>
-            <li><b>Restrict by IP.</b> Allow only your server IPs or an IPv4 range for production keys (Pro and up).</li>
+            <li><b>Read-only by default.</b> New keys can only fetch data. Allow writes only on keys that call your own bring-your-own-key accounts.</li>
+            <li><b>One key per environment or agent.</b> Revoke a leaked key without downtime elsewhere, and limit each key to the categories it needs.</li>
+            <li><b>Restrict by IP.</b> Allow only your server IPs or an IPv4 range for production keys (Starter and up).</li>
             <li><b>Never ship keys to browsers.</b> Call Apizie from your backend or a serverless function.</li>
             <li><b>Watch the logs.</b> A burst of 401s usually means a key leaked or was revoked.</li></ul></section>
         </aside></div>`;
@@ -450,6 +469,27 @@
         await api(`/api/me/keys/${k.id}`, { method: "DELETE" });
         await load();
       },
+      perms: async (el) => {
+        const k = keyById(el.dataset.id);
+        const ok = await c.openModal({ title: `Permissions for “${esc(k.name)}”`, body: permFields(c, k), submit: "Save", onSubmit: (form) => api(`/api/me/keys/${k.id}`, { method: "PATCH", body: readPerms(form) }) });
+        if (ok) {
+          c.toast("Permissions saved");
+          await load();
+        }
+      },
+      makeReadOnly: async (el) => {
+        await api(`/api/me/keys/${el.dataset.id}`, { method: "PATCH", body: { access: "read" } });
+        c.toast("Key is now read-only");
+        await load();
+      },
+      appPerms: async (el) => {
+        const a = apps.find((x) => x.clientId === el.dataset.id);
+        const ok = await c.openModal({ title: `Permissions for ${esc(a.name)}`, body: permFields(c, a), submit: "Save", onSubmit: (form) => api(`/api/me/apps/${encodeURIComponent(a.clientId)}`, { method: "PATCH", body: readPerms(form) }) });
+        if (ok) {
+          c.toast("Permissions saved");
+          await load();
+        }
+      },
       disconnect: async (el) => {
         if (!(await c.confirmModal({ title: "Disconnect this app?", text: "It loses access immediately and will ask you to sign in again next time.", confirm: "Disconnect" }))) return;
         await api(`/api/me/apps/${encodeURIComponent(el.dataset.id)}`, { method: "DELETE" });
@@ -472,7 +512,7 @@
     const load = async () => {
       try {
         data = (await api("/api/me/bulk")).content;
-        setActions(data.enabled ? `<button class="btn btn-primary" data-act="newJob">New bulk job</button>` : `<button class="btn btn-ghost" data-act="newJob" data-locked="Ultra">New bulk job <span class="lock-tag">Ultra</span></button>`);
+        setActions(data.enabled ? `<button class="btn btn-primary" data-act="newJob">New bulk job</button>` : `<button class="btn btn-ghost" data-act="newJob" data-locked="Growth">New bulk job <span class="lock-tag">Growth</span></button>`);
         render();
       } catch (err) {
         c.root.innerHTML = h.error(err);
@@ -495,7 +535,7 @@
           <section class="ds-card ${locked ? "locked-card" : ""}" aria-label="Jobs">
             ${
               locked
-                ? `<div class="lock-panel"><b>Bulk jobs are on Ultra</b><p>Run one endpoint over up to 500 inputs (2,000 on Max) in a single request. Failed items that return 5xx are never billed.</p><a class="btn btn-primary btn-sm" href="/dashboard/billing?plan=ultra#plans">Upgrade to Ultra</a></div>`
+                ? `<div class="lock-panel"><b>Bulk jobs are on Ultra</b><p>Run one endpoint over up to 500 inputs (2,000 on Max) in a single request. Failed items that return 5xx are never billed.</p><a class="btn btn-primary btn-sm" href="/dashboard/billing?plan=ultra#plans">Upgrade to Growth</a></div>`
                 : jobs.length
                 ? h.table(["Job", "Endpoint", "Status", "Items", "Created"], jobs.map((j) => `<tr><td><button class="row-btn" data-act="open" data-id="${esc(j.jobId)}">${esc(j.jobId.slice(-10))}</button></td><td><code>${esc(j.scraperSlug)}/${esc(j.endpointSlug)}</code></td><td>${h.badge(kind(j))}</td><td>${num(j.succeeded)}/${num(j.total)}${j.failed ? ` · ${num(j.failed)} failed` : ""}</td><td>${c.dt(j.createdAt)}</td></tr>`))
                 : h.empty(data.items.length ? "No jobs match" : "No bulk jobs yet", data.items.length ? "Try another filter." : "Submit one from here or with POST /v1/{api}/{endpoint}/bulk.", data.items.length ? "" : `<button class="btn btn-primary btn-sm" data-act="newJob">New bulk job</button>`)
@@ -597,6 +637,92 @@
     }
   }
 
+  const LICENCE = { internal: "Commercial use inside your company", product: "Use in your own product, with attribution" };
+
+  // ===== Data alerts ==========================================================================
+  S.alerts = async (c) => {
+    const { h, esc, api } = c;
+    let data;
+    const load = async () => {
+      try {
+        data = (await api("/api/me/alerts")).content;
+        setActions(data.limit ? `<a class="btn btn-ghost" href="/dashboard/webhooks">Webhooks</a><button class="btn btn-primary" data-act="add" ${data.items.length >= data.limit ? "disabled" : ""}>New alert</button>` : `<a class="btn btn-primary" href="/dashboard/billing?plan=pro#plans">Upgrade to Starter</a>`);
+        render();
+      } catch (err) {
+        c.root.innerHTML = h.error(err);
+      }
+    };
+    const row = (w) => `<li class="hook ${w.enabled ? "" : "off"}"><div class="hook-main"><b>${esc(w.name)}</b><span class="meta">${esc(w.typeLabel)}</span>
+        ${w.lastSummary ? `<span>${esc(w.lastSummary)}</span>` : ""}
+        ${w.lastError ? `<span class="meta" style="color:var(--danger,#f87171)">${esc(w.lastError)}</span>` : ""}
+        <span class="meta">Checked ${w.lastCheckedAt ? c.ago(w.lastCheckedAt) : "never"}${w.lastChangedAt ? ` · last change ${c.ago(w.lastChangedAt)}` : ""} · ${w.changes ?? 0} alert${w.changes === 1 ? "" : "s"} sent</span>
+        ${w.lastSource?.url ? `<span class="meta">Source: <a href="${esc(w.lastSource.url)}" target="_blank" rel="noopener">${esc(w.lastSource.publisher ?? w.lastSource.provider)}</a></span>` : ""}</div>
+      <div class="ds-row"><label class="toggle"><input type="checkbox" data-change="toggleAlert" data-id="${esc(w.id)}" ${w.enabled ? "checked" : ""}><span>${w.enabled ? "On" : "Off"}</span></label><button class="btn btn-ghost btn-sm" data-act="checkNow" data-id="${esc(w.id)}">Check now</button><button class="btn btn-danger-ghost btn-sm" data-act="remove" data-id="${esc(w.id)}">Delete</button></div></li>`;
+    const render = () => {
+      const payload = `{\n  "event": "data.changed",\n  "data": {\n    "name": "New SEC filings: AAPL",\n    "summary": "Apple Inc. filed 8-K on 2026-11-03",\n    "current": { "form": "8-K", "url": "https://www.sec.gov/Archives/..." },\n    "source": { "publisher": "U.S. Securities and Exchange Commission", "url": "https://www.sec.gov/...", "retrievedAt": "…" }\n  }\n}`;
+      c.root.innerHTML = `<div class="split"><div class="stack">
+        <section class="ds-card ${data.limit ? "" : "locked-card"}" aria-labelledby="al-h"><div class="card-top"><h2 id="al-h">Your alerts</h2><span class="meta">${data.items.length} of ${data.limit}</span></div>
+          ${
+            !data.limit
+              ? `<div class="lock-panel"><b>Data alerts are part of Apizie Finance</b><p>Get a signed <code>data.changed</code> webhook and a notification when a company files with the SEC, a FRED series updates, the Treasury publishes a new yield curve or the ECB moves rates. Finance runs next to your current plan.</p><a class="btn btn-primary btn-sm" href="/dashboard/billing?plan=fin_starter#finance">Add Apizie Finance</a></div>`
+              : data.items.length
+              ? `<ul class="hooks">${data.items.map(row).join("")}</ul>`
+              : h.empty("No alerts yet", "Watch an official source and get told the moment it publishes something new.", `<button class="btn btn-primary btn-sm" data-act="add">New alert</button>`)
+          }
+          <p class="meta">${esc(data.schedule)} Changes are sent to your <a href="/dashboard/webhooks">webhooks</a> as <code>data.changed</code> and to the bell. Alert checks are included in your Finance plan and do not use your request quota.</p>
+        </section></div>
+        <aside class="stack"><section class="ds-card"><h2>What you can watch</h2><ul class="plain-list">${data.types.map((t) => `<li><b>${esc(t.label)}</b><br><span class="meta">${esc(t.help)}</span></li>`).join("")}</ul></section>
+        <section class="ds-card"><h2>Webhook payload</h2><p class="meta">Every change arrives with its source, so your agent can cite it.</p>${h.code(payload, "application/json")}</section></aside></div>`;
+    };
+    const fieldsFor = (type) => (data.types.find((t) => t.id === type)?.fields ?? []).map((f) => `<label class="field">${esc(f.label)}<input name="p_${esc(f.name)}" ${f.required ? "required" : ""} placeholder="${esc(f.example ?? "")}"></label>`).join("") || `<p class="meta">No settings needed.</p>`;
+    setHandlers({
+      add: async () => {
+        const first = data.types[0].id;
+        const w = await c.openModal({
+          title: "New data alert",
+          body: `<label class="field">What to watch<select name="type" data-alert-type>${data.types.map((t) => `<option value="${esc(t.id)}">${esc(t.label)}</option>`).join("")}</select></label><div data-alert-fields>${fieldsFor(first)}</div><label class="field">Name (optional)<input name="name" maxlength="80" placeholder="e.g. Apple filings"></label>`,
+          submit: "Create alert",
+          onOpen: (dlg) => {
+            const sel = dlg.querySelector("[data-alert-type]");
+            sel.addEventListener("change", () => (dlg.querySelector("[data-alert-fields]").innerHTML = fieldsFor(sel.value)));
+          },
+          onSubmit: async (form) => {
+            const params = Object.fromEntries([...form.querySelectorAll("input[name^=p_]")].map((i) => [i.name.slice(2), i.value.trim()]));
+            const r = await api("/api/me/alerts", { method: "POST", body: { type: form.type.value, params, name: form.name.value.trim() } });
+            return r;
+          },
+        });
+        if (w) {
+          c.toast(w.message ?? "Alert saved");
+          await load();
+        }
+      },
+      checkNow: async (el) => {
+        el.disabled = true;
+        el.textContent = "Checking…";
+        try {
+          const r = (await api(`/api/me/alerts/${el.dataset.id}/check`, { method: "POST", body: {} })).content;
+          c.toast(r.error ? `Check failed: ${r.error}` : r.changed ? "Something new: alert sent" : "No change since the last check");
+          await load();
+        } catch (err) {
+          c.toast(err.message);
+          el.disabled = false;
+          el.textContent = "Check now";
+        }
+      },
+      toggleAlert: async (el) => {
+        await api(`/api/me/alerts/${el.dataset.id}`, { method: "PATCH", body: { enabled: el.checked } });
+        await load();
+      },
+      remove: async (el) => {
+        if (!(await c.confirmModal({ title: "Delete this alert?", text: "It stops checking right away.", confirm: "Delete" }))) return;
+        await api(`/api/me/alerts/${el.dataset.id}`, { method: "DELETE" });
+        await load();
+      },
+    });
+    await load();
+  };
+
   // ===== Webhooks =============================================================================
   S.webhooks = async (c) => {
     const { h, esc, num, api } = c;
@@ -606,7 +732,7 @@
     const load = async () => {
       try {
         data = (await api("/api/me/webhooks")).content;
-        setActions(data.enabled ? `<button class="btn btn-ghost" data-act="test" ${data.hooks.length ? "" : "disabled"}>Send test</button><button class="btn btn-primary" data-act="add">Add endpoint</button>` : `<button class="btn btn-ghost" data-act="add" data-locked="Pro">Add endpoint <span class="lock-tag">Pro</span></button>`);
+        setActions(data.enabled ? `<button class="btn btn-ghost" data-act="test" ${data.hooks.length ? "" : "disabled"}>Send test</button><button class="btn btn-primary" data-act="add">Add endpoint</button>` : `<button class="btn btn-ghost" data-act="add" data-locked="Starter">Add endpoint <span class="lock-tag">Starter</span></button>`);
         render();
       } catch (err) {
         c.root.innerHTML = h.error(err);
@@ -618,7 +744,7 @@
         <section class="ds-card ${locked ? "locked-card" : ""}" aria-labelledby="ep-h"><div class="card-top"><h2 id="ep-h">Endpoints</h2><span class="meta">${data.hooks.length} of 5</span></div>
           ${
             locked
-              ? `<div class="lock-panel"><b>Webhooks are on Pro</b><p>Get quota, key, balance and error events pushed to your server, signed with your secret.</p><a class="btn btn-primary btn-sm" href="/dashboard/billing?plan=pro#plans">Upgrade to Pro</a></div>`
+              ? `<div class="lock-panel"><b>Webhooks are on Pro</b><p>Get quota, key, balance and error events pushed to your server, signed with your secret. Apizie Finance plans include them too.</p><a class="btn btn-primary btn-sm" href="/dashboard/billing?plan=pro#plans">Upgrade to Starter</a></div>`
               : data.hooks.length
               ? `<ul class="hooks">${data.hooks.map((w) => `<li class="hook ${w.enabled ? "" : "off"}"><div class="hook-main"><b>${esc(w.url)}</b>${w.description ? `<span class="meta">${esc(w.description)}</span>` : ""}<div class="chips">${w.events.map((e) => `<span class="chip">${e === "*" ? "all events" : esc(e)}</span>`).join("")}</div><span class="meta">Secret <code>${esc(w.secretPreview)}</code></span></div>
                   <div class="ds-row"><label class="toggle"><input type="checkbox" data-change="toggleHook" data-id="${esc(w.id)}" ${w.enabled ? "checked" : ""}><span>${w.enabled ? "On" : "Off"}</span></label><button class="btn btn-ghost btn-sm" data-act="testOne" data-id="${esc(w.id)}">Test</button><button class="btn btn-ghost btn-sm" data-act="edit" data-id="${esc(w.id)}">Edit</button><button class="btn btn-ghost btn-sm" data-act="rotate" data-id="${esc(w.id)}">Rotate secret</button><button class="btn btn-danger-ghost btn-sm" data-act="remove" data-id="${esc(w.id)}">Delete</button></div></li>`).join("")}</ul>`
@@ -725,6 +851,22 @@
       }
     };
     const statusTag = (s) => h.badge(s, { failed: "Payment failed", pending: "Waiting for payment", awaiting_review: "Checking payment", paid: "Paid", cancelled: "Cancelled", rejected: "Rejected", settled: "Settled" }[s] ?? s);
+    // Apizie Finance: a premium add-on with its own plan, quota and expiry, next to the general plan.
+    const financeSection = () => {
+      const f = b.finance;
+      if (!f) return "";
+      const cur = f.plan;
+      const fq = b.quota.finance;
+      const rank = (id) => f.plans.findIndex((y) => y.id === id);
+      return `<section class="ds-card finance-card" id="finance" aria-labelledby="fin-h"><div class="card-top"><h2 id="fin-h">Apizie Finance <span class="badge badge-live">Premium</span></h2><span class="meta">SEC EDGAR, FRED, ECB, U.S. Treasury, GLEIF and World Bank, cited on every answer · <a href="/finance">What's included</a></span></div>
+        ${cur ? `<div class="quota-block"><div class="row-between"><span>${esc(cur.name)} · active until ${c.day(f.expiresAt)}</span><b>${num(fq?.month.used ?? 0)} / ${num(cur.monthly)}</b></div>${h.bar(fq?.month.used ?? 0, cur.monthly)}</div>` : `<p class="meta">Not active. The six official sources, the combined <code>official:*</code> endpoints and data alerts need a Finance plan. It runs next to your ${c.planName(b.plan.id)} plan with its own quota.</p>`}
+        <div class="plans">${f.plans.map((x) => `<div class="plan ${cur?.id === x.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${esc(x.name.replace("Finance ", ""))}</b>${cur?.id === x.id ? `<button class="btn btn-ghost btn-sm" data-act="upgrade" data-plan="${x.id}" title="Adds time on top of your current period">Renew</button>` : cur && rank(x.id) < rank(cur.id) ? `<span class="muted-sm">Included in ${esc(cur.name)}</span>` : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">${cur ? "Upgrade" : "Add"}</button>`}</div>
+          <p class="plan-price">$${x.priceUsd} <small>/ month</small></p><p class="meta">$${x.priceUsd * 10} / year (2 months free)</p>
+          <ul class="tips small"><li>${num(x.monthly)} Finance requests / month</li><li>${LICENCE[x.licence] ?? ""}</li><li>${num(x.alerts)} data alerts</li><li>${num(x.perMinute)} requests / minute</li>${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>Signed webhooks</li></ul></div>`).join("")}</div>
+        <p class="meta">Above the Finance quota, pay-as-you-go uses the same balance at $${f.usdPer1k.toFixed(2)} per 1,000 Finance requests. Redistribution, resale or an SLA with credits: <a href="/dashboard/support?type=billing">contact us for Enterprise</a>.</p>
+      </section>`;
+    };
+    const allPlans = () => [...b.plans, ...(b.finance?.plans ?? [])];
     const render = () => {
       const p = b.plan;
       const q = b.quota;
@@ -732,10 +874,10 @@
       c.root.innerHTML = `${b.cardEnabled ? "" : `<div class="ds-banner warn" role="status">Checkout is temporarily unavailable. Plans and top-ups will be back shortly; your current plan keeps working.</div>`}
       <div class="grid-hero">
         <section class="ds-card hero-card plan-hero" aria-labelledby="cp-h">
-          <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.cap(p.id)} <small>$${p.priceUsd} / month</small></h2>
+          <div class="hero-left"><p class="card-label">Current plan</p><h2 id="cp-h" class="plan-name">${c.planName(p.id)} <small>$${p.priceUsd} / month</small></h2>
             <p class="meta">${b.planExpiresAt && p.id !== "free" ? `Active until ${c.day(b.planExpiresAt)}. Renew any time; time is added on top.` : "Free forever. Upgrade any time: one-time payment, no subscription."}</p>
             <div class="quota-block"><div class="row-between"><span>Monthly requests</span><b>${num(q.month.used)} / ${num(q.month.limit)}</b></div>${h.bar(q.month.used, q.month.limit)}</div></div>
-          <div class="hero-right">${p.id === "free" ? `<a class="btn btn-primary" href="#plans">Upgrade</a>` : `<button class="btn btn-primary" data-act="upgrade" data-plan="${p.id}">Renew ${c.cap(p.id)}</button>`}</div>
+          <div class="hero-right">${p.id === "free" ? `<a class="btn btn-primary" href="#plans">Upgrade</a>` : `<button class="btn btn-primary" data-act="upgrade" data-plan="${p.id}">Renew ${c.planName(p.id)}</button>`}</div>
         </section>
         <section class="ds-card" aria-labelledby="bal-h">
           <div class="card-top"><h2 id="bal-h">Pay-as-you-go balance</h2><button class="btn btn-primary btn-sm push" data-act="topupCustom">Top up</button></div>
@@ -749,15 +891,17 @@
           <form class="topup custom" data-topup-form><b>Custom</b><label class="visually-hidden" for="tu-amt">Amount in US dollars</label><input id="tu-amt" name="amount" type="number" inputmode="decimal" min="${b.payg.minTopupUsd}" max="${b.payg.maxTopupUsd}" step="1" placeholder="$"><span class="meta">min $${b.payg.minTopupUsd}</span><button class="btn btn-ghost btn-sm" data-act="topupForm"${b.cardEnabled ? "" : " disabled"}>Top up</button></form></div>
       </section>
       <section class="ds-card" id="plans" aria-labelledby="pl-h"><div class="card-top"><h2 id="pl-h">Plans</h2><span class="meta">Each plan includes a monthly quota; your balance covers anything above it</span></div>
-        <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.cap(x.id)}</b>${x.id === p.id ? (p.id === "free" ? h.badge("current", "Current plan") : `<button class="btn btn-ghost btn-sm" data-act="upgrade" data-plan="${x.id}" title="Adds time on top of your current period">Renew</button>`) : x.id === "free" ? "" : b.plans.findIndex((y) => y.id === x.id) < b.plans.findIndex((y) => y.id === p.id) ? `<span class="muted-sm">Included in ${c.cap(p.id)}</span>` : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">Upgrade</button>`}</div>
+        <div class="plans">${b.plans.map((x) => `<div class="plan ${x.id === p.id ? "current" : ""} ${x.id === want ? "wanted" : ""}"><div class="row-between"><b class="plan-title">${c.planName(x.id)}</b>${x.id === p.id ? (p.id === "free" ? h.badge("current", "Current plan") : `<button class="btn btn-ghost btn-sm" data-act="upgrade" data-plan="${x.id}" title="Adds time on top of your current period">Renew</button>`) : x.id === "free" ? "" : b.plans.findIndex((y) => y.id === x.id) < b.plans.findIndex((y) => y.id === p.id) ? `<span class="muted-sm">Included in ${c.planName(p.id)}</span>` : `<button class="btn btn-primary btn-sm" data-act="upgrade" data-plan="${x.id}">Upgrade</button>`}</div>
           <p class="plan-price">$${x.priceUsd} <small>/ month</small></p>${x.priceUsd ? `<p class="meta">$${x.priceUsd * 10} / year (2 months free)</p>` : ""}
           <ul class="tips small"><li>${num(x.monthly)} requests / month</li><li>${num(x.perMinute)} requests / minute</li><li>${x.logDays}-day log history</li>${x.webhooks ? "<li>Webhooks and IP allowlists</li>" : ""}${x.bulk ? `<li>Bulk jobs up to ${num(x.bulkCap)} items</li>` : ""}<li>${num(x.maxKeys)} active API keys</li></ul></div>`).join("")}</div>
+        <p class="meta">Every plan includes the whole public catalog and the MCP server. Official financial data is the separate Apizie Finance add-on below.</p>
       </section>
+      ${financeSection()}
       <section class="ds-card" aria-labelledby="tx-h"><div class="card-top"><h2 id="tx-h">Transactions</h2>${h.seg("tab", [["all", "All"], ["plan", "Plans"], ["topup", "Top-ups"], ["usage", "Usage"]], tab)}</div>
         ${rows.length ? h.table(["Order ID", "Date", "Item", "Method", "Subtotal", "Tax", "Total", "Status", ""], rows.map((t) => `<tr><td><code>${esc(t.id)}</code></td><td>${c.day(t.date)}</td><td>${esc(t.item)}</td><td>${esc(t.method)}</td><td>${c.money(t.subtotal, t.currency)}</td><td>${t.kind === "usage" ? "–" : `<span class="meta">at checkout</span>`}</td><td><b>${c.money(t.total, t.currency)}</b></td><td>${statusTag(t.status)}${t.reference ? `<div class="meta">Ref: ${esc(t.reference)}</div>` : ""}</td><td>${t.status === "pending" ? `<div class="ds-row"><button class="btn btn-primary btn-sm" data-act="pay" data-id="${esc(t.id)}">Pay</button><button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${esc(t.id)}">Cancel</button></div>` : ""}</td></tr>`)) : h.empty("No transactions yet", "Invoices for plans and top-ups, and pay-as-you-go usage, show up here.")}
       </section>`;
-      if (want) document.getElementById("plans")?.scrollIntoView({ block: "start" });
-      if (want && !autoOpened && b.plans.some((x) => x.id === want && x.id !== "free")) {
+      if (want) document.getElementById(want.startsWith("fin_") || want === "finance" ? "finance" : "plans")?.scrollIntoView({ block: "start" });
+      if (want && !autoOpened && allPlans().some((x) => x.id === want && x.id !== "free")) {
         // Came from the pricing page: open the checkout step for that plan straight away.
         autoOpened = true;
         history.replaceState(null, "", location.pathname);
@@ -802,10 +946,12 @@
         i.focus();
       },
       upgrade: async (el) => {
-        const plan = b.plans.find((x) => x.id === el.dataset.plan);
+        const plan = allPlans().find((x) => x.id === el.dataset.plan);
+        const isFin = plan.id.startsWith("fin_");
+        const current = isFin ? b.finance?.plan?.id : b.plan.id;
         const months = await c.openModal({
-          title: `${c.cap(plan.id)} plan`,
-          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid}</option>`; }).join("")}</select></label><p class="hint">You'll continue to a secure checkout by Dodo Payments (card, Apple Pay or Google Pay, in US dollars). The plan is active as soon as the payment goes through${b.plan.id === plan.id ? " and the time is added to your current period" : ""}. No automatic renewal.</p>`,
+          title: isFin ? `Apizie ${c.planName(plan.id)}` : `${c.planName(plan.id)} plan`,
+          body: `<label class="field">How many months?<select name="months" autofocus>${[1, 3, 6, 12].map((m) => { const paid = m === 12 ? 10 : m; return `<option value="${m}">${m === 12 ? "12 months (2 free)" : `${m} month${m > 1 ? "s" : ""}`} · $${plan.priceUsd * paid}</option>`; }).join("")}</select></label><p class="hint">You'll continue to a secure checkout by Dodo Payments (card, Apple Pay or Google Pay, in US dollars). ${isFin ? "Apizie Finance runs next to your general plan, with its own quota. " : ""}The plan is active as soon as the payment goes through${current === plan.id ? " and the time is added to your current period" : ""}. No automatic renewal.</p>`,
           submit: "Continue to checkout",
           onSubmit: (form) => Number(form.months.value),
         });
@@ -905,7 +1051,7 @@
     };
     const render = () => {
       c.root.innerHTML = `<div class="grid-main">
-        <section class="ds-card" aria-labelledby="sub-h"><h2 id="sub-h">Submit a project</h2><p class="meta">Approved projects appear on the public <a href="/showcase">Showcase</a> page.${c.D.plan.bulk ? " Ultra and Max projects also get their logo on the strip." : ""}</p>
+        <section class="ds-card" aria-labelledby="sub-h"><h2 id="sub-h">Submit a project</h2><p class="meta">Approved projects appear on the public <a href="/showcase">Showcase</a> page.${c.D.plan.bulk ? " Growth and Business projects also get their logo on the strip." : ""}</p>
           <form class="form-grid" data-show-form novalidate><label class="field">Project name<input name="name" required maxlength="80"></label><label class="field">URL<input name="url" type="url" required placeholder="https://"></label><label class="field full">What does it do?<textarea name="description" rows="3" maxlength="280" required></textarea></label><p class="form-error full" data-show-err role="alert" hidden></p><div class="full"><button class="btn btn-primary">Submit for review</button></div></form></section>
         <section class="ds-card" aria-labelledby="mine-h"><h2 id="mine-h">Your submissions</h2>${list.length ? h.table(["Project", "Status", ""], list.map((s) => `<tr><td><b>${esc(s.name)}</b><div class="meta"><a href="${esc(s.url)}" target="_blank" rel="noopener nofollow">${esc(s.url)}</a></div></td><td>${h.badge(s.status)}</td><td>${s.status === "pending" || s.status === "approved" ? `<button class="btn btn-danger-ghost btn-sm" data-act="withdraw" data-id="${esc(s.id)}">Withdraw</button>` : ""}</td></tr>`)) : h.empty("Nothing submitted yet", "Built something with Apizie? Share it.")}</section></div>`;
       c.$("[data-show-form]", c.root).addEventListener("submit", async (e) => {
@@ -945,6 +1091,7 @@
       ["quotaExceeded", "Quota used up"],
       ["balance", "Balance alerts"],
       ["affiliate", "Affiliate earnings"],
+      ["dataAlerts", "Data alerts (new filings, rate changes)"],
       ["product", "Product updates"],
     ];
     const load = async () => {
@@ -967,7 +1114,7 @@
               <div class="avatar-edit">${u.avatar ? `<img src="${esc(u.avatar)}" alt="Your profile photo" width="88" height="88" referrerpolicy="no-referrer">` : `<span class="ds-avatar xl" aria-hidden="true">${esc(u.name[0]?.toUpperCase() ?? "?")}</span>`}
                 <label class="btn btn-ghost btn-sm">Change photo<input type="file" accept="image/png,image/jpeg,image/webp" data-change="avatar" class="visually-hidden"></label>${u.avatar ? `<button type="button" class="btn-link" data-act="removeAvatar">Remove</button>` : ""}</div>
               <div class="form-grid"><label class="field">Display name<input name="name" value="${esc(u.name)}" maxlength="60" required></label><label class="field">Email<input value="${esc(u.email ?? "")}" disabled><small>Used to sign in. It can't be changed here.</small></label>
-                <p class="meta full">Plan <b>${esc(c.cap(me.plan.id))}</b> · <a href="/dashboard/billing">Manage billing →</a></p><p class="form-error full" data-err-profile role="alert" hidden></p><div class="full"><button class="btn btn-primary">Save</button></div></div>
+                <p class="meta full">Plan <b>${esc(c.planName(me.plan.id))}</b> · <a href="/dashboard/billing">Manage billing →</a></p><p class="form-error full" data-err-profile role="alert" hidden></p><div class="full"><button class="btn btn-primary">Save</button></div></div>
             </form></section>
           <section class="ds-card" id="security" aria-labelledby="se-h"><h2 id="se-h">Security</h2>
             <p class="meta">${me.providers.length ? `You sign in with ${me.providers.map((p) => (p === "supabase" ? "Google" : c.cap(p))).join(", ")}${u.hasPassword ? " or your password" : ""}.` : "You sign in with email and password."} Changing your password signs you out everywhere else.</p>
@@ -980,7 +1127,7 @@
           <section class="ds-card danger-card" id="danger" aria-labelledby="dz-h"><h2 id="dz-h">Danger zone</h2><p class="meta">Deleting your account removes your profile, all API keys, logs and webhooks for good. Paid invoices are kept for accounting.</p><button class="btn btn-danger" data-act="deleteAccount">Delete account</button></section>
         </div>
         <aside class="stack"><section class="ds-card" aria-labelledby="ac-h"><h2 id="ac-h">Account</h2><dl class="kv">
-          <dt>User ID</dt><dd><code>${esc(u.id)}</code> ${h.copyBtn(u.id)}</dd><dt>Member since</dt><dd>${c.day(u.createdAt)}</dd><dt>Plan</dt><dd>${esc(c.cap(me.plan.id))}</dd><dt>API keys</dt><dd>${num(me.keys.active)} active · ${num(me.keys.revoked)} revoked</dd><dt>Sign-in</dt><dd>${me.providers.length ? me.providers.map((p) => (p === "supabase" ? "Google" : c.cap(p))).join(", ") : "Email"}</dd></dl></section></aside>
+          <dt>User ID</dt><dd><code>${esc(u.id)}</code> ${h.copyBtn(u.id)}</dd><dt>Member since</dt><dd>${c.day(u.createdAt)}</dd><dt>Plan</dt><dd>${esc(c.planName(me.plan.id))}</dd><dt>API keys</dt><dd>${num(me.keys.active)} active · ${num(me.keys.revoked)} revoked</dd><dt>Sign-in</dt><dd>${me.providers.length ? me.providers.map((p) => (p === "supabase" ? "Google" : c.cap(p))).join(", ") : "Email"}</dd></dl></section></aside>
       </div>`;
       c.$("[data-profile]", c.root).addEventListener("submit", async (e) => {
         e.preventDefault();

@@ -61,7 +61,8 @@ export async function apiKeyCaller(repo, req, oauth = null) {
     if (!rec) throw E.unauthorized("Invalid or expired access token");
     const user = await repo.authUser(rec.userId);
     if (!user || user.status !== "active") throw E.unauthorized("Account disabled");
-    return { owner: user.id, plan: repo.effectivePlan(user), keyId: `oauth_${rec.clientId}`, keyPreview: `MCP · ${rec.clientName}`.slice(0, 40), keyName: `MCP · ${rec.clientName}`.slice(0, 40), ip: clientIp(req), user, oauth: true, requestId: req.zieRequestId };
+    // Connections approved before permissions existed keep full access; new ones carry what the user chose.
+    return { owner: user.id, plan: repo.effectivePlan(user), financePlan: repo.financePlanOf(user), keyId: `oauth_${rec.clientId}`, keyPreview: `MCP · ${rec.clientName}`.slice(0, 40), keyName: `MCP · ${rec.clientName}`.slice(0, 40), ip: clientIp(req), user, oauth: true, access: rec.access ?? "read_write", scope: rec.categories?.length ? { categories: rec.categories } : null, requestId: req.zieRequestId };
   }
   const key = await repo.authKey(raw);
   if (!key) throw E.unauthorized("Invalid API key");
@@ -70,13 +71,15 @@ export async function apiKeyCaller(repo, req, oauth = null) {
   if (!ipAllowed(ip, key.ipAllowlist)) throw E.forbidden(`IP ${ip} is not allowed for this key`);
   let user = null;
   let plan = key.plan ?? "free";
+  let financePlan = key.userId ? null : key.financePlan ?? null;
   if (key.userId) {
     user = await repo.authUser(key.userId);
     if (!user || user.status !== "active") throw E.unauthorized("Account disabled");
     plan = repo.effectivePlan(user);
+    financePlan = repo.financePlanOf(user);
     repo.touchKey(key).catch(() => {});
   }
-  return { owner: key.userId ?? `key_${key.id}`, plan, keyId: key.id, keyPreview: key.preview, keyName: key.name, ip, user, requestId: req.zieRequestId };
+  return { owner: key.userId ?? `key_${key.id}`, plan, financePlan, keyId: key.id, keyPreview: key.preview, keyName: key.name, ip, user, access: key.access ?? "read_write", scope: key.scope ?? null, requestId: req.zieRequestId };
 }
 
 // ---------- OAuth ------------------------------------------------------------

@@ -54,3 +54,16 @@ test("preview deployments and local runs keep their own host", async () => {
   const local = await start({});
   assert.equal((await get(local, "/pricing", "localhost")).status, 200);
 });
+
+test("a localhost URL copied into production env vars is ignored: OAuth callbacks use apizie.tech", async () => {
+  const { createApp } = await import("../src/app.js");
+  const { MemoryKV } = await import("../src/db/kv.js");
+  const app = createApp({ quiet: true, logger: null, kv: new MemoryKV(), env: { VERCEL: "1", VERCEL_ENV: "production", APIZIE_PUBLIC_URL: "http://localhost:8787", APIZIE_API_URL: "http://127.0.0.1:8787", GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gsec" }, supabaseAuth: null });
+  assert.equal(app.publicUrl, "https://apizie.tech");
+  assert.equal(app.apiUrl, "https://apizie.tech");
+  await new Promise((r) => app.server.listen(0, "127.0.0.1", r));
+  const r = await fetch(`http://127.0.0.1:${app.server.address().port}/auth/google`, { redirect: "manual", headers: { host: "apizie.tech" } });
+  await new Promise((r) => app.server.close(r));
+  const loc = r.headers.get("location") ?? "";
+  assert.match(decodeURIComponent(loc), /redirect_uri=https:\/\/apizie\.tech\/auth\/google\/callback/);
+});

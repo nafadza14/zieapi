@@ -59,7 +59,9 @@ export function createApp(opts = {}) {
   // Production always answers as the brand domain: a *.vercel.app value (env var or Vercel's own default) is replaced by
   // CANONICAL_URL, so links, OAuth callbacks, sitemap, canonical tags and code samples never show the Vercel host.
   const isVercelProd = env.VERCEL_ENV === "production" || (env.VERCEL === "1" && !env.VERCEL_ENV);
-  const canonicalize = (u) => (isVercelProd && /\.vercel\.app$/i.test(hostOf(u)) ? CANONICAL_URL : u);
+  // A local value copied into production env vars (localhost, 127.0.0.1) is replaced the same way, so OAuth never
+  // sends Google or GitHub back to a developer machine.
+  const canonicalize = (u) => (isVercelProd && /(\.vercel\.app|^localhost|^127\.0\.0\.1|^0\.0\.0\.0)$/i.test(hostOf(u)) ? CANONICAL_URL : u);
   const apiUrl = canonicalize(originOf(opts.apiUrl ?? env.ZIE_API_URL ?? env.ZIE_PUBLIC_URL ?? (isVercelProd ? CANONICAL_URL : vercelHost ? `https://${vercelHost}` : `http://localhost:${env.PORT ?? 8787}`)));
   const publicUrl = canonicalize(originOf(opts.publicUrl ?? env.ZIE_PUBLIC_URL ?? apiUrl));
   const canonicalHost = hostOf(publicUrl);

@@ -137,6 +137,7 @@ export const BUILD_DATE = new Date().toISOString();
 export const AI_AGENTS = [
   "Googlebot", "Bingbot", "OAI-SearchBot", "ChatGPT-User", "GPTBot", "Claude-SearchBot", "Claude-User", "ClaudeBot",
   "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot", "Applebot-Extended", "meta-externalagent", "DuckAssistBot", "CCBot",
+  "AhrefsBot", "SemrushBot", "DotBot", "MJ12bot", "Bytespider", "DataForSeoBot", "PetalBot",
 ];
 const PRIVATE = ["/dashboard", "/admin", "/api/", "/oauth/", "/auth/", "/login", "/register", "/v1/"];
 

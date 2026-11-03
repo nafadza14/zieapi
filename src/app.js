@@ -784,6 +784,12 @@ export function createApp(opts = {}) {
   // ---------- node:http glue ------------------------------------------------------
   const offCanonicalPage = (req, url) => isOffCanonicalPage(req, url, canonicalHost);
   async function handler(req, res) {
+    const ua = String(req.headers["user-agent"] ?? "");
+    if (/AhrefsBot|SemrushBot|DotBot|MJ12bot|DataForSeoBot|Bytespider|PetalBot/i.test(ua)) {
+      res.writeHead(403, { "content-type": "text/plain", "Cache-Control": "public, max-age=86400, s-maxage=86400" });
+      res.end("Forbidden\n");
+      return;
+    }
     const t0 = process.hrtime.bigint();
     const requestId = /^[A-Za-z0-9._-]{6,64}$/.test(req.headers["x-request-id"] ?? "") ? req.headers["x-request-id"] : ulid();
     let out;

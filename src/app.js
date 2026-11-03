@@ -22,7 +22,7 @@ import { buildOpenApi, buildLlmsTxt } from "./core/openapi.js";
 import { E, HttpError, okContent, errBody } from "./core/envelope.js";
 import { PLANS, PAYG, MICROS, getPlan, microsFromLegacyTenths, isFinancePlan, getFinancePlan } from "./core/plans.js";
 import { ulid, monthKey } from "./core/util.js";
-import { apiKeyCaller, clientIp, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
+import { apiKeyCaller, clientIp, extractKey, parseCookies, cookie, SESSION_COOKIE, hashPassword, verifyPassword, enabledProviders, authorizeUrl, exchangeCode, PROVIDERS } from "./auth/index.js";
 import { createOAuth, OAuthError, oauthErrorBody } from "./auth/oauth.js";
 import { supabaseAuthConfig, pkcePair, supabaseAuthorizeUrl, supabaseExchange } from "./auth/supabase.js";
 import liveScrapers from "./scrapers/index.js";
@@ -783,12 +783,40 @@ export function createApp(opts = {}) {
 
   // ---------- node:http glue ------------------------------------------------------
   const offCanonicalPage = (req, url) => isOffCanonicalPage(req, url, canonicalHost);
+  const badBotPattern = /AhrefsBot|SemrushBot|DotBot|MJ12bot|DataForSeoBot|Bytespider|PetalBot|Amazonbot|Claude-Web|Seekport|BLEXBot|YandexBot|Baiduspider|Sogou/i;
+  const ipHits = new Map();
+  let lastPrune = Date.now();
+
   async function handler(req, res) {
     const ua = String(req.headers["user-agent"] ?? "");
-    if (/AhrefsBot|SemrushBot|DotBot|MJ12bot|DataForSeoBot|Bytespider|PetalBot/i.test(ua)) {
+    if (badBotPattern.test(ua)) {
       res.writeHead(403, { "content-type": "text/plain", "Cache-Control": "public, max-age=86400, s-maxage=86400" });
       res.end("Forbidden\n");
       return;
+    }
+
+    // IP-based Rate Limiting for unauthenticated scrapers on serverless production
+    const now = Date.now();
+    if (now - lastPrune > 60000) {
+      lastPrune = now;
+      for (const [ip, item] of ipHits.entries()) {
+        if (now - item.resetAt > 60000) ipHits.delete(ip);
+      }
+    }
+    const ip = clientIp(req);
+    const hasKey = !!extractKey(req.headers);
+    if (production && !hasKey && ip && ip !== "127.0.0.1" && ip !== "::1") {
+      let rec = ipHits.get(ip);
+      if (!rec || now > rec.resetAt) {
+        rec = { count: 0, resetAt: now + 60000 };
+        ipHits.set(ip, rec);
+      }
+      rec.count += 1;
+      if (rec.count > 120) {
+        res.writeHead(429, { "content-type": "text/plain", "Retry-After": "60", "Cache-Control": "no-store, private" });
+        res.end("Too Many Requests\n");
+        return;
+      }
     }
     const t0 = process.hrtime.bigint();
     const requestId = /^[A-Za-z0-9._-]{6,64}$/.test(req.headers["x-request-id"] ?? "") ? req.headers["x-request-id"] : ulid();

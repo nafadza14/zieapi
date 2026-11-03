@@ -301,24 +301,24 @@ export function createApp(opts = {}) {
     }
 
     // ----- public catalog API -----------------------------------------------
-    const LIST_CACHE = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
+    const LIST_CACHE = { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" };
     if (m === "GET" && p === "/api/public/categories") return json(200, okContent(catalog.categoryList()), LIST_CACHE);
     if (m === "GET" && p === "/api/scrapers/list") return json(200, okContent(catalog.list(q, await statsFor(catalog.scrapers), await repo.disabledScrapers())), LIST_CACHE);
     if (m === "GET" && (mm = /^\/api\/scrapers\/([^/]+)$/.exec(p))) {
       const s = catalog.find(decodeURIComponent(mm[1]));
       if (!s) throw E.notFound(`Scraper "${mm[1]}" not found`);
-      return json(200, okContent(catalog.detail(s.key, (await statsFor([s]))[s.id], await repo.disabledScrapers())));
+      return json(200, okContent(catalog.detail(s.key, (await statsFor([s]))[s.id], await repo.disabledScrapers())), LIST_CACHE);
     }
     if (m === "GET" && (mm = /^\/api\/public\/scrapers\/([^/]+)\/endpoints\/([^/]+)\/schema$/.exec(p))) {
       const sc = catalog.schema(decodeURIComponent(mm[1]), decodeURIComponent(mm[2]));
       if (!sc) throw E.notFound("Endpoint not found");
-      return json(200, okContent(sc));
+      return json(200, okContent(sc), LIST_CACHE);
     }
     if (m === "GET" && (mm = /^\/api\/public\/scrapers\/([^/]+)\/stats$/.exec(p))) {
       const s = catalog.find(decodeURIComponent(mm[1]));
       if (!s) throw E.notFound("Scraper not found");
       const st = (await statsFor([s]))[s.id];
-      return json(200, okContent({ requests: st.requests, successRate: st.requests ? Math.round((st.success / st.requests) * 1000) / 10 : 100 }));
+      return json(200, okContent({ requests: st.requests, successRate: st.requests ? Math.round((st.success / st.requests) * 1000) / 10 : 100 }), LIST_CACHE);
     }
 
     // ----- auth ------------------------------------------------------------------
@@ -631,7 +631,7 @@ export function createApp(opts = {}) {
       }
     }
     const totals = catalog.totals();
-    const html = (s, status = 200, headers = {}) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": user ? "private, no-store" : "public, max-age=0, s-maxage=60, stale-while-revalidate=600", ...headers } });
+    const html = (s, status = 200, headers = {}) => ({ status, body: s, headers: { "content-type": "text/html; charset=utf-8", "Cache-Control": user ? "private, no-store" : "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400", ...headers } });
     const items = async () => catalog.list({ limit: 2000 }, await statsFor(catalog.scrapers), await repo.disabledScrapers()).items;
 
     // ---- Markdown twins for AI assistants: <path>.md, /api/c/s/llms.txt, or Accept: text/markdown ----
@@ -702,7 +702,7 @@ export function createApp(opts = {}) {
     if ((mm = /^\/api\/([a-z0-9-]+)\/([a-z0-9-]+)\/openapi\.json$/.exec(p))) {
       const s = catalog.find(`${mm[1]}:${mm[2]}`);
       if (!s) return html(notFoundPage({ user }), 404);
-      return json(200, buildOpenApi(catalog, { apiUrl, version: VERSION, only: [s] }), { "Cache-Control": "public, max-age=3600" });
+      return json(200, buildOpenApi(catalog, { apiUrl, version: VERSION, only: [s] }), { "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400" });
     }
     if ((mm = /^\/api\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(p))) {
       const s = catalog.find(`${mm[1]}:${mm[2]}`);

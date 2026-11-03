@@ -138,7 +138,7 @@ export const AI_AGENTS = [
   "Googlebot", "Bingbot", "OAI-SearchBot", "ChatGPT-User", "GPTBot", "Claude-SearchBot", "Claude-User", "ClaudeBot",
   "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot", "Applebot-Extended", "meta-externalagent", "DuckAssistBot", "CCBot",
 ];
-const PRIVATE = ["/dashboard", "/admin", "/api/me", "/api/admin", "/oauth/", "/auth/", "/login", "/register", "/v1/"];
+const PRIVATE = ["/dashboard", "/admin", "/api/", "/oauth/", "/auth/", "/login", "/register", "/v1/"];
 
 export function robotsTxt(publicUrl) {
   const block = (ua) => [`User-agent: ${ua}`, "Allow: /", ...PRIVATE.map((p) => `Disallow: ${p}`)].join("\n");
